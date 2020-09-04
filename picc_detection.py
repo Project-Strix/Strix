@@ -1,4 +1,4 @@
-import os, sys, click, functools, shutil, json, logging
+import os, sys, functools, shutil, json, logging
 import numpy as np
 import torch
 from torch import from_numpy, reshape, cuda, cat
@@ -12,9 +12,12 @@ from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2,
 import nibabel as nib
 
 from models import get_engine
+import click
+from click.parser import OptionParser
 import click_callbacks as clb
 
-@click.command('train')
+@click.command('train', context_settings={'allow_extra_args':True})
+@click.option('--config', type=str, help="tmp var for train_from_cfg")
 @clb.common_params
 @clb.network_params
 @click.option('--debug', is_flag=True)
@@ -62,3 +65,23 @@ def train(**args):
     engine = get_engine(cargs, train_loader, test_loader, show_network=True)
     engine.run()
         
+@click.command('train_from_cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
+@click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
+def train_cfg(**args):
+    #if len(args.get('additional_args')) != 0: #parse additional args
+        # for i in range(0, len(args['additional_args']), 2):
+        #     print(args['additional_args'][i].strip('-').replace('-','_'))
+
+    configures = get_items_from_file(args['config'], format='json')
+    #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
+    configures['data_list'] = clb.dataset_list.index(configures['data_list'])
+    configures['model_type'] = clb.model_types.index(configures['model_type'])
+    configures['criterion'] = clb.losses.index(configures['criterion'])
+    configures['lr_policy'] = clb.lr_schedule.index(configures['lr_policy'])
+    configures['framework'] = clb.framework_types.index(configures['framework'])
+    configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
+    
+    train(default_map=configures)
+    #ctx.invoke(train, **configures) 
+
