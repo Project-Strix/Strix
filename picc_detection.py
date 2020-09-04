@@ -1,6 +1,7 @@
-import os, sys, functools, shutil, json, logging
+import os, sys, shutil, json, logging, warnings
 import numpy as np
 import torch
+from functools import partial
 from torch import from_numpy, reshape, cuda, cat
 from types import SimpleNamespace as sn
 from torch.utils.data import DataLoader, TensorDataset
@@ -22,16 +23,16 @@ import click_callbacks as clb
 @clb.network_params
 @click.option('--debug', is_flag=True)
 @click.option('--snip', is_flag=True)
-@click.option('--snip_percent', type=float, default=0.4, callback=functools.partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
+@click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
 @click.option('--preload', type=bool, default=True, help='Preload all data once')
 @click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
-@click.option('-p', '--partial', type=float, default=1, callback=functools.partial(prompt_when,trigger='debug'), help='Only load part of data')
+@click.option('-p', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
 @click.option('--save-epoch-freq', type=int, default=20, help='Save model freq')
 @click.option('--seed', type=int, default=100, help='random seed')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 @click.option('--experiment-name', type=str, callback=clb.get_exp_name, default='')
-@click.option('--confirm', callback=functools.partial(confirmation, output_dir_ctx='experiment_name',save_code=True))
+@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_name',save_code=True))
 def train(**args):
     cargs = sn(**args)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
@@ -69,9 +70,8 @@ def train(**args):
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
-    #if len(args.get('additional_args')) != 0: #parse additional args
-        # for i in range(0, len(args['additional_args']), 2):
-        #     print(args['additional_args'][i].strip('-').replace('-','_'))
+    if len(args.get('additional_args')) != 0: #parse additional args
+        Print('*** Lr schedule changes do not work yet! ***\n', color='y')
 
     configures = get_items_from_file(args['config'], format='json')
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
@@ -81,6 +81,8 @@ def train_cfg(**args):
     configures['lr_policy'] = clb.lr_schedule.index(configures['lr_policy'])
     configures['framework'] = clb.framework_types.index(configures['framework'])
     configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
+    configures['smi'] = False
+    click.confirm(f"Current GPU id: {configures['gpus']}", default=True, abort=True, show_default=True)
     
     train(default_map=configures)
     #ctx.invoke(train, **configures) 

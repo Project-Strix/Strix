@@ -26,7 +26,7 @@ def _prompt(prompt_str, data_type, default_value):
                             type=data_type, default=default_value)
 
 def lr_schedule_params(ctx, param, value):
-    if ctx.params['lr_policy_params'] is not None: #loaded config from specified file
+    if ctx.params.get('lr_policy_params', None): #loaded config from specified file
         return value
 
     if value == 'step':
@@ -84,7 +84,7 @@ def network_params(func):
     @click.option('--optim', type=click.Choice(['sgd', 'adam']), default='adam')
     @click.option('--layer-order', prompt=True, type=click.Choice(layer_orders,show_index=True), default=3, help='conv layer order')
     @click.option('-l2', '--l2-reg-weight', type=float, default=0, help='l2 reg weight')
-    @click.option('--lr-policy-params', type=dict, help='Auxilary params for lr schedule')
+    @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
     @click.option('--lr-policy', prompt=True, callback=lr_schedule_params, type=click.Choice(lr_schedule,show_index=True), default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
