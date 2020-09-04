@@ -32,7 +32,7 @@ import click_callbacks as clb
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 @click.option('--experiment-name', type=str, callback=clb.get_exp_name, default='')
-@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_name',save_code=True))
+@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_name',save_code=True,exist_ok=False))
 def train(**args):
     cargs = sn(**args)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)

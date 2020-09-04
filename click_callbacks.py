@@ -15,7 +15,8 @@ def get_exp_name(ctx, param, value):
     exp_name = f"{datalist_name}-{model_name}-{crop_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}-{ctx.params['timestamp']}"
 
-    #input_str = exp_name
+    #suffix = '-redo' if ctx.params.get('config') is not None else ''
+        
     input_str = click.prompt('Experiment name', default=exp_name, type=str)
     exp_name = exp_name + '-' + input_str.strip('+') if '+' in input_str else input_str
 
@@ -44,12 +45,11 @@ def lr_schedule_params(ctx, param, value):
 
     return value
 
-
 dataset_list = ['picc_h5', 'all_dr']
-model_types = ['unet', 'vgg']
+model_types = ['unet', 'vgg13', 'vgg16']
 losses = ['CE', 'WCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
-framework_types = ['segmentation','classification','siamese']
+framework_types = ['segmentation','classification','siamese','selflearning']
 layer_orders = ['crb','cbr', 'cgr','cbe','cB']
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(dataset_list,show_index=True), default=0, help='Data file list (json)')
