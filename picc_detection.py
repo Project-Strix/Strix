@@ -71,7 +71,7 @@ def train(**args):
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     if len(args.get('additional_args')) != 0: #parse additional args
-        Print('*** Lr schedule changes do not work yet! ***\n', color='y')
+        Print('*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n', color='y')
 
     configures = get_items_from_file(args['config'], format='json')
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)

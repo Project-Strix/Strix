@@ -79,7 +79,7 @@ def network_params(func):
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), default=0, help='loss criterion type')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(72,72), help='Crop volume size')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
-    @click.option('--n_level', type=int, default=4, help='Network depth')
+    @click.option('--n-level', type=int, default=4, help='Network depth')
     @click.option('--is-deconv', type=bool, default=True, help='use deconv or interplate')
     @click.option('--optim', type=click.Choice(['sgd', 'adam']), default='adam')
     @click.option('--layer-order', prompt=True, type=click.Choice(layer_orders,show_index=True), default=3, help='conv layer order')
