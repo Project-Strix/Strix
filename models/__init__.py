@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from .unet3d import UNet3D
 from .unet2d import UNet2D
 from .vgg import vgg13_bn, vgg16_bn
+from .resnet import resnet34
 from .utils import print_network, output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -30,7 +31,7 @@ from monai.handlers import (
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16'], 'FCN':['unet']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34'], 'FCN':['unet']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -41,7 +42,8 @@ def _get_model_instance(name, tensor_dim):
     return {
         'unet':{'3D': None, '2D': UNet2D},
         'vgg13':{'3D': None, '2D': vgg13_bn},
-        'vgg16':{'3D':None, '2D': vgg16_bn}
+        'vgg16':{'3D': None, '2D': vgg16_bn},
+        'resnet34':{'3D': None, '2D': resnet34}
     }[name][tensor_dim]
 
 def get_network(opts):
@@ -76,7 +78,6 @@ def get_network(opts):
             act='relu',
             norm='batch'
         )
-
         # model = model(in_channels=in_channels,
         #               out_channels=out_channels,
         #               f_maps=f_maps,
@@ -86,6 +87,9 @@ def get_network(opts):
         #               skip_conn=skip_conn,
         #               num_groups=n_groups)
     elif 'vgg' in name:
+        model = model(in_channels=in_channels,
+                      num_classes=out_channels)
+    elif 'resnet' in name:
         model = model(in_channels=in_channels,
                       num_classes=out_channels)
     else:
@@ -147,7 +151,8 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             StatsHandler(output_transform=lambda x: None),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
             MyTensorBoardImageHandler(
-                summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
+                summary_writer=writer, 
+                batch_transform=lambda x: (x["image"], x["label"]), 
                 output_transform=lambda x: x["pred"],
                 max_channels=opts.output_nc,
                 prefix_name='Val'
@@ -227,7 +232,6 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             StatsHandler(output_transform=lambda x: None),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
             CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True)
-            # TensorBoardImageHandler(summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), output_transform=lambda x: x["pred"]),
         ]
 
         train_post_transforms = Compose([

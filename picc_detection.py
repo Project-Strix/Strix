@@ -46,18 +46,18 @@ def train(**args):
         Print('Use {} data'.format(int(len(files_list)*cargs.partial)), color='y')
         files_list = files_list[:int(len(files_list)*cargs.partial)]
     cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
-    files_train, files_test = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+    files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
 
     # Save param and datalist
     with open(os.path.join(cargs.out_dir, 'train_files'), 'w') as f:
         json.dump(files_train, f, indent=2)
     with open(os.path.join(cargs.out_dir, 'test_files'), 'w') as f:
-        json.dump(files_test, f, indent=2)
+        json.dump(files_valid, f, indent=2)
 
     train_loader = get_dataloader(cargs, files_train, dataset_type='train')
-    test_loader  = get_dataloader(cargs, files_test, dataset_type='valid')
+    valid_loader  = get_dataloader(cargs, files_valid, dataset_type='valid')
 
-    engine = get_engine(cargs, train_loader, test_loader, show_network=True)
+    engine = get_engine(cargs, train_loader, valid_loader, show_network=True)
     engine.run()
         
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})

@@ -180,7 +180,7 @@ class RandomCropDataset(Dataset):
         self.channels = 1
         self.augment_ratio = augment_ratio
         self.n_classes = n_classes
-        self.classes = ['tip', 'pos', 'neg']
+        self.classes = ['pos', 'neg', 'tip']
         
         assert random_type in ['gt', 'balance']
         self.random_type = random_type

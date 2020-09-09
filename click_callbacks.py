@@ -55,7 +55,7 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 dataset_list = ['picc_h5', 'all_dr', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16']
+model_types = ['unet', 'vgg13', 'vgg16', 'resnet34']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 framework_types = ['segmentation','classification','siamese','selflearning']
