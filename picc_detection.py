@@ -12,23 +12,17 @@ from sklearn.model_selection import train_test_split
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
 import nibabel as nib
 
-from models import get_engine
+from models import get_engine, get_test_engine
 import click
 from click.parser import OptionParser
 import click_callbacks as clb
 
 @click.command('train', context_settings={'allow_extra_args':True})
 @click.option('--config', type=str, help="tmp var for train_from_cfg")
+@click.option('--debug', is_flag=True)
 @clb.common_params
 @clb.network_params
-@click.option('--debug', is_flag=True)
-@click.option('--snip', is_flag=True)
-@click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
-@click.option('--preload', type=bool, default=True, help='Preload all data once')
 @click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
-@click.option('-p', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
-@click.option('--save-epoch-freq', type=int, default=20, help='Save model freq')
-@click.option('--seed', type=int, default=100, help='random seed')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 @click.option('--experiment-name', type=str, callback=clb.get_exp_name, default='')
@@ -66,7 +60,7 @@ def train(**args):
     engine = get_engine(cargs, train_loader, test_loader, show_network=True)
     engine.run()
         
-@click.command('train_from_cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
+@click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
@@ -82,8 +76,34 @@ def train_cfg(**args):
     configures['framework'] = clb.framework_types.index(configures['framework'])
     configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
     configures['smi'] = False
-    click.confirm(f"Current GPU id: {configures['gpus']}", default=True, abort=True, show_default=True)
+    gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
+    configures['gpus'] = gpu_id
     
     train(default_map=configures)
     #ctx.invoke(train, **configures) 
 
+
+@click.command('test-from-cfg')
+@click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
+@click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
+def test_cfg(**args):
+    configures = get_items_from_file(args['config'], format='json')
+    
+    if 'CUDA_VISIBLE_DEVICES' in os.environ:
+        Print('CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag')
+    else:
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(args['gpus'])
+
+    exp_dir = args.get('experiment_name', os.path.dirname(args['config']))
+    assert os.path.isfile(os.path.join(exp_dir, 'test_files')), f'Test file does not exists in {exp_dir}!'
+    test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
+    configures['model_path'] = clb.get_trained_models(exp_dir)
+    configures['out_dir'] = check_dir(exp_dir, 'Test')
+    configures['preload'] = False
+    
+    test_loader = get_dataloader(sn(**configures), test_files, dataset_type='test')
+
+    engine = get_test_engine(sn(**configures), test_loader)
+    Print("Begin testing...", color='g')
+    engine.run()

@@ -17,8 +17,10 @@ from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import (
     AddChanneld,
     Compose,
+    Zoomd,
     SpatialCrop, 
     RandCropByPosNegLabeld,
+    RandSpatialCropd,
     RandRotated,
     RandFlipd,
     RandRotate90d,
@@ -27,6 +29,7 @@ from monai.transforms import (
     MapTransform, 
     Randomizable
 )
+from monai.data import CacheDataset
 
 class PICC_RandCropByPosNegLabeld(Randomizable, MapTransform):
     """
@@ -196,7 +199,7 @@ class RandomCropDataset(Dataset):
             pos_ratio = 0.5
             neg_raito = 0.5
         
-        self.augmentations = Compose( [
+        self.transforms = Compose( [
             AddChanneld(keys=["img", "roi"]),
             RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=augment_ratio),
             PICC_RandCropByPosNegLabeld(
@@ -231,7 +234,98 @@ class RandomCropDataset(Dataset):
             roi = roi[::self.downsample,::self.downsample]
             coord = coord/self.downsample
 
-        data = self.augmentations({"img":image, "roi":roi, "coord":coord})
+        data = self.transforms({"img":image, "roi":roi, "coord":coord})
         
         return {"image":data[0]['img'], "label":self.classes.index(data[0]['crop_label'])}
  
+
+from skimage import transform, util, exposure
+class Rib_dataset(Dataset):
+    def __init__(self, raw_list, mask_list, crop_size=(512,512), mode='train', augmentation_prob=0.6):
+
+        """Initializes image paths and preprocessing module."""
+        self.images = raw_list
+        self.masks = mask_list
+        self.crop_size = crop_size
+        self.mode = mode
+        self.augmentation_prob = augmentation_prob
+        print("image count in {} path :{}".format(
+            self.mode, len(self.images)))
+
+        self.transforms = Compose([
+            AddChanneld(keys=["img", "roi"]),
+            Zoomd(keys=["img", "roi"], zoom=0.5, keep_size=False),
+            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=self.augmentation_prob),
+            RandSpatialCropd(keys=["img", "roi"], roi_size=self.crop_size, random_size=False),
+            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=self.augmentation_prob),
+            #RandFlipd(keys=["img","roi"], prob=self.augmentation_prob, spatial_axis=[1]),
+            #RandRotate90d(keys=["img", "roi"], prob=augment_ratio, spatial_axes=[0,1]),
+            ToTensord(keys=["img", "roi"])
+        ])
+
+    def random_crop2D(self, img, mask, size, verbose=False):
+        xrange = abs(img.shape[0] - size[0])
+        yrange = abs(img.shape[1] - size[1])
+        xstart = random.randint(0, xrange) if xrange > 0 else 0
+        ystart = random.randint(0, yrange) if yrange > 0 else 0
+        crop_start = [xstart, ystart]
+        if verbose:
+            print('random crop at {} with size {}'.format(crop_start, size))
+
+        img_cropped = img[xstart:xstart + size[0], ystart:ystart + size[1]]
+        mask_cropped = mask[xstart:xstart + size[0], ystart:ystart + size[1]]
+
+        return img_cropped, mask_cropped
+
+    def __getitem__(self, index):
+        """Reads an image from a file and preprocesses it and returns."""
+        image = self.images[index]
+        mask = self.masks[index]
+        if isinstance(image, str):
+            image = nib.load(image).get_fdata()  # 图像90°向右翻转, dtype=float64
+            mask = nib.load(mask).get_fdata() 
+        else:
+            image = np.squeeze(image).astype(np.float32)
+            mask = np.squeeze(mask).astype(np.int64)
+         
+        data = self.transforms({"img":image, "roi":mask})
+        
+        return {"image":data['img'], "label":data['roi']}
+
+        # image = transform.resize(image, (2048,2048))
+        # mask = transform.resize(mask, (2048,2048)) 
+
+        # image = F.adjust_contrast(image, 2)
+
+        # data augmentation
+        if (self.mode == 'train') and random.random() <= self.augmentation_prob:
+            rotate_angle = random.randint(-10, 10)
+            image = transform.rotate(image, rotate_angle)
+            mask = transform.rotate(mask, rotate_angle)
+        if (self.mode == 'train') and random.random() <= self.augmentation_prob: 
+            # horizontal flip
+            image = np.flip(image, axis=1)
+            mask = np.flip(mask, axis=1) 
+
+        # # 对比度调整
+        # image = exposure.adjust_log(image, 1)
+
+        if (self.mode == 'train') and random.random() <= self.augmentation_prob:
+            image = util.random_noise(image,mode='gaussian') 
+
+        # 对比度均衡
+        # image = np.repeat(np.expand_dims(image,axis=0),3,axis=0)
+        # image = torch.tensor(image)
+        # image = np.array(F.adjust_contrast(image, 2))[0, ...]
+
+        img_cropped, mask_cropped = self.random_crop2D(image, mask, (768, 768))
+        img_cropped, mask_cropped = img_cropped[::2, ::2], mask_cropped[::2, ::2]  # downsample for tmp exp
+
+        img_cropped = np.expand_dims(img_cropped, axis=0)
+        mask_cropped = np.expand_dims(mask_cropped, axis=0)
+
+        return {"image":img_cropped.astype(np.float32), "label":mask_cropped.astype(np.int8)}
+
+    def __len__(self):
+        """Returns the total number of font files."""
+        return len(self.images)

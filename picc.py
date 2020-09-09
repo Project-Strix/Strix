@@ -22,6 +22,8 @@ if __name__ == '__main__':
 
     from picc_detection import train
     from picc_detection import train_cfg
+    from picc_detection import test_cfg
     main.add_command(train)
     main.add_command(train_cfg)
+    main.add_command(test_cfg)
     main()
