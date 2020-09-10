@@ -12,6 +12,7 @@ from monai.transforms import (
         LoadHdf5d,
         LoadNumpyd,
         AddChanneld,
+        RandCropByPosNegLabeld,
         ToTensord
     )
 
@@ -60,7 +61,7 @@ def get_dataloader(args, files_list, dataset_type='train', random_crop_type='bal
         shuffle = True
         augment_ratio = args.augment_ratio
         n_batch = args.n_batch
-        num_workers = 10
+        num_workers = 15
         drop_last = True
     elif dataset_type == 'valid':
         shuffle = True
@@ -91,7 +92,7 @@ def get_dataloader(args, files_list, dataset_type='train', random_crop_type='bal
             all_data = all_roi = all_coord = files_list
 
         if dataset_type == 'train' or dataset_type == 'valid':
-            dataset_ = RandomCropDataset(all_data, all_roi, all_coord, n_classes=3, 
+            dataset_ = RandomCropDataset(all_data, all_roi, all_coord, in_channels=args.input_nc, 
                                          augment_ratio=augment_ratio, crop_size=args.crop_size,
                                          downsample=args.downsample, random_type=random_crop_type,
                                          verbose=args.debug)
@@ -103,8 +104,9 @@ def get_dataloader(args, files_list, dataset_type='train', random_crop_type='bal
 
             test_transforms = Compose(
                 [   
-                    data_reader,    
+                    data_reader,
                     AddChanneld(keys=["image", "label"]),
+                    #RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', spatial_size=args.crop_size),
                     ToTensord(keys=["image", "label"]),
                 ]
             )

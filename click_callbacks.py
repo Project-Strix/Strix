@@ -1,5 +1,6 @@
-import os, time, click, functools
+import os, time, click
 from utils_cw import Print, check_dir, prompt_when
+from functools import partial, wraps
 
 def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder,'Models')
@@ -29,7 +30,7 @@ def get_exp_name(ctx, param, value):
     input_str = click.prompt('Experiment name', default=exp_name, type=str)
     exp_name = exp_name + '-' + input_str.strip('+') if '+' in input_str else input_str
 
-    return os.path.join(ctx.params['out_dir'], exp_name)
+    return os.path.join(ctx.params['out_dir'], ctx.params['framework'], exp_name)
 
 def _prompt(prompt_str, data_type, default_value):
     return click.prompt('\tInput {} for lr strategy'.format(prompt_str),\
@@ -54,8 +55,17 @@ def lr_schedule_params(ctx, param, value):
 
     return value
 
+def model_select(ctx, param, value):
+    if value in ['vgg13', 'vgg16', 'resnet34','resnet50']:
+        ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
+        ctx.params['input_nc'] = 3
+    else:
+        pass
+
+    return value
+
 dataset_list = ['picc_h5', 'all_dr', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16', 'resnet34']
+model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 framework_types = ['segmentation','classification','siamese','selflearning']
@@ -72,23 +82,23 @@ def common_params(func):
     @click.option('--input-nc', type=int, default=1, help='input data channels')
     @click.option('--output-nc', type=int, default=3, help='output channels (classes)')
     @click.option('--continue-train', type=bool, default=False, help='continue train mode flag')
-    @click.option('--which-epoch', type=int, default=0, callback=functools.partial(prompt_when,trigger='continue_train'), help='used if continue train mode')
+    @click.option('--which-epoch', type=int, default=0, callback=partial(prompt_when,trigger='continue_train'), help='used if continue train mode')
     @click.option('--tensor-dim', type=str, default='2D', help='2D or 3D')
     @click.option('--split', type=float, default=0.1, help='Training/testing split ratio')
     @click.option('-W', '--path-pre-trained-model', type=str, default='', help='pretrained model path')
     @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/picc/exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
-    @click.option('-p', '--partial', type=float, default=1, callback=functools.partial(prompt_when,trigger='debug'), help='Only load part of data')
+    @click.option('-p', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
     @click.option('--save-epoch-freq', type=int, default=20, help='Save model freq')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
-    @functools.wraps(func)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     return wrapper
 
 def network_params(func):
-    @click.option('--model-type', prompt=True, type=click.Choice(model_types,show_index=True), default=1, help='Choose model type')
+    @click.option('--model-type', prompt=True, type=click.Choice(model_types,show_index=True), callback=model_select, default=1, help='Choose model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), default=0, help='loss criterion type')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(72,72), help='Crop volume size')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
@@ -102,12 +112,12 @@ def network_params(func):
     @click.option('--lr-policy', prompt=True, callback=lr_schedule_params, type=click.Choice(lr_schedule,show_index=True), default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
     @click.option('--snip', is_flag=True)
-    @click.option('--snip_percent', type=float, default=0.4, callback=functools.partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
+    @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
     # @click.option('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
     # @click.option('--sep-conv', type=bool, default=False, help='Use Depthwise Separable Convolution')
     # @click.option('--use-apex', is_flag=True, help='Use NVIDIA apex module')
     # @click.option('--use-half', is_flag=True, help='Use half precision')
-    @functools.wraps(func)
+    @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     return wrapper

@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from .unet3d import UNet3D
 from .unet2d import UNet2D
 from .vgg import vgg13_bn, vgg16_bn
-from .resnet import resnet34
+from .resnet import resnet34, resnet50
 from .utils import print_network, output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -28,10 +28,11 @@ from monai.handlers import (
     CheckpointSaver,
     CheckpointLoader,
     SegmentationSaver,
+    ClassificationSaver,
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34'], 'FCN':['unet']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -43,7 +44,8 @@ def _get_model_instance(name, tensor_dim):
         'unet':{'3D': None, '2D': UNet2D},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
-        'resnet34':{'3D': None, '2D': resnet34}
+        'resnet34':{'3D': None, '2D': resnet34},
+        'resnet50':{'3D': None, '2D': resnet50}
     }[name][tensor_dim]
 
 def get_network(opts):
@@ -61,6 +63,7 @@ def get_network(opts):
     layer_order = get_attr_(opts, 'layer_order', 'crb')
     skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     n_groups = get_attr_(opts, 'n_groups', 8)
+    load_imagenet = get_attr_(opts, 'load_imagenet', False)
     # bottleneck = get_attr_(opts, 'bottleneck', False)
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
@@ -87,10 +90,12 @@ def get_network(opts):
         #               skip_conn=skip_conn,
         #               num_groups=n_groups)
     elif 'vgg' in name:
-        model = model(in_channels=in_channels,
+        model = model(pretrained=load_imagenet,
+                      in_channels=in_channels,
                       num_classes=out_channels)
     elif 'resnet' in name:
-        model = model(in_channels=in_channels,
+        model = model(pretrained=load_imagenet,
+                      in_channels=in_channels,
                       num_classes=out_channels)
     else:
         raise ValueError(f'Model {name} not available')  
@@ -108,8 +113,9 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     # Tensorboard Logger
     writer = SummaryWriter(log_dir=os.path.join(opts.out_dir, 'tensorboard'))
     if not opts.debug:
+        tb_dir = check_dir(os.path.dirname(opts.out_dir),'tb')
         os.symlink(os.path.join(opts.out_dir, 'tensorboard'), 
-                os.path.join(os.path.dirname(opts.out_dir),'tb', os.path.basename(opts.experiment_name)),target_is_directory=True)
+                   os.path.join(tb_dir, os.path.basename(opts.experiment_name)), target_is_directory=True)
 
     loss = lr_scheduler = None
     if opts.criterion == 'CE':
@@ -117,7 +123,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':
-        loss = DiceLoss(include_background=True, to_onehot_y=True, softmax=True)
+        loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
     else:
         raise NotImplementedError
 
@@ -211,6 +217,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     
     #! Siamese moduel
     elif framework_type == 'siamese':
+        assert _get_network_type(opts.model_type) == 'CNN', f"Only accept CNN arch: {NETWORK_TYPES['CNN']}"
         raise NotImplementedError
     
     #! Selflearning module
@@ -231,7 +238,13 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
         val_handlers = [
             StatsHandler(output_transform=lambda x: None),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True)
+            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True),
+            MyTensorBoardImageHandler(
+                summary_writer=writer, 
+                batch_transform=lambda x : (None, None),
+                output_transform=lambda x: x["image"],
+                prefix_name='Val'
+            )
         ]
 
         train_post_transforms = Compose([
@@ -255,6 +268,12 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"]),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
             CheckpointSaver(save_dir=model_dir, save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
+            MyTensorBoardImageHandler(
+                summary_writer=writer, 
+                batch_transform=lambda x : (None, None),
+                output_transform=lambda x: x["image"],
+                prefix_name='Train'
+            )
         ]
 
         trainer = SupervisedTrainer(
@@ -282,25 +301,31 @@ def get_test_engine(opts, test_loader):
 
     if framework_type == 'classification':
         post_transforms = Compose([
-            Activationsd(keys="pred", softmax=True),
+            Activationsd(keys="pred", sigmoid=True),
             #AsDiscreted(keys="pred", argmax=True)
         ])
 
         val_handlers = [
             StatsHandler(output_transform=lambda x: None),
             CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+            # ClassificationSaver(
+            #     output_dir=opts.out_dir,
+            #     output_transform=lambda x : (x['image'], x['pred'].cpu().numpy()),
+            #     save_img = True
+            # )
             SegmentationSaver(
                 output_dir=opts.out_dir,
                 batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["affine"]},
-                output_transform=lambda output: output["pred"][:,0:1,:,:],
+                output_transform=lambda output: output["pred"],#[:,0:1,:,:],
             )
         ]
 
         evaluator = SupervisedEvaluator(
             device=device,
             val_data_loader=test_loader,
+            #prepare_batch=lambda x : (x[0]["image"],torch.Tensor(0)),
             network=net,
-            inferer=SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.5),
+            inferer=SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
             post_transform=post_transforms,
             val_handlers=val_handlers
         )

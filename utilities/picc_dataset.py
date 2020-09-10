@@ -16,6 +16,7 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import (
     AddChanneld,
+    RepeatChanneld,
     Compose,
     Zoomd,
     SpatialCrop, 
@@ -25,6 +26,7 @@ from monai.transforms import (
     RandFlipd,
     RandRotate90d,
     RandScaleIntensityd,
+    Lambdad,
     ToTensord,
     MapTransform, 
     Randomizable
@@ -169,7 +171,7 @@ class PICC_RandCropByPosNegLabeld(Randomizable, MapTransform):
 
 
 class RandomCropDataset(Dataset):
-    def __init__(self, data, labels, coords, num_samples=1, n_classes=3, augment_ratio=0.3, 
+    def __init__(self, data, labels, coords, num_samples=1, in_channels=3, augment_ratio=0.3, 
                  crop_size=(64,64), downsample=1, random_type='balance', **kwargs):
         self.images = data
         self.labels = labels
@@ -177,9 +179,8 @@ class RandomCropDataset(Dataset):
         self.num_samples = num_samples
         self.crop_size = (crop_size,)*2 if isinstance(crop_size,int) else crop_size
         self.downsample = downsample
-        self.channels = 1
         self.augment_ratio = augment_ratio
-        self.n_classes = n_classes
+        self.in_channels = in_channels
         self.classes = ['pos', 'neg', 'tip']
         
         assert random_type in ['gt', 'balance']
@@ -191,27 +192,13 @@ class RandomCropDataset(Dataset):
         self.verbose = kwargs.get('verbose', False)
 
         if self.random_type == 'gt':
-            tip_ratio = 0.5
-            pos_ratio = 1.0
-            neg_raito = 0.0
+            self.tip_ratio = 0.5
+            self.pos_ratio = 1.0
+            self.neg_raito = 0.0
         elif self.random_type == 'balance':
-            tip_ratio = 0.3
-            pos_ratio = 0.5
-            neg_raito = 0.5
-        
-        self.transforms = Compose( [
-            AddChanneld(keys=["img", "roi"]),
-            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=augment_ratio),
-            PICC_RandCropByPosNegLabeld(
-                keys=["img", "roi"], label_key="roi", tip_key="coord", 
-                tip=tip_ratio, pos=pos_ratio, neg=neg_raito,
-                spatial_size=self.crop_size, num_samples=self.num_samples
-            ),
-            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=augment_ratio),
-            RandFlipd(keys=["img","roi"], prob=augment_ratio, spatial_axis=[0,1]),
-            RandRotate90d(keys=["img", "roi"], prob=augment_ratio, spatial_axes=[0,1]),
-            ToTensord(keys=["img", "roi"])
-        ])
+            self.tip_ratio = 0.3
+            self.pos_ratio = 0.5
+            self.neg_raito = 0.5
 
     def __len__(self):
         return len(self.images)
@@ -219,8 +206,26 @@ class RandomCropDataset(Dataset):
     def __getitem__(self, index):
         image, roi, coord = self.images[index], self.labels[index], self.coords[index]
 
+        Repeat_channel = RepeatChanneld(keys=["img","roi"], repeats=self.in_channels) if self.in_channels > 1  else \
+                         Lambdad(keys=["img", "roi"], func=lambda x : x)
+
+        transforms = Compose([
+            AddChanneld(keys=["img", "roi"]),
+            Repeat_channel,
+            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=self.augment_ratio),
+            PICC_RandCropByPosNegLabeld(
+                keys=["img", "roi"], label_key="roi", tip_key="coord", 
+                tip=self.tip_ratio, pos=self.pos_ratio, neg=self.neg_raito,
+                spatial_size=self.crop_size, num_samples=self.num_samples
+            ),
+            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=self.augment_ratio),
+            RandFlipd(keys=["img","roi"], prob=self.augment_ratio, spatial_axis=[0,1]),
+            RandRotate90d(keys=["img", "roi"], prob=self.augment_ratio, spatial_axes=[0,1]),
+            ToTensord(keys=["img", "roi"])
+        ])
+
         if isinstance(image, str):
-            Print('Loading', os.path.basename(image), color='y', end='\n', verbose=self.verbose)
+            Print('Loading', os.path.basename(image), color='y', verbose=True)
             data, roi, coord = load_h5(image, keywords=['image', 'roi', 'coord'], transpose=self.transpose)
             image  = np.squeeze(data).astype(np.float32)
             roi  = np.squeeze(roi).astype(np.uint8)
@@ -234,7 +239,7 @@ class RandomCropDataset(Dataset):
             roi = roi[::self.downsample,::self.downsample]
             coord = coord/self.downsample
 
-        data = self.transforms({"img":image, "roi":roi, "coord":coord})
+        data = transforms({"img":image, "roi":roi, "coord":coord})
         
         return {"image":data[0]['img'], "label":self.classes.index(data[0]['crop_label'])}
  

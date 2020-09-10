@@ -89,11 +89,27 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
         kwargs['init_weights'] = False
 
     in_channels = kwargs.get('in_channels', 3)
+    if pretrained:
+        num_classes_ = kwargs['num_classes']
+        kwargs['num_classes'] = 1000
     model = VGG(make_layers(cfgs[cfg], in_channels=in_channels, batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict)
+
+        classifier_ = nn.Sequential(
+            nn.Linear(512 * 7 * 7, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, 2048),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(2048, num_classes_),
+        )
+
+        model.classifier = classifier_
+
     return model
 
 
