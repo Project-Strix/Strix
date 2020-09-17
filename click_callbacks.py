@@ -1,14 +1,14 @@
 import os, time, click
-from utils_cw import Print, check_dir, prompt_when
+from utils_cw import Print, check_dir, prompt_when, recursive_glob
 from functools import partial, wraps
 
 def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder,'Models')
     assert os.path.isdir(model_dir), f"Model dir is not found! {model_dir}"
-    files = os.listdir(model_dir)
-    prompt = { i:f.split('=')[-1] for i, f in enumerate(files)}
+    files = recursive_glob(model_dir, '*.pth')
+    prompt = { i:f.stem.split('=')[-1] for i, f in enumerate(files)}
     selected = click.prompt(f"Choose model: {prompt}", type=int)
-    return os.path.join(model_dir, files[selected])
+    return str(files[selected])
 
 
 def get_exp_name(ctx, param, value):
@@ -65,7 +65,7 @@ def model_select(ctx, param, value):
     return value
 
 dataset_list = ['picc_h5', 'all_dr', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50']
+model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 framework_types = ['segmentation','classification','siamese','selflearning']

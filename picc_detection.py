@@ -54,8 +54,8 @@ def train(**args):
     with open(os.path.join(cargs.out_dir, 'test_files'), 'w') as f:
         json.dump(files_valid, f, indent=2)
 
-    train_loader = get_dataloader(cargs, files_train, dataset_type='train')
-    valid_loader  = get_dataloader(cargs, files_valid, dataset_type='valid')
+    train_loader = get_dataloader(cargs, files_train, phase='train')
+    valid_loader  = get_dataloader(cargs, files_valid, phase='valid')
 
     engine = get_engine(cargs, train_loader, valid_loader, show_network=True)
     engine.run()

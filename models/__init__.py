@@ -8,6 +8,7 @@ from .unet3d import UNet3D
 from .unet2d import UNet2D
 from .vgg import vgg13_bn, vgg16_bn
 from .resnet import resnet34, resnet50
+from .scnn import SCNN
 from .utils import print_network, output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -32,7 +33,7 @@ from monai.handlers import (
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -42,10 +43,11 @@ def _get_network_type(name):
 def _get_model_instance(name, tensor_dim):
     return {
         'unet':{'3D': None, '2D': UNet2D},
+        'scnn':{'3D': None, '2D': SCNN},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
         'resnet34':{'3D': None, '2D': resnet34},
-        'resnet50':{'3D': None, '2D': resnet50}
+        'resnet50':{'3D': None, '2D': resnet50},
     }[name][tensor_dim]
 
 def get_network(opts):
@@ -64,6 +66,7 @@ def get_network(opts):
     skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     n_groups = get_attr_(opts, 'n_groups', 8)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
+    crop_size = get_attr_(opts, 'crop_size', (512,512))
     # bottleneck = get_attr_(opts, 'bottleneck', False)
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
@@ -81,14 +84,15 @@ def get_network(opts):
             act='relu',
             norm='batch'
         )
-        # model = model(in_channels=in_channels,
-        #               out_channels=out_channels,
-        #               f_maps=f_maps,
-        #               n_level=n_depth,
-        #               layer_order=layer_order,
-        #               is_deconv=is_deconv,
-        #               skip_conn=skip_conn,
-        #               num_groups=n_groups)
+    elif name == 'scnn':
+        model = model(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            input_size=crop_size,
+            ms_ks=9,
+            is_deconv=is_deconv,
+            use_dilated_conv=True,
+            pretrained=load_imagenet)
     elif 'vgg' in name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
@@ -218,16 +222,12 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     #! Siamese moduel
     elif framework_type == 'siamese':
         assert _get_network_type(opts.model_type) == 'CNN', f"Only accept CNN arch: {NETWORK_TYPES['CNN']}"
+
         raise NotImplementedError
     
     #! Selflearning module
     elif framework_type == 'selflearning':
         assert _get_network_type(opts.model_type) == 'FCN', f"Only accept FCN arch: {NETWORK_TYPES['FCN']}"
-
-        val_handlers = [
-            StatsHandler(output_transform=lambda x: None),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True)
-        ]
 
         raise NotImplementedError
        
@@ -238,7 +238,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
         val_handlers = [
             StatsHandler(output_transform=lambda x: None),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True),
+            CheckpointSaver(save_dir=os.path.join(model_dir), save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=4),
             MyTensorBoardImageHandler(
                 summary_writer=writer, 
                 batch_transform=lambda x : (None, None),
@@ -264,10 +264,10 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
 
         train_handlers = [
             LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
-            ValidationHandler(validator=evaluator, interval=5, epoch_level=True),
+            ValidationHandler(validator=evaluator, interval=3, epoch_level=True),
             StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"]),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
+            CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
             MyTensorBoardImageHandler(
                 summary_writer=writer, 
                 batch_transform=lambda x : (None, None),

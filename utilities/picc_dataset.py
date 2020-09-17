@@ -1,7 +1,7 @@
-import os, sys, time, torch, random
+import os, sys, time, torch, random, tqdm
 import numpy as np
-from torch.utils.data import Dataset
-from utils_cw import Print, crop3D, load_h5
+#from torch.utils.data import Dataset
+from utils_cw import Print, load_h5
 import nibabel as nib
 
 # dataio_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,11 +15,15 @@ import monai
 from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import (
+    LoadHdf5d,
+    LoadNumpyd,
     AddChanneld,
     RepeatChanneld,
     Compose,
     Zoomd,
-    SpatialCrop, 
+    Spacingd,
+    SpatialCrop,
+    CenterSpatialCropd,
     RandCropByPosNegLabeld,
     RandSpatialCropd,
     RandRotated,
@@ -31,7 +35,29 @@ from monai.transforms import (
     MapTransform, 
     Randomizable
 )
-from monai.data import CacheDataset
+
+from monai.data import CacheDataset, Dataset
+
+def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
+    #Pre-load all training data once.
+    data = { i:[] for i in h5_keys }
+    Print('\nPreload all {} training data'.format(len(file_list)), color='g')
+    for fname in tqdm.tqdm(file_list):
+        try:
+            data_ = load_h5(fname, keywords=h5_keys, transpose=transpose)
+            # if ds>1:
+            #     data = data[::ds,::ds]
+            #     roi  = roi[::ds,::ds]
+            #     coord = coord[0]/ds, coord[1]/ds
+        except Exception as e:
+            Print('Data not exist!', fname, color='r')
+            print(e)
+            continue
+
+        for i, key in enumerate(h5_keys):
+           data[key].append(data_[i])
+    return data.values()
+
 
 class PICC_RandCropByPosNegLabeld(Randomizable, MapTransform):
     """
@@ -170,12 +196,13 @@ class PICC_RandCropByPosNegLabeld(Randomizable, MapTransform):
         return results
 
 
-class RandomCropDataset(Dataset):
-    def __init__(self, data, labels, coords, num_samples=1, in_channels=3, augment_ratio=0.3, 
+class PICC_RandomCropDataset(Dataset):
+    def __init__(self, data, labels, coords, phase, num_samples=1, in_channels=1, augment_ratio=0.3, 
                  crop_size=(64,64), downsample=1, random_type='balance', **kwargs):
         self.images = data
         self.labels = labels
         self.coords = coords
+        self.phase = phase
         self.num_samples = num_samples
         self.crop_size = (crop_size,)*2 if isinstance(crop_size,int) else crop_size
         self.downsample = downsample
@@ -242,10 +269,93 @@ class RandomCropDataset(Dataset):
         data = transforms({"img":image, "roi":roi, "coord":coord})
         
         return {"image":data[0]['img'], "label":self.classes.index(data[0]['crop_label'])}
- 
+
+
+def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,0),
+                     preload=True, augment_ratio=0.4, downsample=1, verbose=False):
+
+    cache_ratio = 1.0 if preload else 0.0
+    all_data = all_roi = all_coord = files_list
+    data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], affine_keys=["affine","affine",None])
+    input_data = all_data
+
+    if spacing:
+        spacer = Spacingd(keys=["image","label"], pixdim=spacing)
+    else:
+        spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
+
+    if np.any(np.less_equal(crop_size,0)):
+        Print('No cropping!', color='g')
+        cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
+    else:
+        cropper = CenterSpatialCropd(keys=["image","label"], roi_size=crop_size, allow_pad=True)
+
+    def debug(x):
+        print("image shape:", x.shape)
+        nib.save(nib.Nifti1Image(x, np.eye(4)), f'./{str(time.time())}.nii.gz')
+        return x
+    debugger = Lambdad(keys=["image"], func=debug)
+
+    if phase == 'train':
+        transforms = Compose([
+            data_reader,
+            AddChanneld(keys=["image", "label"]),
+            spacer,
+            cropper,
+            RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1]),
+            ToTensord(keys=["image", "label"])
+        ])
+    elif phase == 'valid' or phase == 'test':
+        transforms = Compose([
+            data_reader,
+            AddChanneld(keys=["image", "label"]),
+            spacer,
+            cropper,
+            ToTensord(keys=["image", "label"])
+        ])
+    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
+    return dataset_
+
+
+def get_RIB_dataset(files_list, phase, in_channels=1, perload=True, crop_size=(0,0),
+                    augment_ratio=0.4, downsample=1, verbose=False):
+    raise NotImplementedError
+    if perload:
+        all_data, all_roi = load_picc_h5_data_once(files_list, h5_keys=['image', 'roi'], transpose=None)
+        data_reader = LoadNumpyd(keys=["image","label"])
+        input_data = {"image":all_data,"label":all_roi}
+    else:
+        all_data = all_roi = all_coord = files_list    
+        input_data = all_data
+        data_reader = LoadHdf5d(keys=["image","label"], h5_keys=["image","roi","coord","affine"])
+        input_data = all_data
+
+    if phase == 'train':
+        transforms = Compose([
+            data_reader,
+            AddChanneld(keys=["img", "roi"]),
+            Zoomd(keys=["img", "roi"], zoom=1/downsample, keep_size=False),
+            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=augment_ratio),
+            RandSpatialCropd(keys=["img", "roi"], roi_size=crop_size, random_size=False),
+            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=augment_ratio),
+            #RandFlipd(keys=["img","roi"], prob=augment_ratio, spatial_axis=[1]),
+            #RandRotate90d(keys=["img", "roi"], prob=augment_ratio, spatial_axes=[0,1]),
+            ToTensord(keys=["img", "roi"])
+        ])
+    elif phase == 'valid' or phase == 'test':
+        transforms = Compose([
+            data_reader,
+            AddChanneld(keys=["img", "roi"]),
+            Zoomd(keys=["img", "roi"], zoom=1/downsample, keep_size=False),
+            ToTensord(keys=["img", "roi"])
+        ])
+    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=0.5)
+    return dataset_
 
 from skimage import transform, util, exposure
-class Rib_dataset(Dataset):
+class RIB_dataset(Dataset):
     def __init__(self, raw_list, mask_list, crop_size=(512,512), mode='train', augmentation_prob=0.6):
 
         """Initializes image paths and preprocessing module."""
@@ -257,16 +367,7 @@ class Rib_dataset(Dataset):
         print("image count in {} path :{}".format(
             self.mode, len(self.images)))
 
-        self.transforms = Compose([
-            AddChanneld(keys=["img", "roi"]),
-            Zoomd(keys=["img", "roi"], zoom=0.5, keep_size=False),
-            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=self.augmentation_prob),
-            RandSpatialCropd(keys=["img", "roi"], roi_size=self.crop_size, random_size=False),
-            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=self.augmentation_prob),
-            #RandFlipd(keys=["img","roi"], prob=self.augmentation_prob, spatial_axis=[1]),
-            #RandRotate90d(keys=["img", "roi"], prob=augment_ratio, spatial_axes=[0,1]),
-            ToTensord(keys=["img", "roi"])
-        ])
+        
 
     def random_crop2D(self, img, mask, size, verbose=False):
         xrange = abs(img.shape[0] - size[0])

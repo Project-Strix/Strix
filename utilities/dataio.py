@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader, get_worker_info
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5
-from utilities.picc_dataset import RandomCropDataset, Rib_dataset, CacheDataset
+from utilities.picc_dataset import get_PICC_dataset, get_RIB_dataset, CacheDataset
 
 from monai.transforms import (
         Compose,
@@ -13,6 +13,8 @@ from monai.transforms import (
         LoadNumpyd,
         AddChanneld,
         RandCropByPosNegLabeld,
+        RepeatChanneld,
+        Lambdad,
         ToTensord
     )
 
@@ -49,68 +51,41 @@ def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpo
             continue
 
         for i, key in enumerate(h5_keys):
-           data[key].append(data_[i])
+            data[key].append(data_[i])
     return data.values()
 
 def worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id + int(time.time() * 1000 % 1000))
 
-def get_dataloader(args, files_list, dataset_type='train', random_crop_type='balance'):
+def get_dataloader(args, files_list, phase='train'):
 
-    if dataset_type == 'train':
+    if phase == 'train': #Todo: move this part to each dataset
         shuffle = True
         augment_ratio = args.augment_ratio
         n_batch = args.n_batch
         num_workers = 15
         drop_last = True
-    elif dataset_type == 'valid':
+    elif phase == 'valid':
         shuffle = True
         augment_ratio = 0.
         n_batch = math.ceil(args.n_batch/4)
         num_workers = 1
         drop_last = True
-    elif dataset_type == 'test':
+    elif phase == 'test':
         shuffle = False
         augment_ratio = 0.
         n_batch = 1
         num_workers = 2
         drop_last = False
     else:
-        raise ValueError(f"dataset_type must be in 'train,valid,test', but got {dataset_type}") 
+        raise ValueError(f"phase must be in 'train,valid,test', but got {phase}") 
 
     if args.data_list == 'rib':
-        if args.preload:
-            all_data, all_roi = load_picc_h5_data_once(files_list, h5_keys=['image', 'roi'], transpose=args.transpose)
-        else:
-            all_data = all_roi = all_coord = files_list
-
-        dataset_ = Rib_dataset(all_data, all_roi, mode=dataset_type, augmentation_prob=augment_ratio)
+        dataset_ = get_RIB_dataset(files_list, phase=phase, in_channels=args.input_nc, perload=args.preload,
+                                   augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'picc_h5':
-        if args.preload:
-            all_data, all_roi, all_coord = load_picc_h5_data_once(files_list, h5_keys=['image', 'roi', 'coord'], transpose=args.transpose)
-        else:
-            all_data = all_roi = all_coord = files_list
-
-        if dataset_type == 'train' or dataset_type == 'valid':
-            dataset_ = RandomCropDataset(all_data, all_roi, all_coord, in_channels=args.input_nc, 
-                                         augment_ratio=augment_ratio, crop_size=args.crop_size,
-                                         downsample=args.downsample, random_type=random_crop_type,
-                                         verbose=args.debug)
-        elif dataset_type == 'test':
-            if args.preload:
-                data_reader = LoadNumpyd(keys=["image","label"])
-            else:
-                data_reader = LoadHdf5d(keys=["image","label","affine"], h5_keys=["image","roi","affine"])
-
-            test_transforms = Compose(
-                [   
-                    data_reader,
-                    AddChanneld(keys=["image", "label"]),
-                    #RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', spatial_size=args.crop_size),
-                    ToTensord(keys=["image", "label"]),
-                ]
-            )
-            dataset_ = CacheDataset(all_data, transform=test_transforms, cache_rate=0)
+        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, crop_size=args.crop_size,
+                                    preload=args.preload, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
     
     loader = DataLoader(dataset_, batch_size=n_batch, shuffle=shuffle, drop_last=drop_last, 
                         num_workers=num_workers, pin_memory=True, worker_init_fn=worker_init_fn)
