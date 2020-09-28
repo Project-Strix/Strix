@@ -10,14 +10,17 @@ import nibabel as nib
 #from dataio import load_picc_data_once
 from scipy.ndimage.morphology import binary_dilation
 from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
-from monai.config import IndexSelection, KeysCollection
+
 import monai
+from monai.config import IndexSelection, KeysCollection
+from monai.data import CacheDataset, Dataset
 from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import (
     LoadHdf5d,
     LoadNumpyd,
     AddChanneld,
+    SqueezeDimd,
     RepeatChanneld,
     Compose,
     Zoomd,
@@ -33,10 +36,10 @@ from monai.transforms import (
     Lambdad,
     ToTensord,
     MapTransform, 
-    Randomizable
+    Randomizable,
+    CastToTyped,
 )
 
-from monai.data import CacheDataset, Dataset
 
 def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
     #Pre-load all training data once.
@@ -276,13 +279,19 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
 
     cache_ratio = 1.0 if preload else 0.0
     all_data = all_roi = all_coord = files_list
-    data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], affine_keys=["affine","affine",None])
+    data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], 
+                            affine_keys=["affine","affine",None], dtype=[np.float32, np.int64, np.float32])
     input_data = all_data
 
     if spacing:
         spacer = Spacingd(keys=["image","label"], pixdim=spacing)
     else:
         spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
+
+    if in_channels > 1:
+        repeater = RepeatChanneld(keys="image", repeats=in_channels)
+    else:
+        repeater = Lambdad(keys="image", func=lambda x : x)
 
     if np.any(np.less_equal(crop_size,0)):
         Print('No cropping!', color='g')
@@ -291,10 +300,11 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
         cropper = CenterSpatialCropd(keys=["image","label"], roi_size=crop_size, allow_pad=True)
 
     def debug(x):
-        print("image shape:", x.shape)
+        print("image type:", type(x), x.dtype, "image shape:", x.shape)
+        return x
         nib.save(nib.Nifti1Image(x, np.eye(4)), f'./{str(time.time())}.nii.gz')
         return x
-    debugger = Lambdad(keys=["image"], func=debug)
+    debugger = Lambdad(keys=["image", "label"], func=debug)
 
     if phase == 'train':
         transforms = Compose([
@@ -304,8 +314,11 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             cropper,
             RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
-            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1]),
-            ToTensord(keys=["image", "label"])
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
+            CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+            SqueezeDimd(keys=["label"]), #! to fit the demand of CE
+            repeater,
+            ToTensord(keys=["image", "label"]),
         ])
     elif phase == 'valid' or phase == 'test':
         transforms = Compose([
@@ -313,6 +326,8 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             AddChanneld(keys=["image", "label"]),
             spacer,
             cropper,
+            CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+            SqueezeDimd(keys=["label"]),
             ToTensord(keys=["image", "label"])
         ])
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
@@ -367,7 +382,6 @@ class RIB_dataset(Dataset):
         print("image count in {} path :{}".format(
             self.mode, len(self.images)))
 
-        
 
     def random_crop2D(self, img, mask, size, verbose=False):
         xrange = abs(img.shape[0] - size[0])

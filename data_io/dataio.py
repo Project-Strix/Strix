@@ -2,11 +2,11 @@ import tqdm, math, random, time
 from PIL import Image
 import inspect, re, os, h5py, collections, json, csv
 import numpy as np
-from torch.utils.data import DataLoader, get_worker_info
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5
-from utilities.picc_dataset import get_PICC_dataset, get_RIB_dataset, CacheDataset
+from data_io.picc_dataset import get_PICC_dataset, get_RIB_dataset, CacheDataset
 
+from monai.data import DataLoader
 from monai.transforms import (
         Compose,
         LoadHdf5d,
@@ -54,16 +54,12 @@ def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpo
             data[key].append(data_[i])
     return data.values()
 
-def worker_init_fn(worker_id):
-    np.random.seed(np.random.get_state()[1][0] + worker_id + int(time.time() * 1000 % 1000))
-
 def get_dataloader(args, files_list, phase='train'):
-
     if phase == 'train': #Todo: move this part to each dataset
         shuffle = True
         augment_ratio = args.augment_ratio
         n_batch = args.n_batch
-        num_workers = 15
+        num_workers = 10
         drop_last = True
     elif phase == 'valid':
         shuffle = True
@@ -87,8 +83,9 @@ def get_dataloader(args, files_list, phase='train'):
         dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, crop_size=args.crop_size,
                                     preload=args.preload, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
     
-    loader = DataLoader(dataset_, batch_size=n_batch, shuffle=shuffle, drop_last=drop_last, 
-                        num_workers=num_workers, pin_memory=True, worker_init_fn=worker_init_fn)
+
+    loader = DataLoader(dataset_, batch_size=n_batch, shuffle=shuffle, 
+                        drop_last=drop_last, num_workers=num_workers, pin_memory=True)
 
     return loader
     

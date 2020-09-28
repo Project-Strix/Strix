@@ -33,7 +33,7 @@ class SCNN(nn.Module):
         if not pretrained:
             self.weight_init()
 
-        self.scale_background = 0.4
+        self.scale_background = 0.01
         self.scale_seg = 1.0
         self.scale_exist = 0.1
 

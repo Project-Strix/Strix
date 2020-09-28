@@ -1,13 +1,12 @@
-import os, sys, shutil, json, logging, warnings
+import os, sys, shutil, json, logging, warnings, time, random
 import numpy as np
 import torch
 from functools import partial
 from torch import from_numpy, reshape, cuda, cat
 from types import SimpleNamespace as sn
-from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from utilities.dataio import get_dataloader, get_picc_datalist
+from data_io.dataio import get_dataloader, get_picc_datalist
 from sklearn.model_selection import train_test_split
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
 import nibabel as nib
@@ -16,6 +15,7 @@ from models import get_engine, get_test_engine
 import click
 from click.parser import OptionParser
 import click_callbacks as clb
+from ignite.engine import Events
 
 @click.command('train', context_settings={'allow_extra_args':True})
 @click.option('--config', type=str, help="tmp var for train_from_cfg")
@@ -55,10 +55,11 @@ def train(**args):
         json.dump(files_valid, f, indent=2)
 
     train_loader = get_dataloader(cargs, files_train, phase='train')
-    valid_loader  = get_dataloader(cargs, files_valid, phase='valid')
+    valid_loader = get_dataloader(cargs, files_valid, phase='valid')
 
-    engine = get_engine(cargs, train_loader, valid_loader, show_network=True)
-    engine.run()
+    trainer = get_engine(cargs, train_loader, valid_loader, show_network=True)
+    trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('-'*40))
+    trainer.run()
         
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
@@ -102,7 +103,7 @@ def test_cfg(**args):
     configures['out_dir'] = check_dir(exp_dir, 'Test')
     configures['preload'] = False
     
-    test_loader = get_dataloader(sn(**configures), test_files, dataset_type='test')
+    test_loader = get_dataloader(sn(**configures), test_files, phase='test')
 
     engine = get_test_engine(sn(**configures), test_loader)
     Print("Begin testing...", color='g')

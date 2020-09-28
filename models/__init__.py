@@ -124,6 +124,8 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     loss = lr_scheduler = None
     if opts.criterion == 'CE':
         loss = torch.nn.CrossEntropyLoss()
+    if opts.criterion == 'WCE':
+        loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(opts.loss_params).to(device))
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':
@@ -185,7 +187,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
             post_transform=trainval_post_transforms,
             key_val_metric={
-                "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"]))
+                "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"].unsqueeze(dim=1)))
             },
             val_handlers=val_handlers,
         )
@@ -214,7 +216,9 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             inferer=SimpleInferer(),
             amp=False,
             post_transform=trainval_post_transforms,
-            key_train_metric={"train_mean_dice": MeanDice(include_background=False, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"]))},
+            key_train_metric={
+                "train_mean_dice": MeanDice(include_background=False, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"].unsqueeze(dim=1)))
+                },
             train_handlers=train_handlers,
         )
         return trainer

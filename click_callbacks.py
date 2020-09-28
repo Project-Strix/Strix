@@ -55,6 +55,15 @@ def lr_schedule_params(ctx, param, value):
 
     return value
 
+def loss_params(ctx, param, value):
+    if ctx.params.get('loss_params', None): #loaded config from specified file
+        return value
+
+    if value == 'WCE':
+        weights = _prompt('Loss weights', tuple, (0.01,1))
+        ctx.params['loss_params'] = weights
+    return value
+
 def model_select(ctx, param, value):
     if value in ['vgg13', 'vgg16', 'resnet34','resnet50']:
         ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
@@ -99,7 +108,7 @@ def common_params(func):
 
 def network_params(func):
     @click.option('--model-type', prompt=True, type=click.Choice(model_types,show_index=True), callback=model_select, default=1, help='Choose model type')
-    @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), default=0, help='loss criterion type')
+    @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), callback=loss_params, default=0, help='loss criterion type')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(72,72), help='Crop volume size')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-level', type=int, default=4, help='Network depth')
@@ -109,7 +118,7 @@ def network_params(func):
     @click.option('-l2', '--l2-reg-weight', type=float, default=0, help='l2 reg weight')
     @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
-    @click.option('--lr-policy', prompt=True, callback=lr_schedule_params, type=click.Choice(lr_schedule,show_index=True), default=0, help='learning rate strategy')
+    @click.option('--lr-policy', prompt=True, type=click.Choice(lr_schedule,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
     @click.option('--snip', is_flag=True)
     @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
