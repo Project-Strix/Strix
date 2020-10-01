@@ -14,11 +14,12 @@ from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Seque
 import monai
 from monai.config import IndexSelection, KeysCollection
 from monai.data import CacheDataset, Dataset
-from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple
+from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import (
     LoadHdf5d,
     LoadNumpyd,
+    LoadNiftid,
     AddChanneld,
     SqueezeDimd,
     RepeatChanneld,
@@ -38,6 +39,9 @@ from monai.transforms import (
     MapTransform, 
     Randomizable,
     CastToTyped,
+    ThresholdIntensityd,
+    NormalizeIntensityd,
+    RandGaussianNoised,
 )
 
 
@@ -293,7 +297,7 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
     else:
         repeater = Lambdad(keys="image", func=lambda x : x)
 
-    if np.any(np.less_equal(crop_size,0)):
+    if crop_size is None or np.any(np.less_equal(crop_size,0)):
         Print('No cropping!', color='g')
         cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
@@ -316,7 +320,7 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-            SqueezeDimd(keys=["label"]), #! to fit the demand of CE
+            #SqueezeDimd(keys=["label"]), #! to fit the demand of CE
             repeater,
             ToTensord(keys=["image", "label"]),
         ])
@@ -327,125 +331,61 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             spacer,
             cropper,
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-            SqueezeDimd(keys=["label"]),
+            #SqueezeDimd(keys=["label"]),
             ToTensord(keys=["image", "label"])
         ])
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
     return dataset_
 
 
-def get_RIB_dataset(files_list, phase, in_channels=1, perload=True, crop_size=(0,0),
-                    augment_ratio=0.4, downsample=1, verbose=False):
-    raise NotImplementedError
-    if perload:
-        all_data, all_roi = load_picc_h5_data_once(files_list, h5_keys=['image', 'roi'], transpose=None)
-        data_reader = LoadNumpyd(keys=["image","label"])
-        input_data = {"image":all_data,"label":all_roi}
+def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=None, 
+                    crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
+
+    cache_ratio = 1.0 if preload else 0.0
+    input_data = []
+    for img, msk in files_list:
+        input_data.append({"image":img, "label":msk})
+
+    if image_size is None or np.any(np.less_equal(image_size,0)):
+        Print('No image resize!', color='g')
+        resizer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        all_data = all_roi = all_coord = files_list    
-        input_data = all_data
-        data_reader = LoadHdf5d(keys=["image","label"], h5_keys=["image","roi","coord","affine"])
-        input_data = all_data
+        resizer = CenterSpatialCropd(keys=["image","label"], roi_size=image_size, allow_pad=True)
+
+    if crop_size is None or np.any(np.less_equal(crop_size,0)):
+        Print('No cropping!', color='g')
+        cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
+    else:
+        cropper = RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False)
 
     if phase == 'train':
         transforms = Compose([
-            data_reader,
-            AddChanneld(keys=["img", "roi"]),
-            Zoomd(keys=["img", "roi"], zoom=1/downsample, keep_size=False),
-            RandScaleIntensityd(keys="img",factors=(-0.01,0.01), prob=augment_ratio),
-            RandSpatialCropd(keys=["img", "roi"], roi_size=crop_size, random_size=False),
-            RandRotated(keys=["img","roi"], range_x=10, range_y=10, prob=augment_ratio),
-            #RandFlipd(keys=["img","roi"], prob=augment_ratio, spatial_axis=[1]),
-            #RandRotate90d(keys=["img", "roi"], prob=augment_ratio, spatial_axes=[0,1]),
-            ToTensord(keys=["img", "roi"])
+            LoadNiftid(keys=["image","label"]),
+            AddChanneld(keys=["image", "label"]),
+            NormalizeIntensityd(keys="image"),
+            ThresholdIntensityd(keys="label", threshold=1, above=False, cval=1),
+            Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
+            RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            resizer,
+            cropper,
+            RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
+            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
+            CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+            ToTensord(keys=["image", "label"])
         ])
     elif phase == 'valid' or phase == 'test':
         transforms = Compose([
-            data_reader,
-            AddChanneld(keys=["img", "roi"]),
-            Zoomd(keys=["img", "roi"], zoom=1/downsample, keep_size=False),
-            ToTensord(keys=["img", "roi"])
+            LoadNiftid(keys=["image","label"]),
+            AddChanneld(keys=["image", "label"]),
+            NormalizeIntensityd(keys=["image"]),
+            ThresholdIntensityd(keys=["label"], threshold=1, above=False, cval=1),
+            Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
+            resizer,
+            cropper,
+            CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+            ToTensord(keys=["image", "label"])
         ])
-    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=0.5)
+    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
     return dataset_
 
-from skimage import transform, util, exposure
-class RIB_dataset(Dataset):
-    def __init__(self, raw_list, mask_list, crop_size=(512,512), mode='train', augmentation_prob=0.6):
-
-        """Initializes image paths and preprocessing module."""
-        self.images = raw_list
-        self.masks = mask_list
-        self.crop_size = crop_size
-        self.mode = mode
-        self.augmentation_prob = augmentation_prob
-        print("image count in {} path :{}".format(
-            self.mode, len(self.images)))
-
-
-    def random_crop2D(self, img, mask, size, verbose=False):
-        xrange = abs(img.shape[0] - size[0])
-        yrange = abs(img.shape[1] - size[1])
-        xstart = random.randint(0, xrange) if xrange > 0 else 0
-        ystart = random.randint(0, yrange) if yrange > 0 else 0
-        crop_start = [xstart, ystart]
-        if verbose:
-            print('random crop at {} with size {}'.format(crop_start, size))
-
-        img_cropped = img[xstart:xstart + size[0], ystart:ystart + size[1]]
-        mask_cropped = mask[xstart:xstart + size[0], ystart:ystart + size[1]]
-
-        return img_cropped, mask_cropped
-
-    def __getitem__(self, index):
-        """Reads an image from a file and preprocesses it and returns."""
-        image = self.images[index]
-        mask = self.masks[index]
-        if isinstance(image, str):
-            image = nib.load(image).get_fdata()  # 图像90°向右翻转, dtype=float64
-            mask = nib.load(mask).get_fdata() 
-        else:
-            image = np.squeeze(image).astype(np.float32)
-            mask = np.squeeze(mask).astype(np.int64)
-         
-        data = self.transforms({"img":image, "roi":mask})
-        
-        return {"image":data['img'], "label":data['roi']}
-
-        # image = transform.resize(image, (2048,2048))
-        # mask = transform.resize(mask, (2048,2048)) 
-
-        # image = F.adjust_contrast(image, 2)
-
-        # data augmentation
-        if (self.mode == 'train') and random.random() <= self.augmentation_prob:
-            rotate_angle = random.randint(-10, 10)
-            image = transform.rotate(image, rotate_angle)
-            mask = transform.rotate(mask, rotate_angle)
-        if (self.mode == 'train') and random.random() <= self.augmentation_prob: 
-            # horizontal flip
-            image = np.flip(image, axis=1)
-            mask = np.flip(mask, axis=1) 
-
-        # # 对比度调整
-        # image = exposure.adjust_log(image, 1)
-
-        if (self.mode == 'train') and random.random() <= self.augmentation_prob:
-            image = util.random_noise(image,mode='gaussian') 
-
-        # 对比度均衡
-        # image = np.repeat(np.expand_dims(image,axis=0),3,axis=0)
-        # image = torch.tensor(image)
-        # image = np.array(F.adjust_contrast(image, 2))[0, ...]
-
-        img_cropped, mask_cropped = self.random_crop2D(image, mask, (768, 768))
-        img_cropped, mask_cropped = img_cropped[::2, ::2], mask_cropped[::2, ::2]  # downsample for tmp exp
-
-        img_cropped = np.expand_dims(img_cropped, axis=0)
-        mask_cropped = np.expand_dims(mask_cropped, axis=0)
-
-        return {"image":img_cropped.astype(np.float32), "label":mask_cropped.astype(np.int8)}
-
-    def __len__(self):
-        """Returns the total number of font files."""
-        return len(self.images)

@@ -1,17 +1,16 @@
-import os, sys, shutil, json, logging, warnings, time, random
+import os, sys, shutil, json, logging, warnings, time, random, torch
 import numpy as np
-import torch
 from functools import partial
 from torch import from_numpy, reshape, cuda, cat
 from types import SimpleNamespace as sn
-from tqdm import tqdm
-
-from data_io.dataio import get_dataloader, get_picc_datalist
-from sklearn.model_selection import train_test_split
-from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
 import nibabel as nib
 
 from models import get_engine, get_test_engine
+from data_io.dataio import get_dataloader, get_picc_datalist
+
+from sklearn.model_selection import train_test_split
+from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
+
 import click
 from click.parser import OptionParser
 import click_callbacks as clb
@@ -20,6 +19,7 @@ from ignite.engine import Events
 @click.command('train', context_settings={'allow_extra_args':True})
 @click.option('--config', type=str, help="tmp var for train_from_cfg")
 @click.option('--debug', is_flag=True)
+@clb.latent_auxilary_params
 @clb.common_params
 @clb.network_params
 @click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
@@ -47,6 +47,7 @@ def train(**args):
         files_list = files_list[:int(len(files_list)*cargs.partial)]
     cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
     files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+    Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
 
     # Save param and datalist
     with open(os.path.join(cargs.out_dir, 'train_files'), 'w') as f:
@@ -70,12 +71,14 @@ def train_cfg(**args):
 
     configures = get_items_from_file(args['config'], format='json')
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
+    
+    #Convert args to index
     configures['data_list'] = clb.dataset_list.index(configures['data_list'])
     configures['model_type'] = clb.model_types.index(configures['model_type'])
     configures['criterion'] = clb.losses.index(configures['criterion'])
     configures['lr_policy'] = clb.lr_schedule.index(configures['lr_policy'])
     configures['framework'] = clb.framework_types.index(configures['framework'])
-    configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
+    #configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
     configures['smi'] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id

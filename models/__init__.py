@@ -1,11 +1,12 @@
 import os, time
 from types import SimpleNamespace as sn
 from utils_cw import check_dir
+import numpy as np
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from .unet3d import UNet3D
-from .unet2d import UNet2D
+#from .unet2d import UNet2D
 from .vgg import vgg13_bn, vgg16_bn
 from .resnet import resnet34, resnet50
 from .scnn import SCNN
@@ -15,7 +16,7 @@ from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.inferers import SimpleInferer, SlidingWindowClassify
 from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd
-from monai.networks.nets import UNet
+from monai.networks.nets import UNet, DynUNet, VNet
 from ignite.metrics import Accuracy
 
 from monai.handlers import (
@@ -33,7 +34,7 @@ from monai.handlers import (
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn','vnet']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -42,7 +43,7 @@ def _get_network_type(name):
 
 def _get_model_instance(name, tensor_dim):
     return {
-        'unet':{'3D': None, '2D': UNet2D},
+        'unet':{'3D': None, '2D': DynUNet},
         'scnn':{'3D': None, '2D': SCNN},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
@@ -67,28 +68,32 @@ def get_network(opts):
     n_groups = get_attr_(opts, 'n_groups', 8)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
     crop_size = get_attr_(opts, 'crop_size', (512,512))
+    image_size = get_attr_(opts, 'image_size', (512,512))
     # bottleneck = get_attr_(opts, 'bottleneck', False)
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
     model = _get_model_instance(name, opts.tensor_dim)
 
     dim = 2 if opts.tensor_dim == '2D' else 3
+    input_size = image_size if crop_size is None or \
+                 np.any(np.less_equal(crop_size,0)) else crop_size
     if name == 'unet':
-        model = UNet(
-            dimensions=dim,
+        model = model(
+            spatial_dims=dim,
             in_channels=in_channels,
             out_channels=out_channels,
-            channels=(32, 64, 128, 265, 512),
-            strides=(2, 2, 2, 2),
-            num_res_units=0,
-            act='relu',
-            norm='batch'
+            norm_name="batch",
+            kernel_size=(3, 3, 3, 3, 3, 3),
+            strides=(1, 2, 2, 2, 2, 2),
+            deep_supervision=False
         )
+    elif name == 'senet':
+        raise NotImplementedError
     elif name == 'scnn':
         model = model(
             in_channels=in_channels,
             out_channels=out_channels,
-            input_size=crop_size,
+            input_size=input_size,
             ms_ks=9,
             is_deconv=is_deconv,
             use_dilated_conv=True,
@@ -124,7 +129,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     loss = lr_scheduler = None
     if opts.criterion == 'CE':
         loss = torch.nn.CrossEntropyLoss()
-    if opts.criterion == 'WCE':
+    elif opts.criterion == 'WCE':
         loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(opts.loss_params).to(device))
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
@@ -169,7 +174,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
                 max_channels=opts.output_nc,
                 prefix_name='Val'
             ),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True)
+            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, n_saved=3)
         ]
 
         trainval_post_transforms = Compose(
@@ -180,16 +185,25 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             ]
         )
 
+        if opts.criterion == 'CE' or opts.criterion == 'WCE':
+            prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+            key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+        else:
+            prepare_batch_fn = lambda x : (x["image"], x["label"])
+            key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+
         evaluator = SupervisedEvaluator(
             device=device,
             val_data_loader=test_loader,
             network=net,
+            prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
             post_transform=trainval_post_transforms,
             key_val_metric={
-                "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"].unsqueeze(dim=1)))
+                "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
             },
             val_handlers=val_handlers,
+            amp=opts.amp
         )
 
         train_handlers = [
@@ -213,16 +227,21 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             network=net,
             optimizer=optim,
             loss_function=loss,
+            prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(),
-            amp=False,
             post_transform=trainval_post_transforms,
             key_train_metric={
-                "train_mean_dice": MeanDice(include_background=False, to_onehot_y=True, output_transform=lambda x: (x["pred"], x["label"].unsqueeze(dim=1)))
+                "train_mean_dice": MeanDice(include_background=False, to_onehot_y=True, output_transform=key_metric_transform_fn)
                 },
             train_handlers=train_handlers,
+            amp=opts.amp
         )
         return trainer
     
+    #! Detection module
+    if framework_type == 'detection':
+        raise NotImplementedError
+
     #! Siamese moduel
     elif framework_type == 'siamese':
         assert _get_network_type(opts.model_type) == 'CNN', f"Only accept CNN arch: {NETWORK_TYPES['CNN']}"
@@ -264,6 +283,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             post_transform=train_post_transforms,
             key_val_metric={"val_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
             val_handlers=val_handlers,
+            amp=opts.amp
         )
 
         train_handlers = [
@@ -288,10 +308,10 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             optimizer=optim,
             loss_function=loss,
             inferer=SimpleInferer(),
-            amp=False,
             post_transform=train_post_transforms,
             key_train_metric={"train_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
             train_handlers=train_handlers,
+            amp=opts.amp
         )
 
         return trainer
@@ -331,7 +351,8 @@ def get_test_engine(opts, test_loader):
             network=net,
             inferer=SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
             post_transform=post_transforms,
-            val_handlers=val_handlers
+            val_handlers=val_handlers,
+            amp=opts.amp
         )
 
         return evaluator

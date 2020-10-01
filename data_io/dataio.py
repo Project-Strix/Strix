@@ -27,7 +27,7 @@ def get_picc_datalist(dataset_name):
     elif dataset_name == 'all_dr':
         raise NotImplementedError
     elif dataset_name == 'rib':
-        fname = "/homes/clwang/Data/picc/prepared_rib_h5/data_list.json"
+        fname = "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json"
         #fname = "/homes/yliu/Code/picc/raw_data2.json"
     else:
         raise ValueError
@@ -64,8 +64,8 @@ def get_dataloader(args, files_list, phase='train'):
     elif phase == 'valid':
         shuffle = True
         augment_ratio = 0.
-        n_batch = math.ceil(args.n_batch/4)
-        num_workers = 1
+        n_batch = 3 #math.ceil(args.n_batch/2)
+        num_workers = 0
         drop_last = True
     elif phase == 'test':
         shuffle = False
@@ -77,12 +77,11 @@ def get_dataloader(args, files_list, phase='train'):
         raise ValueError(f"phase must be in 'train,valid,test', but got {phase}") 
 
     if args.data_list == 'rib':
-        dataset_ = get_RIB_dataset(files_list, phase=phase, in_channels=args.input_nc, perload=args.preload,
-                                   augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
+        dataset_ = get_RIB_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
+                                   crop_size=args.crop_size, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'picc_h5':
         dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, crop_size=args.crop_size,
                                     preload=args.preload, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
-    
 
     loader = DataLoader(dataset_, batch_size=n_batch, shuffle=shuffle, 
                         drop_last=drop_last, num_workers=num_workers, pin_memory=True)

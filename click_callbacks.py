@@ -32,12 +32,15 @@ def get_exp_name(ctx, param, value):
 
     return os.path.join(ctx.params['out_dir'], ctx.params['framework'], exp_name)
 
-def _prompt(prompt_str, data_type, default_value):
-    return click.prompt('\tInput {} for lr strategy'.format(prompt_str),\
-                            type=data_type, default=default_value)
+def split_input_str(value):
+    return [ float(s) for s in value.split(',')] if value is not None else None
+
+def _prompt(prompt_str, data_type, default_value, value_proc=None):
+    return click.prompt('\tInput {}'.format(prompt_str),\
+                            type=data_type, default=default_value, value_proc=value_proc)
 
 def lr_schedule_params(ctx, param, value):
-    if ctx.params.get('lr_policy_params', None): #loaded config from specified file
+    if ctx.params.get('lr_policy_params', None) is not None: #loaded config from specified file
         return value
 
     if value == 'step':
@@ -56,11 +59,11 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 def loss_params(ctx, param, value):
-    if ctx.params.get('loss_params', None): #loaded config from specified file
+    if ctx.params.get('loss_params', None) is not None: #loaded config from specified file
         return value
 
     if value == 'WCE':
-        weights = _prompt('Loss weights', tuple, (0.01,1))
+        weights = _prompt('Loss weights', tuple, (0.01,1), split_input_str)
         ctx.params['loss_params'] = weights
     return value
 
@@ -74,10 +77,10 @@ def model_select(ctx, param, value):
     return value
 
 dataset_list = ['picc_h5', 'all_dr', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn']
+model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','vnet']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
-framework_types = ['segmentation','classification','siamese','selflearning']
+framework_types = ['segmentation','classification','siamese','selflearning','detection']
 layer_orders = ['crb','cbr', 'cgr','cbe','cB']
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(dataset_list,show_index=True), default=0, help='Data file list (json)')
@@ -109,23 +112,34 @@ def common_params(func):
 def network_params(func):
     @click.option('--model-type', prompt=True, type=click.Choice(model_types,show_index=True), callback=model_select, default=1, help='Choose model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), callback=loss_params, default=0, help='loss criterion type')
-    @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(72,72), help='Crop volume size')
+    @click.option('--image-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Input Image size')
+    @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-level', type=int, default=4, help='Network depth')
-    @click.option('--is-deconv', type=bool, default=True, help='use deconv or interplate')
+    @click.option('--is-deconv', type=bool, default=False, help='use deconv or interplate')
     @click.option('--optim', type=click.Choice(['sgd', 'adam']), default='adam')
-    @click.option('--layer-order', prompt=True, type=click.Choice(layer_orders,show_index=True), default=0, help='conv layer order')
+    @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
     @click.option('-l2', '--l2-reg-weight', type=float, default=0, help='l2 reg weight')
-    @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
     @click.option('--lr-policy', prompt=True, type=click.Choice(lr_schedule,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
-    @click.option('--snip', is_flag=True)
-    @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
+    #@click.option('--layer-order', prompt=True, type=click.Choice(layer_orders,show_index=True), default=0, help='conv layer order')
+    # @click.option('--snip', is_flag=True)
+    # @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
     # @click.option('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
     # @click.option('--sep-conv', type=bool, default=False, help='Use Depthwise Separable Convolution')
     # @click.option('--use-apex', is_flag=True, help='Use NVIDIA apex module')
     # @click.option('--use-half', is_flag=True, help='Use half precision')
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+# Put these auxilary params to the top of click.options for 
+# successfully loading auxilary params.
+def latent_auxilary_params(func):
+    @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
+    @click.option('--loss-params', type=(float,float), default=(0,0), help='Auxilary params for loss')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

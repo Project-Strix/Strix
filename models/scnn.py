@@ -37,7 +37,7 @@ class SCNN(nn.Module):
         self.scale_seg = 1.0
         self.scale_exist = 0.1
 
-        self.ce_loss = nn.CrossEntropyLoss(weight=torch.tensor([self.scale_background]+[1]*(self.out_channels-1)))
+        #self.ce_loss = nn.CrossEntropyLoss(weight=torch.tensor([self.scale_background]+[1]*(self.out_channels-1)))
         #self.bce_loss = nn.BCELoss()
 
         if not self.is_deconv:

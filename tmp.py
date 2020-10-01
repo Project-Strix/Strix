@@ -1,39 +1,13 @@
-import torch
-import monai, random
-import numpy as np
-from monai.transforms import Randomizable, Compose
-from monai.data import Dataset #DataLoader
-from torch.utils.data import DataLoader
+import os
+import click
 
+def split_input_str(value):
+    return [ float(s) for s in value.split(',')] if value is not None else None
 
-def wif(worker_id: int) -> None:
-    """
-    Callback function for PyTorch DataLoader `worker_init_fn`.
-    It can set different random seed for the transforms in different workers.
+def _prompt(prompt_str, data_type, default_value):
+    return click.prompt('\tInput {} for lr strategy'.format(prompt_str),\
+                            type=data_type, default=default_value, value_proc=split_input_str)
 
-    """
-    worker_info = torch.utils.data.get_worker_info()
-    if hasattr(worker_info.dataset, "transform") and hasattr(worker_info.dataset.transform, "set_random_state"):
-        worker_info.dataset.transform.set_random_state(worker_info.seed % (2 ** 32))
-
-
-class RandPrint(Randomizable):        
-    def randomize(self):
-        rnd = self.R.random()
-        self.val = rnd
-    
-    def __call__(self, x):
-        self.randomize()
-        print(x, self.val)
-        return self.val
-
-ds = Dataset(np.arange(12), transform=RandPrint())
-
-loader = DataLoader(ds, batch_size=3, shuffle=False, 
-                    num_workers=3, pin_memory=False, worker_init_fn=wif)
-
-for e in range(3):
-    print(e, '-'*10)
-    #np.random.seed() #not work
-    for x in loader:
-        pass
+if __name__ == "__main__":
+    a = _prompt('TTTEST', tuple, (0.1,4.9))
+    print(a)
