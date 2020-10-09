@@ -42,6 +42,7 @@ from monai.transforms import (
     ThresholdIntensityd,
     NormalizeIntensityd,
     RandGaussianNoised,
+    DivisiblePadd,
 )
 
 
@@ -320,7 +321,6 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-            #SqueezeDimd(keys=["label"]), #! to fit the demand of CE
             repeater,
             ToTensord(keys=["image", "label"]),
         ])
@@ -331,7 +331,6 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, crop_size=(0,
             spacer,
             cropper,
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-            #SqueezeDimd(keys=["label"]),
             ToTensord(keys=["image", "label"])
         ])
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
@@ -374,7 +373,7 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=N
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
         ])
-    elif phase == 'valid' or phase == 'test':
+    elif phase == 'valid':
         transforms = Compose([
             LoadNiftid(keys=["image","label"]),
             AddChanneld(keys=["image", "label"]),
@@ -383,6 +382,17 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=N
             Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
             resizer,
             cropper,
+            CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+            ToTensord(keys=["image", "label"])
+        ])
+    elif phase == 'test':
+        transforms = Compose([
+            LoadNiftid(keys=["image","label"]),
+            AddChanneld(keys=["image", "label"]),
+            NormalizeIntensityd(keys=["image"]),
+            ThresholdIntensityd(keys=["label"], threshold=1, above=False, cval=1),
+            Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
+            DivisiblePadd(keys=["image","label"], k=16),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
         ])

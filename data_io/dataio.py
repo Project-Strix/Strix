@@ -64,14 +64,14 @@ def get_dataloader(args, files_list, phase='train'):
     elif phase == 'valid':
         shuffle = True
         augment_ratio = 0.
-        n_batch = 3 #math.ceil(args.n_batch/2)
-        num_workers = 0
-        drop_last = True
+        n_batch = 2 #math.ceil(args.n_batch/2)
+        num_workers = 1
+        drop_last = False
     elif phase == 'test':
         shuffle = False
         augment_ratio = 0.
         n_batch = 1
-        num_workers = 2
+        num_workers = 1
         drop_last = False
     else:
         raise ValueError(f"phase must be in 'train,valid,test', but got {phase}") 

@@ -77,7 +77,7 @@ def model_select(ctx, param, value):
     return value
 
 dataset_list = ['picc_h5', 'all_dr', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','vnet']
+model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 framework_types = ['segmentation','classification','siamese','selflearning','detection']
@@ -140,6 +140,7 @@ def network_params(func):
 def latent_auxilary_params(func):
     @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
     @click.option('--loss-params', type=(float,float), default=(0,0), help='Auxilary params for loss')
+    @click.option('--load-imagenet', type=bool, default=False, help='Load pretrain Imagenet for some net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

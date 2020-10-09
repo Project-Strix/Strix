@@ -92,6 +92,7 @@ def train_cfg(**args):
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 def test_cfg(**args):
+    logging.basicConfig(stream=sys.stderr, level=logging.INFO)
     configures = get_items_from_file(args['config'], format='json')
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
@@ -106,6 +107,7 @@ def test_cfg(**args):
     configures['out_dir'] = check_dir(exp_dir, 'Test')
     configures['preload'] = False
     
+    Print(f'{len(test_files)} test files', color='g')
     test_loader = get_dataloader(sn(**configures), test_files, phase='test')
 
     engine = get_test_engine(sn(**configures), test_loader)

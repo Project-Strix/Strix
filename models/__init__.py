@@ -16,7 +16,9 @@ from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.inferers import SimpleInferer, SlidingWindowClassify
 from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd
-from monai.networks.nets import UNet, DynUNet, VNet
+from monai.networks.nets import UNet, DynUNet, HighResNet
+from monai.networks import predict_segmentation
+from monai.utils import Activation, ChannelMatching, Normalisation
 from ignite.metrics import Accuracy
 
 from monai.handlers import (
@@ -34,7 +36,7 @@ from monai.handlers import (
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn','vnet']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn','highresnet']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -49,6 +51,7 @@ def _get_model_instance(name, tensor_dim):
         'vgg16':{'3D': None, '2D': vgg16_bn},
         'resnet34':{'3D': None, '2D': resnet34},
         'resnet50':{'3D': None, '2D': resnet50},
+        'highresnet':{'3D':None, '2D': HighResNet},
     }[name][tensor_dim]
 
 def get_network(opts):
@@ -73,6 +76,7 @@ def get_network(opts):
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
     model = _get_model_instance(name, opts.tensor_dim)
+    assert model is not None, f"Cannot get your network {name} for {opts.tensor_dim}"
 
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
@@ -87,8 +91,15 @@ def get_network(opts):
             strides=(1, 2, 2, 2, 2, 2),
             deep_supervision=False
         )
-    elif name == 'senet':
-        raise NotImplementedError
+    elif name == 'highresnet':
+        model = model(
+            spatial_dims=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            norm_type=Normalisation.BATCH,
+            acti_type=Activation.RELU,
+            dropout_prob=0.5,
+        )
     elif name == 'scnn':
         model = model(
             in_channels=in_channels,
@@ -356,5 +367,44 @@ def get_test_engine(opts, test_loader):
         )
 
         return evaluator
+    
     elif framework_type == 'segmentation':
-        pass
+        post_transforms = Compose(
+            [
+                Activationsd(keys="pred", softmax=True),
+                AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
+            ]
+        )
+
+        val_handlers = [
+            StatsHandler(output_transform=lambda x: None),
+            CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+            SegmentationSaver(
+                output_dir=opts.out_dir,
+                batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["image_meta_dict"]["affine"]},
+                output_transform=lambda output: predict_segmentation(output["pred"])
+            ),
+        ]
+
+        if opts.criterion == 'CE' or opts.criterion == 'WCE':
+            prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+            key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+        else:
+            prepare_batch_fn = lambda x : (x["image"], x["label"])
+            key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+
+        evaluator = SupervisedEvaluator(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
+            # post_transform=post_transforms,
+            # key_val_metric={
+            #     "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
+            # },
+            val_handlers=val_handlers,
+            amp=opts.amp
+        )
+
+        return evaluator
