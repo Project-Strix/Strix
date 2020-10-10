@@ -89,6 +89,7 @@ def train_cfg(**args):
 
 @click.command('test-from-cfg')
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.option('--test-files', type=str, default='', help='External files (.json) for testing')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 def test_cfg(**args):
@@ -101,8 +102,12 @@ def test_cfg(**args):
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args['gpus'])
 
     exp_dir = args.get('experiment_name', os.path.dirname(args['config']))
-    assert os.path.isfile(os.path.join(exp_dir, 'test_files')), f'Test file does not exists in {exp_dir}!'
-    test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
+    if os.path.isfile(args['test_files']):
+        test_files = get_items_from_file(args['test_files'], format='json')
+    else:
+        assert os.path.isfile(os.path.join(exp_dir, 'test_files')), f'Test file does not exists in {exp_dir}!'
+        test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
+
     configures['model_path'] = clb.get_trained_models(exp_dir)
     configures['out_dir'] = check_dir(exp_dir, 'Test')
     configures['preload'] = False

@@ -89,7 +89,9 @@ def get_network(opts):
             norm_name="batch",
             kernel_size=(3, 3, 3, 3, 3, 3),
             strides=(1, 2, 2, 2, 2, 2),
-            deep_supervision=False
+            #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
+            deep_supervision=False,
+            res_block=True
         )
     elif name == 'highresnet':
         model = model(
@@ -386,12 +388,16 @@ def get_test_engine(opts, test_loader):
             ),
         ]
 
-        if opts.criterion == 'CE' or opts.criterion == 'WCE':
-            prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
-            key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
-        else:
-            prepare_batch_fn = lambda x : (x["image"], x["label"])
-            key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+        # if opts.criterion == 'CE' or opts.criterion == 'WCE':
+        #     prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+        #     key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+        # else:
+        #     prepare_batch_fn = lambda x : (x["image"], x["label"])
+        #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+
+        prepare_batch_fn = lambda x : (x["image"], None)
+        key_metric_transform_fn = lambda x : (x["pred"], None)
+
 
         evaluator = SupervisedEvaluator(
             device=device,
