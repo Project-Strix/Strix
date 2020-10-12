@@ -59,8 +59,8 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 def loss_params(ctx, param, value):
-    if ctx.params.get('loss_params', None) is not None: #loaded config from specified file
-        return value
+    # if ctx.params.get('loss_params', (0,0)) is not (0,0): #loaded config from specified file
+    #     return value
 
     if value == 'WCE':
         weights = _prompt('Loss weights', tuple, (0.01,1), split_input_str)
@@ -70,7 +70,12 @@ def loss_params(ctx, param, value):
 def model_select(ctx, param, value):
     if value in ['vgg13', 'vgg16', 'resnet34','resnet50']:
         ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
-        ctx.params['input_nc'] = 3
+        if ctx.params['load_imagenet']:
+            ctx.params['input_nc'] = 3
+    elif value == 'unet':
+        ctx.params['deep_supervision'] = click.confirm("Whether use deep supervision?", default=False, abort=False, show_default=True)
+        if ctx.params['deep_supervision']:
+            ctx.params['deep_supr_num'] = click.prompt("Num of deep supervision?", default=1, type=int, show_default=True)
     else:
         pass
 
@@ -86,7 +91,7 @@ def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(dataset_list,show_index=True), default=0, help='Data file list (json)')
     @click.option('--framework', prompt=True, type=click.Choice(framework_types,show_index=True), default=1, help='Choose your framework type')
     @click.option('--preload', type=bool, default=True, help='Preload all data once')
-    @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=1000, help='Epoch number')
+    @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=5000, help='Epoch number')
     @click.option('--n-batch', prompt=True, show_default=True, type=int, default=50, help='Batch size')
     @click.option('--istrain', type=bool, default=True, help="train/test phase flag")
     @click.option('--downsample', type=int, default=0, help='Downsample rate. disable:0')
@@ -141,6 +146,8 @@ def latent_auxilary_params(func):
     @click.option('--lr-policy-params', type=dict, default=None, help='Auxilary params for lr schedule')
     @click.option('--loss-params', type=(float,float), default=(0,0), help='Auxilary params for loss')
     @click.option('--load-imagenet', type=bool, default=False, help='Load pretrain Imagenet for some net')
+    @click.option('--deep-supervision', type=bool, default=False, help='Use deep supervision module')
+    @click.option('--deep-supr-num', type=int, default=1, help='Num of features will be output')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

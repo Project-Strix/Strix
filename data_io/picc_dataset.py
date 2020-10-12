@@ -90,7 +90,7 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
         repeater = Lambdad(keys="image", func=lambda x : x)
 
     if image_size is None or np.any(np.less_equal(image_size,0)):
-        Print('No cropping!', color='g')
+        Print('No resizing!', color='g')
         resizer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
         resizer = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size)

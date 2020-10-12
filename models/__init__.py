@@ -11,6 +11,7 @@ from .vgg import vgg13_bn, vgg16_bn
 from .resnet import resnet34, resnet50
 from .scnn import SCNN
 from .utils import print_network, output_onehot_transform
+from .losses import DeepSupervisionLoss
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
@@ -36,7 +37,9 @@ from monai.handlers import (
     MeanDice
 )
 
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 'FCN':['unet','scnn','highresnet']}
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 
+                 'FCN':['unet','scnn','highresnet'],
+                 'RCNN':['retina_unet']}
 
 def _get_network_type(name):
     for k, v in NETWORK_TYPES.items():
@@ -90,7 +93,8 @@ def get_network(opts):
             kernel_size=(3, 3, 3, 3, 3, 3),
             strides=(1, 2, 2, 2, 2, 2),
             #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
-            deep_supervision=False,
+            deep_supervision=get_attr_(opts, 'deep_supervision', False),
+            deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
             res_block=True
         )
     elif name == 'highresnet':
@@ -150,6 +154,9 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
         loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
     else:
         raise NotImplementedError
+    
+    if opts.deep_supervision:
+        loss = DeepSupervisionLoss(loss)
 
     net = get_network(opts).to(device)
     if show_network:
@@ -253,6 +260,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     
     #! Detection module
     if framework_type == 'detection':
+        assert _get_network_type(opts.model_type) == 'RCNN', f"Only accept RCNN arch: {NETWORK_TYPES['RCNN']}"
         raise NotImplementedError
 
     #! Siamese moduel

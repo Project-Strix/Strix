@@ -18,14 +18,11 @@
 Retina Net. According to https://arxiv.org/abs/1708.02002
 Retina U-Net. According to https://arxiv.org/abs/1811.08661
 """
-
-import utils.model_utils as mutils
-import utils.exp_utils as utils
 import sys
-sys.path.append('../')
-from cuda_functions.nms_2D.pth_nms import nms_gpu as nms_2D
-from cuda_functions.nms_3D.pth_nms import nms_gpu as nms_3D
+from .cuda_functions.nms_2D.pth_nms import nms_gpu as nms_2D
+from .cuda_functions.nms_3D.pth_nms import nms_gpu as nms_3D
 
+from .utils import *
 import numpy as np
 import torch
 import torch.nn as nn
@@ -152,7 +149,7 @@ def compute_class_loss(anchor_matches, class_pred_logits, shem_poolsize=20):
         roi_logits_neg = class_pred_logits[neg_indices]
         negative_count = np.max((1, pos_indices.size()[0]))
         roi_probs_neg = F.softmax(roi_logits_neg, dim=1)
-        neg_ix = mutils.shem(roi_probs_neg, negative_count, shem_poolsize)
+        neg_ix = shem(roi_probs_neg, negative_count, shem_poolsize)
         neg_loss = F.cross_entropy(roi_logits_neg[neg_ix], torch.LongTensor([0] * neg_ix.shape[0]).cuda())
         # return the indices of negative samples, which contributed to the loss (for monitoring plots).
         np_neg_ix = neg_ix.cpu().data.numpy()
@@ -221,20 +218,20 @@ def refine_detections(anchors, probs, deltas, batch_ixs, cf):
     # apply bounding box deltas. re-scale to image coordinates.
     std_dev = torch.from_numpy(np.reshape(cf.rpn_bbox_std_dev, [1, cf.dim * 2])).float().cuda()
     scale = torch.from_numpy(cf.scale).float().cuda()
-    refined_rois = mutils.apply_box_deltas_2D(pre_nms_anchors / scale, pre_nms_deltas * std_dev) * scale \
-        if cf.dim == 2 else mutils.apply_box_deltas_3D(pre_nms_anchors / scale, pre_nms_deltas * std_dev) * scale
+    refined_rois = apply_box_deltas_2D(pre_nms_anchors / scale, pre_nms_deltas * std_dev) * scale \
+        if cf.dim == 2 else apply_box_deltas_3D(pre_nms_anchors / scale, pre_nms_deltas * std_dev) * scale
 
     # round and cast to int since we're deadling with pixels now
-    refined_rois = mutils.clip_to_window(cf.window, refined_rois)
+    refined_rois = clip_to_window(cf.window, refined_rois)
     pre_nms_rois = torch.round(refined_rois)
-    for j, b in enumerate(mutils.unique1d(pre_nms_batch_ixs)):
+    for j, b in enumerate(unique1d(pre_nms_batch_ixs)):
 
         bixs = torch.nonzero(pre_nms_batch_ixs == b)[:, 0]
         bix_class_ids = pre_nms_class_ids[bixs]
         bix_rois = pre_nms_rois[bixs]
         bix_scores = pre_nms_scores[bixs]
 
-        for i, class_id in enumerate(mutils.unique1d(bix_class_ids)):
+        for i, class_id in enumerate(unique1d(bix_class_ids)):
 
             ixs = torch.nonzero(bix_class_ids == class_id)[:, 0]
             # nms expects boxes sorted by score.
@@ -252,13 +249,13 @@ def refine_detections(anchors, probs, deltas, batch_ixs, cf):
             # map indices back.
             class_keep = keep[bixs[ixs[order[class_keep]]]]
             # merge indices over classes for current batch element
-            b_keep = class_keep if i == 0 else mutils.unique1d(torch.cat((b_keep, class_keep)))
+            b_keep = class_keep if i == 0 else unique1d(torch.cat((b_keep, class_keep)))
 
         # only keep top-k boxes of current batch-element.
         top_ids = pre_nms_scores[b_keep].sort(descending=True)[1][:cf.model_max_instances_per_batch_element]
         b_keep = b_keep[top_ids]
         # merge indices over batch elements.
-        batch_keep = b_keep if j == 0 else mutils.unique1d(torch.cat((batch_keep, b_keep)))
+        batch_keep = b_keep if j == 0 else unique1d(torch.cat((batch_keep, b_keep)))
 
     keep = batch_keep
 
@@ -338,20 +335,21 @@ def get_results(cf, img_shape, detections, seg_logits, box_results_list=None):
 ############################################################
 
 
-class net(nn.Module):
+class RetinaUNet(nn.Module):
 
 
     def __init__(self, cf, logger):
 
-        super(net, self).__init__()
+        super(RetinaUNet, self).__init__()
         self.cf = cf
         self.logger = logger
         self.build()
         if self.cf.weight_init is not None:
             logger.info("using pytorch weight init of type {}".format(self.cf.weight_init))
-            mutils.initialize_weights(self)
+            initialize_weights(self)
         else:
             logger.info("using default pytorch weight init")
+
 
     def build(self):
         """
@@ -366,11 +364,11 @@ class net(nn.Module):
                             "For example, use 256, 320, 384, 448, 512, ... etc. ")
 
         # instanciate abstract multi dimensional conv class and backbone model.
-        conv = mutils.NDConvGenerator(self.cf.dim)
-        backbone = utils.import_module('bbone', self.cf.backbone_path)
+        conv = NDConvGenerator(self.cf.dim)
+        backbone = import_module('bbone', self.cf.backbone_path)
 
         # build Anchors, FPN, Classifier / Bbox-Regressor -head
-        self.np_anchors = mutils.generate_pyramid_anchors(self.logger, self.cf)
+        self.np_anchors = generate_pyramid_anchors(self.logger, self.cf)
         self.anchors = torch.from_numpy(self.np_anchors).float().cuda()
         self.Fpn = backbone.FPN(self.cf, conv, operate_stride1=self.cf.operate_stride1)
         self.Classifier = Classifier(self.cf, conv)
@@ -392,7 +390,7 @@ class net(nn.Module):
         img = batch['data']
         gt_class_ids = batch['roi_labels']
         gt_boxes = batch['bb_target']
-        var_seg_ohe = torch.FloatTensor(mutils.get_one_hot_encoding(batch['seg'], self.cf.num_seg_classes)).cuda()
+        var_seg_ohe = torch.FloatTensor(get_one_hot_encoding(batch['seg'], self.cf.num_seg_classes)).cuda()
         var_seg = torch.LongTensor(batch['seg']).cuda()
 
         img = torch.from_numpy(img).float().cuda()
@@ -413,11 +411,11 @@ class net(nn.Module):
                                                 'box_label': batch['roi_labels'][b][ix], 'box_type': 'gt'})
 
                 # match gt boxes with anchors to generate targets.
-                anchor_class_match, anchor_target_deltas = mutils.gt_anchor_matching(
+                anchor_class_match, anchor_target_deltas = gt_anchor_matching(
                     self.cf, self.np_anchors, gt_boxes[b], gt_class_ids[b])
 
                 # add positive anchors used for loss to results_dict for monitoring.
-                pos_anchors = mutils.clip_boxes_numpy(
+                pos_anchors = clip_boxes_numpy(
                     self.np_anchors[np.argwhere(anchor_class_match > 0)][:, 0], img.shape[2:])
                 for p in pos_anchors:
                     box_results_list[b].append({'box_coords': p, 'box_type': 'pos_anchor'})
@@ -434,7 +432,7 @@ class net(nn.Module):
             bbox_loss = compute_bbox_loss(anchor_target_deltas, pred_deltas[b], anchor_class_match)
 
             # add negative anchors used for loss to results_dict for monitoring.
-            neg_anchors = mutils.clip_boxes_numpy(
+            neg_anchors = clip_boxes_numpy(
                 self.np_anchors[np.argwhere(anchor_class_match == -1)][0, neg_anchor_ix], img.shape[2:])
             for n in neg_anchors:
                 box_results_list[b].append({'box_coords': n, 'box_type': 'neg_anchor'})
@@ -443,7 +441,7 @@ class net(nn.Module):
             batch_bbox_loss += bbox_loss / img.shape[0]
 
         results_dict = get_results(self.cf, img.shape, detections, seg_logits, box_results_list)
-        seg_loss_dice = 1 - mutils.batch_dice(F.softmax(seg_logits, dim=1),var_seg_ohe)
+        seg_loss_dice = 1 - batch_dice(F.softmax(seg_logits, dim=1),var_seg_ohe)
         seg_loss_ce = F.cross_entropy(seg_logits, var_seg[:, 0])
         loss = batch_class_loss + batch_bbox_loss + (seg_loss_dice + seg_loss_ce) / 2
         results_dict['torch_loss'] = loss

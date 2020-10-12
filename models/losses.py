@@ -1,6 +1,8 @@
 import torch
 from torch.nn import Module
 import torch.nn.functional as F
+from torch import Tensor
+from typing import Optional, Sequence
 
 class ContrastiveLoss(Module):
       def __init__(self, margin=2.0):
@@ -29,3 +31,16 @@ class ContrastiveCELoss(Module):
         ce_loss = self.ce_loss1(pred_label1, gt1) + self.ce_loss2(pred_label2, gt2)
         con_loss = self.contrastive_loss(output1, output2, target)
         return ce_loss + con_loss
+
+class DeepSupervisionLoss(Module):
+    def __init__(self, base_loss):
+        super(DeepSupervisionLoss, self).__init__()
+        self.base_loss = base_loss
+
+    def forward(self, inputs: Sequence[Tensor], gt: Tensor):
+        deep_sup_num = len(inputs)-1
+        weights = [0.5]+[0.5/deep_sup_num]*deep_sup_num
+        losses = []
+        for w, ret in zip(weights, inputs):
+            losses.append(w*self.base_loss(ret, gt))
+        return torch.mean(torch.stack(losses))
