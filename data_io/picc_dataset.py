@@ -16,37 +16,7 @@ from monai.config import IndexSelection, KeysCollection
 from monai.data import CacheDataset, Dataset
 from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
-from monai.transforms import (
-    LoadHdf5d,
-    LoadNumpyd,
-    LoadNiftid,
-    AddChanneld,
-    AsChannelFirstd,
-    SqueezeDimd,
-    RepeatChanneld,
-    Compose,
-    Zoomd,
-    Spacingd,
-    SpatialCrop,
-    ResizeWithPadOrCropd,
-    RandCropByPosNegLabeld,
-    RandSpatialCropd,
-    RandRotated,
-    RandFlipd,
-    Flipd,
-    RandRotate90d,
-    RandScaleIntensityd,
-    Lambdad,
-    Lambda,
-    ToTensord,
-    MapTransform, 
-    Randomizable,
-    CastToTyped,
-    ThresholdIntensityd,
-    NormalizeIntensityd,
-    RandGaussianNoised,
-    DivisiblePadd,
-)
+from monai.transforms import *
 
 
 def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
@@ -71,9 +41,8 @@ def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpo
 
 
 def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,
-                     crop_size=None, preload=True, augment_ratio=0.4, downsample=1, verbose=False):
+                     crop_size=None, preload=1.0, augment_ratio=0.4, downsample=1, verbose=False):
 
-    cache_ratio = 1.0 if preload else 0.0
     all_data = all_roi = all_coord = files_list
     data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], 
                             affine_keys=["affine","affine",None], dtype=[np.float32, np.int64, np.float32])
@@ -108,7 +77,7 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             AddChanneld(keys=["image", "label"]),
             spacer,
             resizer,
-            RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,2.0)),
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
@@ -133,14 +102,13 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             CastToTyped(keys=["image"], dtype=[np.float32]),
             ToTensord(keys=["image"])
         ])
-    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
+    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
 
-def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=None, 
+def get_RIB_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
                     crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
 
-    cache_ratio = 1.0 if preload else 0.0
     input_data = []
     for img, msk in files_list:
         input_data.append({"image":img, "label":msk})
@@ -176,10 +144,11 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=N
         transforms = Compose([
             LoadNiftid(keys=["image","label"]),
             AddChanneld(keys=["image", "label"]),
-            NormalizeIntensityd(keys="image"),
+            ScaleIntensityd(keys="image"),
             ThresholdIntensityd(keys="label", threshold=1, above=False, cval=1),
             Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
-            RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,2.0)),
             resizer,
             cropper,
             RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
@@ -192,7 +161,7 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=N
         transforms = Compose([
             LoadNiftid(keys=["image","label"]),
             AddChanneld(keys=["image", "label"]),
-            NormalizeIntensityd(keys=["image"]),
+            ScaleIntensityd(keys=["image"]),
             ThresholdIntensityd(keys=["label"], threshold=1, above=False, cval=1),
             Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
             resizer,
@@ -207,12 +176,12 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=True, image_size=N
             winlevel,
             Flipd(keys=["image"], spatial_axis=0),
             AsChannelFirstd(keys=['image']),
-            NormalizeIntensityd(keys=["image"]),
+            ScaleIntensityd(keys=["image"]),
             Zoomd(keys=["image"], zoom=1/downsample, mode=[InterpolateMode.AREA], keep_size=False),
             DivisiblePadd(keys=["image"], k=32),
             CastToTyped(keys=["image"], dtype=[np.float32]),
             ToTensord(keys=["image"])
         ])
-    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=cache_ratio)
+    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 

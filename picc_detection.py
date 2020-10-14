@@ -110,7 +110,7 @@ def test_cfg(**args):
 
     configures['model_path'] = clb.get_trained_models(exp_dir)
     configures['out_dir'] = check_dir(exp_dir, 'Test')
-    configures['preload'] = False
+    configures['preload'] = 0.0
     
     Print(f'{len(test_files)} test files', color='g')
     test_loader = get_dataloader(sn(**configures), test_files, phase='test')

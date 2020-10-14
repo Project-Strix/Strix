@@ -5,6 +5,7 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5
 from data_io.picc_dataset import get_PICC_dataset, get_RIB_dataset, CacheDataset
+from data_io.dr_sl_dataset import get_ObjCXR_dataset
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -24,8 +25,8 @@ def get_picc_datalist(dataset_name):
             fname = r"\\mega\clwang\Data\picc\prepared_h5\data_list.json"
         elif os.name == 'posix':
             fname = "/homes/clwang/Data/picc/prepared_h5/data_list_linux.json"
-    elif dataset_name == 'all_dr':
-        raise NotImplementedError
+    elif dataset_name == 'Obj_CXR':
+        fname = "/homes/clwang/Data/object-CXR/train_data_list.json"
     elif dataset_name == 'rib':
         fname = "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json"
         #fname = "/homes/yliu/Code/picc/raw_data2.json"
@@ -54,37 +55,45 @@ def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpo
             data[key].append(data_[i])
     return data.values()
 
-def get_dataloader(args, files_list, phase='train'):
+def get_default_setting(phase, **kwargs):
     if phase == 'train': #Todo: move this part to each dataset
-        shuffle = True
-        augment_ratio = args.augment_ratio
-        n_batch = args.n_batch
-        num_workers = 10
-        drop_last = True
+        shuffle = kwargs.get('train_shuffle', True)
+        batch_size = kwargs.get('train_n_batch', 5)
+        num_workers = kwargs.get('train_n_workers', 10)
+        drop_last = kwargs.get('train_drop_last', True)
+        pin_memory = kwargs.get('train_pin_memory', True)
     elif phase == 'valid':
-        shuffle = True
-        augment_ratio = 0.
-        n_batch = 2 #math.ceil(args.n_batch/2)
-        num_workers = 1
-        drop_last = False
+        shuffle =  kwargs.get('valid_shuffle', True)
+        batch_size = kwargs.get('valid_n_batch', 2)
+        num_workers = kwargs.get('valid_n_workers', 2)
+        drop_last = kwargs.get('valid_drop_last', False)
+        pin_memory = kwargs.get('valid_pin_memory', True)
     elif phase == 'test':
-        shuffle = False
-        augment_ratio = 0.
-        n_batch = 1
-        num_workers = 1
-        drop_last = False
+        shuffle = kwargs.get('test_shuffle', False)
+        batch_size = kwargs.get('test_n_batch', 1)
+        num_workers = kwargs.get('test_n_workers', 2)
+        drop_last = kwargs.get('test_drop_last', False)
+        pin_memory = kwargs.get('test_pin_memory', True)
     else:
         raise ValueError(f"phase must be in 'train,valid,test', but got {phase}") 
-
-    if args.data_list == 'rib':
-        dataset_ = get_RIB_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
-                                   crop_size=args.crop_size, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
-    elif args.data_list == 'picc_h5':
-        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, image_size=args.image_size, 
-                                    crop_size=args.crop_size, preload=args.preload, augment_ratio=augment_ratio, downsample=args.downsample, verbose=args.debug)
-
-    loader = DataLoader(dataset_, batch_size=n_batch, shuffle=shuffle, 
-                        drop_last=drop_last, num_workers=num_workers, pin_memory=True)
-
-    return loader
     
+    return {'batch_size':batch_size, 'shuffle':shuffle, 'drop_last':drop_last, 'num_workers':num_workers, 'pin_memory':pin_memory}
+    
+def get_dataloader(args, files_list, phase='train'):
+    if args.data_list == 'rib':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
+        dataset_ = get_RIB_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
+                                   crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+    elif args.data_list == 'picc_h5':
+        params = get_default_setting(phase, train_n_batch=args.n_batch)
+        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, image_size=args.image_size, 
+                                    crop_size=args.crop_size, preload=args.preload, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+    elif args.data_list == 'Obj_CXR':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
+        dataset_ = get_ObjCXR_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
+                                      crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+    else:
+        raise ValueError(f'No {args.data_list} dataset')
+
+    loader = DataLoader(dataset_, **params)
+    return loader

@@ -13,6 +13,7 @@ def get_trained_models(exp_folder):
 
 def get_exp_name(ctx, param, value):
     if 'debug' in ctx.params and ctx.params['debug']:
+        ctx.params['preload'] = 0.0 #emmm...
         return check_dir(ctx.params['out_dir'], 'test')
 
     model_name = ctx.params['model_type']
@@ -20,9 +21,10 @@ def get_exp_name(ctx, param, value):
     if 'partial' in ctx.params and ctx.params['partial'] < 1:
         datalist_name = datalist_name+'_p'
 
-    crop_size_str = str(ctx.params['crop_size']).strip('(').strip(')').replace(' ','')
+    input_size = ctx.params['image_size'] if ctx.params['crop_size'] == (0,0) else ctx.params['crop_size']
+    input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
 
-    exp_name = f"{datalist_name}-{model_name}-{crop_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
+    exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}-{ctx.params['timestamp']}"
 
     #suffix = '-redo' if ctx.params.get('config') is not None else ''
@@ -30,7 +32,7 @@ def get_exp_name(ctx, param, value):
     input_str = click.prompt('Experiment name', default=exp_name, type=str)
     exp_name = exp_name + '-' + input_str.strip('+') if '+' in input_str else input_str
 
-    return os.path.join(ctx.params['out_dir'], ctx.params['framework'], exp_name)
+    return os.path.join(ctx.params['out_dir'], ctx.params['framework'], datalist_name, exp_name)
 
 def split_input_str(value):
     return [ float(s) for s in value.split(',')] if value is not None else None
@@ -50,7 +52,7 @@ def lr_schedule_params(ctx, param, value):
     elif value == 'SGDR':
         t0 = _prompt('SGDR T-0', int, 50)
         eta  = _prompt('SGDR Min LR', float, 1e-4)
-        tmul = _prompt('SGDR T-mult', float, 1)
+        tmul = _prompt('SGDR T-mult', int, 1)
         #dcay = _prompt('SGDR decay', float, 1)
         ctx.params['lr_policy_params'] = {'T_0':t0, 'eta_min':eta, 'T_mult':tmul}
     elif value == 'CLR':
@@ -81,7 +83,7 @@ def model_select(ctx, param, value):
 
     return value
 
-dataset_list = ['picc_h5', 'all_dr', 'rib']
+dataset_list = ['picc_h5', 'Obj_CXR', 'rib']
 model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
@@ -90,7 +92,7 @@ layer_orders = ['crb','cbr', 'cgr','cbe','cB']
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(dataset_list,show_index=True), default=0, help='Data file list (json)')
     @click.option('--framework', prompt=True, type=click.Choice(framework_types,show_index=True), default=1, help='Choose your framework type')
-    @click.option('--preload', type=bool, default=True, help='Preload all data once')
+    @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=5000, help='Epoch number')
     @click.option('--n-batch', prompt=True, show_default=True, type=int, default=50, help='Batch size')
     @click.option('--istrain', type=bool, default=True, help="train/test phase flag")
