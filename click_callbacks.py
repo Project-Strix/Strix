@@ -110,6 +110,7 @@ def common_params(func):
     @click.option('-p', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
     @click.option('--save-epoch-freq', type=int, default=20, help='Save model freq')
     @click.option('--seed', type=int, default=101, help='random seed')
+    @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
     @wraps(func)
     def wrapper(*args, **kwargs):

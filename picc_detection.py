@@ -30,6 +30,8 @@ from ignite.engine import Events
 def train(**args):
     cargs = sn(**args)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+    if not cargs.verbose_log:
+        logging.StreamHandler.terminator = "\r"
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
         Print('CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag')
@@ -59,7 +61,7 @@ def train(**args):
     valid_loader = get_dataloader(cargs, files_valid, phase='valid')
 
     trainer = get_engine(cargs, train_loader, valid_loader, show_network=True)
-    trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('-'*40))
+    trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
     trainer.run()
         
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
