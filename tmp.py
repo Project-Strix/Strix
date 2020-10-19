@@ -96,42 +96,53 @@ for i in range(10):
 # %%
 import os, tqdm, json
 from pathlib import Path
+from PIL import Image
 import matplotlib.pyplot as plt
 from monai.transforms import *
-
+from scipy import ndimage
 
 folder = Path(r"\\mega\clwang\Data\object-CXR\train")
 files = [ f for f in folder.iterdir()]
 
-# json_file = r"\\mega\clwang\Data\object-CXR\train_data_list_win.json"
-# with open(json_file, 'r') as f:
-#     files = json.load(f)
+image_size = 1024
+augment_ratio = 0.5
+transforms = Compose([
+    LoadPNG(image_only=True, grayscale=True),
+    AddChannel(),
+    ScaleIntensity(),
+    FixedResize(spatial_size=image_size, mode=InterpolateMode.AREA),
+    #RandSpatialCrop(roi_size=384, random_size=False),
+    #resizer,
+    #RandAdjustContrast(prob=augment_ratio, gamma=(0.5, 1.5)),
+    RandFlip(prob=augment_ratio, spatial_axis=[1]),
+    RandNonlinear(prob=augment_ratio),
+    RandLocalPixelShuffle(prob=augment_ratio, num_block_range=[10000,10001]),
+    RandomSelect([
+        RandImageInpainting(prob=1, num_block_range=(3,5)),
+        RandImageOutpainting(prob=1, num_block_range=(6,9)),
+    ], prob=augment_ratio),
+    CastToType(dtype=np.float32),
+])
 
-loader = Compose([LoadPNGd(keys='image'), AddChanneld(keys='image')]) 
+loader = Compose([LoadPNG(image_only=True, grayscale=True), ScaleIntensity(), AddChannel(), RandSpatialCrop(roi_size=512, random_size=False)]) 
 for i, file in enumerate(files):
-    # if file.stem not in ['02988','02188','01231','05052']:
+    # if file.stem not in ['03538','02781','04908']:
     #     continue
 
     if not os.path.isfile(file):
         continue
+    print(file.stem)    
+    x = loader(file)
+    y = RandGaussianSmooth(prob=1,sigma_x=(8,10), sigma_y=(8,10))(x)
+    #x = transforms(file)
 
-    print(file.stem)
-    image = loader({'image':file})
-    new_image = FixedResized(keys='image', spatial_size=512)(image)
-    print('\n', image['image'].shape, new_image['image'].shape)
-    plt.imshow(new_image['image'].squeeze(), cmap=plt.cm.gray)
+    #new_image = FixedResized(keys='image', spatial_size=512)(image)
+    plt.subplot(1,2,1)
+    plt.imshow(x.squeeze(), cmap=plt.cm.gray)
+    plt.subplot(1,2,2)
+    plt.imshow(y.squeeze(), cmap=plt.cm.gray)
     plt.show()
-
-    # except:
-    #     print("Error in read:", file.stem)
-    #     continue
     input()
-    # ratio = np.count_nonzero(image < 100) / image.size
-    # #plt.hist(image.ravel(), bins=128)
-    # if ratio > 0.75:
-    #     plt.imshow(image, cmap=plt.cm.gray)
-    #     plt.show()
-    #     print('Remove:', file.stem)
-    #     os.remove(file)
+
 
 # %%

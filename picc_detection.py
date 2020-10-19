@@ -29,8 +29,9 @@ from ignite.engine import Events
 @click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_name',save_code=True,exist_ok=False))
 def train(**args):
     cargs = sn(**args)
-    logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-    if not cargs.verbose_log:
+    logging_level = logging.DEBUG if cargs.debug else logging.INFO
+    logging.basicConfig(stream=sys.stderr, level=logging_level)
+    if not cargs.verbose_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:

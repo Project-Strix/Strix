@@ -15,6 +15,7 @@ from .losses import DeepSupervisionLoss
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
+from monai.engines import multi_gpu_supervised_trainer
 from monai.inferers import SimpleInferer, SlidingWindowClassify
 from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd
 from monai.networks.nets import UNet, DynUNet, HighResNet
@@ -163,7 +164,12 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
     if opts.deep_supervision:
         loss = DeepSupervisionLoss(loss)
 
-    net = get_network(opts).to(device)
+    net_ = get_network(opts)
+    if len(opts.gpu_ids)>1 and not opts.amp:
+        net = torch.nn.DataParallel(net_.to(device))
+    else:
+        net = net_.to(device)
+
     if show_network:
         print_network(net)
 
@@ -184,7 +190,8 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, 
                                                                             T_0=opts.lr_policy_params['T_0'],
                                                                             T_mult=opts.lr_policy_params['T_mult'],
-                                                                            eta_min=opts.lr_policy_params['eta_min'])
+                                                                            eta_min=opts.lr_policy_params['eta_min'])    
+
     #! Segmentation module
     if framework_type == 'segmentation':
         assert _get_network_type(opts.model_type) == 'FCN', f"Only accept FCN arch: {NETWORK_TYPES['FCN']}"
@@ -288,7 +295,8 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
                 max_channels=opts.output_nc,
                 prefix_name='Val'
             ),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_name='val_mse', key_metric_n_saved=3)
+            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True,
+                            key_metric_name='val_mse',key_metric_mode='min',key_metric_n_saved=2)
         ]
 
         prepare_batch_fn = lambda x : (x["image"], x["label"])
@@ -320,7 +328,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
                prefix_name='train'
             ),
         ]
-
+        
         trainer = SupervisedTrainer(
             device=device,
             max_epochs=opts.n_epoch,

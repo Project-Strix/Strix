@@ -5,7 +5,7 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5
 from data_io.picc_dataset import get_PICC_dataset, get_RIB_dataset, CacheDataset
-from data_io.dr_sl_dataset import get_ObjCXR_dataset
+from data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -27,6 +27,8 @@ def get_picc_datalist(dataset_name):
             fname = "/homes/clwang/Data/picc/prepared_h5/data_list_linux.json"
     elif dataset_name == 'Obj_CXR':
         fname = "/homes/clwang/Data/object-CXR/train_data_list.json"
+    elif dataset_name == 'NIH_CXR':
+        fname = "/homes/clwang/Data/NIH-CXR_TRAIN_VAL_LIST.json"
     elif dataset_name == 'rib':
         fname = "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json"
         #fname = "/homes/yliu/Code/picc/raw_data2.json"
@@ -86,12 +88,16 @@ def get_dataloader(args, files_list, phase='train'):
                                    crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'picc_h5':
         params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, image_size=args.image_size, 
+        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.4,0.4], in_channels=args.input_nc, image_size=args.image_size, 
                                     crop_size=args.crop_size, preload=args.preload, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'Obj_CXR':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
         dataset_ = get_ObjCXR_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
-                                      crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+                                      crop_size=args.crop_size, augment_ratio=args.augment_ratio, verbose=args.debug)
+    elif args.data_list == 'NIH_CXR':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
+        dataset_ = get_NIHXray_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
+                                       crop_size=args.crop_size, augment_ratio=args.augment_ratio, verbose=args.debug)
     else:
         raise ValueError(f'No {args.data_list} dataset')
 

@@ -18,14 +18,13 @@ def get_exp_name(ctx, param, value):
 
     model_name = ctx.params['model_type']
     datalist_name = str(ctx.params['data_list'])
-    if 'partial' in ctx.params and ctx.params['partial'] < 1:
-        datalist_name = datalist_name+'_p'
+    partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
 
     input_size = ctx.params['image_size'] if ctx.params['crop_size'] == (0,0) else ctx.params['crop_size']
     input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
 
     exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
-                f"{ctx.params['optim']}-{ctx.params['lr_policy']}-{ctx.params['timestamp']}"
+                f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{ctx.params['timestamp']}"
 
     #suffix = '-redo' if ctx.params.get('config') is not None else ''
         
@@ -83,7 +82,7 @@ def model_select(ctx, param, value):
 
     return value
 
-dataset_list = ['picc_h5', 'Obj_CXR', 'rib']
+dataset_list = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib']
 model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
 losses = ['CE', 'WCE', 'MSE', 'DCE']
 lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']

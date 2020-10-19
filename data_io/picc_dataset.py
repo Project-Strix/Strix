@@ -77,11 +77,13 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             AddChanneld(keys=["image", "label"]),
             spacer,
             resizer,
-            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,2.0)),
+            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,1.4)),
+            #Rand2DElasticd(keys=["image","label"], prob=augment_ratio, spacing=(300, 300), magnitude_range=(10, 20), padding_mode="border"),
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             repeater,
+            #DataStatsd(keys='image'),
             ToTensord(keys=["image", "label"]),
         ])
     elif phase == 'valid':
