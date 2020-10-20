@@ -1,3 +1,26 @@
+# %%
+import os, torch
+from monai.networks.nets import UNet, DynUNet, DenseNet
+
+pretrain_state_dict = torch.load("/homes/clwang/Data/picc/exp/selflearning/Obj_CXR/unet-512,512-MSE-sgd-const-1015_1215-crop/Models/checkpoint_epoch=1000.pt")
+mod = DynUNet(spatial_dims=2,
+              in_channels=1,
+              out_channels=2,
+              norm_name="batch",
+              kernel_size=(3, 3, 3, 3, 3, 3),
+              strides=(1, 2, 2, 2, 2, 2),
+              #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
+              deep_supervision=False,
+              deep_supr_num=1,
+              res_block=True,
+              last_activation=None)
+
+model_dict = mod.state_dict()
+filtered_dict = {k: v for k, v in pretrain_state_dict['net'].items() if v.shape == model_dict[k].shape}
+model_dict.update(filtered_dict)
+mod.load_state_dict(model_dict)
+
+os.sys.exit()
 #%%
 import os
 import numpy as np 
@@ -124,16 +147,20 @@ transforms = Compose([
     CastToType(dtype=np.float32),
 ])
 
-loader = Compose([LoadPNG(image_only=True, grayscale=True), ScaleIntensity(), AddChannel(), RandSpatialCrop(roi_size=512, random_size=False)]) 
+loader = Compose([LoadPNGd(keys='image', grayscale=True), 
+                  ScaleIntensityd(keys='image'), 
+                  AddChanneld(keys='image'), 
+                  RandSpatialCropd(keys='image', roi_size=512, random_size=False),
+                  adaptor(RandLocalPixelShuffle(prob=augment_ratio, num_block_range=[100,1000]), "image")])
 for i, file in enumerate(files):
-    # if file.stem not in ['03538','02781','04908']:
-    #     continue
+    if i > 10:
+        break
 
     if not os.path.isfile(file):
         continue
+
     print(file.stem)    
     x = loader(file)
-    y = RandGaussianSmooth(prob=1,sigma_x=(8,10), sigma_y=(8,10))(x)
     #x = transforms(file)
 
     #new_image = FixedResized(keys='image', spatial_size=512)(image)
@@ -143,6 +170,7 @@ for i, file in enumerate(files):
     plt.imshow(y.squeeze(), cmap=plt.cm.gray)
     plt.show()
     input()
+
 
 
 # %%

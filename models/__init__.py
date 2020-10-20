@@ -184,8 +184,8 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x:1)
     elif opts.lr_policy == 'step':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 
-                                                        step_size=opts.lr_policy_params['step_size'], 
-                                                        gamma=opts.lr_policy_params['gamma'])
+                                                       step_size=opts.lr_policy_params['step_size'], 
+                                                       gamma=opts.lr_policy_params['gamma'])
     elif opts.lr_policy == 'SGDR':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, 
                                                                             T_0=opts.lr_policy_params['T_0'],
@@ -268,7 +268,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             train_handlers=train_handlers,
             amp=opts.amp
         )
-        return trainer
+        return trainer, net
     
     #! Detection module
     if framework_type == 'detection':
@@ -341,7 +341,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             train_handlers=train_handlers,
             amp=opts.amp
         )
-        return trainer
+        return trainer, net
        
     #! Classification module
     elif framework_type == 'classification':
@@ -403,7 +403,7 @@ def get_engine(opts, train_loader, test_loader, show_network=True):
             amp=opts.amp
         )
 
-        return trainer
+        return trainer, net
 
 
 def get_test_engine(opts, test_loader):

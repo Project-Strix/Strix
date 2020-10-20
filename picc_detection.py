@@ -15,6 +15,7 @@ import click
 from click.parser import OptionParser
 import click_callbacks as clb
 from ignite.engine import Events
+from monai.handlers import CheckpointLoader
 
 @click.command('train', context_settings={'allow_extra_args':True})
 @click.option('--config', type=str, help="tmp var for train_from_cfg")
@@ -61,8 +62,13 @@ def train(**args):
     train_loader = get_dataloader(cargs, files_train, phase='train')
     valid_loader = get_dataloader(cargs, files_valid, phase='valid')
 
-    trainer = get_engine(cargs, train_loader, valid_loader, show_network=True)
+    trainer, net = get_engine(cargs, train_loader, valid_loader, show_network=True)
     trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
+    if os.path.isfile(cargs.pretrained_model_path):
+        Print("Load pretrained model for contiune training:\n\t", cargs.pretrained_model_path, color='g')
+        trainer.add_event_handler(event_name=Events.STARTED, 
+                                  handler=CheckpointLoader(load_path=cargs.pretrained_model_path,
+                                                           load_dict={"net": net}, strict=False, skip_mismatch=True))
     trainer.run()
         
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})

@@ -42,7 +42,7 @@ def get_ObjCXR_dataset(files_list, phase, in_channels=1, preload=1.0, image_size
             #RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.5, 1.5)),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1]),
             adaptor(RandNonlinear(prob=augment_ratio), "image"),
-            adaptor(RandLocalPixelShuffle(prob=augment_ratio, num_block_range=[9000,10000]), "image"),
+            adaptor(RandLocalPixelShuffle(prob=augment_ratio, num_block_range=(9000,10000)), "image"),
             RandomSelect([
                 adaptor(RandImageInpainting(prob=1, num_block_range=(3,5)), 'image'),
                 adaptor(RandImageOutpainting(prob=1, num_block_range=(6,9)), 'image'),
