@@ -305,40 +305,38 @@ def generate_anchors_3D(scales_xy, scales_z, ratios, shape, feature_stride_xy, f
     return boxes
 
 
-def generate_pyramid_anchors(logger, cf):
+def generate_pyramid_anchors(logger, 
+                             rpn_anchor_scales, 
+                             rpn_anchor_ratios,
+                             backbone_feat_shapes, 
+                             rpn_anchor_stride, 
+                             pyramid_levels, 
+                             backbone_feat_strides):
     """Generate anchors at different levels of a feature pyramid. Each scale
     is associated with a level of the pyramid, but each ratio is used in
     all levels of the pyramid.
 
-    from configs:
-    :param scales: cf.RPN_ANCHOR_SCALES , e.g. [4, 8, 16, 32]
-    :param ratios: cf.RPN_ANCHOR_RATIOS , e.g. [0.5, 1, 2]
-    :param feature_shapes: cf.BACKBONE_SHAPES , e.g.  [array of shapes per feature map] [80, 40, 20, 10, 5]
-    :param feature_strides: cf.BACKBONE_STRIDES , e.g. [2, 4, 8, 16, 32, 64]
-    :param anchors_stride: cf.RPN_ANCHOR_STRIDE , e.g. 1
+    :param scales: RPN_ANCHOR_SCALES , e.g. [4, 8, 16, 32]
+    :param ratios: RPN_ANCHOR_RATIOS , e.g. [0.5, 1, 2]
+    :param feature_shapes: BACKBONE_SHAPES , e.g.  [array of shapes per feature map] [80, 40, 20, 10, 5]
+    :param feature_strides: BACKBONE_STRIDES , e.g. [2, 4, 8, 16, 32, 64]
+    :param anchors_stride: RPN_ANCHOR_STRIDE , e.g. 1
     :return anchors: (N, (y1, x1, y2, x2, (z1), (z2)). All generated anchors in one array. Sorted
     with the same order of the given scales. So, anchors of scale[0] come first, then anchors of scale[1], and so on.
     """
-    scales = cf.rpn_anchor_scales
-    ratios = cf.rpn_anchor_ratios
-    feature_shapes = cf.backbone_shapes
-    anchor_stride = cf.rpn_anchor_stride
-    pyramid_levels = cf.pyramid_levels
-    feature_strides = cf.backbone_strides
-
     anchors = []
-    logger.info("feature map shapes: {}".format(feature_shapes))
-    logger.info("anchor scales: {}".format(scales))
+    logger.info("BACKBONE feature map shapes: {}".format(backbone_feat_shapes))
+    logger.info("BACKBONE anchor scales: {}".format(rpn_anchor_scales))
 
-    expected_anchors = [np.prod(feature_shapes[ii]) * len(ratios) * len(scales['xy'][ii]) for ii in pyramid_levels]
+    expected_anchors = [np.prod(backbone_feat_shapes[ii]) * len(rpn_anchor_ratios) * len(rpn_anchor_scales['xy'][ii]) for ii in pyramid_levels]
 
     for lix, level in enumerate(pyramid_levels):
-        if len(feature_shapes[level]) == 2:
-            anchors.append(generate_anchors(scales['xy'][level], ratios, feature_shapes[level],
-                                            feature_strides['xy'][level], anchor_stride))
+        if len(backbone_feat_shapes[level]) == 2:
+            anchors.append(generate_anchors(rpn_anchor_scales['xy'][level], rpn_anchor_ratios, backbone_feat_shapes[level],
+                                            backbone_feat_strides['xy'][level], rpn_anchor_stride))
         else:
-            anchors.append(generate_anchors_3D(scales['xy'][level], scales['z'][level], ratios, feature_shapes[level],
-                                            feature_strides['xy'][level], feature_strides['z'][level], anchor_stride))
+            anchors.append(generate_anchors_3D(rpn_anchor_scales['xy'][level], rpn_anchor_scales['z'][level], rpn_anchor_ratios, backbone_feat_shapes[level],
+                                            backbone_feat_strides['xy'][level], backbone_feat_strides['z'][level], rpn_anchor_stride))
 
         logger.info("level {}: built anchors {} / expected anchors {} ||| total build {} / total expected {}".format(
             level, anchors[-1].shape, expected_anchors[lix], np.concatenate(anchors).shape, np.sum(expected_anchors)))

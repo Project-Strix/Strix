@@ -24,7 +24,18 @@ class FPN(nn.Module):
     Feature Pyramid Network from https://arxiv.org/pdf/1612.03144.pdf with options for modifications.
     by default is constructed with Pyramid levels P2, P3, P4, P5.
     """
-    def __init__(self, cf, conv, operate_stride1=False):
+    def __init__(self,
+                 input_channels,
+                 out_channels,
+                 conv,
+                 start_filts, 
+                 res_architecture,
+                 norm,
+                 relu,
+                 sixth_pooling,
+                 n_latent_dims=0,
+                 operate_stride1=False):
+        
         """
         from configs:
         :param input_channels: number of channel dimensions in input data.
@@ -39,62 +50,61 @@ class FPN(nn.Module):
         """
         super(FPN, self).__init__()
 
-        self.start_filts = cf.start_filts
-        start_filts = self.start_filts
-        self.n_blocks = [3, 4, {"resnet50": 6, "resnet101": 23}[cf.res_architecture], 3]
+        self.start_filts = start_filts
+        self.n_blocks = [3, 4, {"resnet50": 6, "resnet101": 23}[res_architecture], 3]
         self.block = ResBlock
         self.block_expansion = 4
         self.operate_stride1 = operate_stride1
-        self.sixth_pooling = cf.sixth_pooling
+        self.sixth_pooling = sixth_pooling
         self.dim = conv.dim
 
         if operate_stride1:
-            self.C0 = nn.Sequential(conv(cf.n_channels, start_filts, ks=3, pad=1, norm=cf.norm, relu=cf.relu),
-                                    conv(start_filts, start_filts, ks=3, pad=1, norm=cf.norm, relu=cf.relu))
+            self.C0 = nn.Sequential(conv(input_channels, start_filts, ks=3, pad=1, norm=norm, relu=relu),
+                                    conv(start_filts, start_filts, ks=3, pad=1, norm=norm, relu=relu))
 
-            self.C1 = conv(start_filts, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=cf.norm, relu=cf.relu)
+            self.C1 = conv(start_filts, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
 
         else:
-            self.C1 = conv(cf.n_channels, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=cf.norm, relu=cf.relu)
+            self.C1 = conv(input_channels, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
 
         start_filts_exp = start_filts * self.block_expansion
 
         C2_layers = []
         C2_layers.append(nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
                          if conv.dim == 2 else nn.MaxPool3d(kernel_size=3, stride=(2, 2, 1), padding=1))
-        C2_layers.append(self.block(start_filts, start_filts, conv=conv, stride=1, norm=cf.norm, relu=cf.relu,
+        C2_layers.append(self.block(start_filts, start_filts, conv=conv, stride=1, norm=norm, relu=relu,
                                     downsample=(start_filts, self.block_expansion, 1)))
         for i in range(1, self.n_blocks[0]):
-            C2_layers.append(self.block(start_filts_exp, start_filts, conv=conv, norm=cf.norm, relu=cf.relu))
+            C2_layers.append(self.block(start_filts_exp, start_filts, conv=conv, norm=norm, relu=relu))
         self.C2 = nn.Sequential(*C2_layers)
 
         C3_layers = []
-        C3_layers.append(self.block(start_filts_exp, start_filts * 2, conv=conv, stride=2, norm=cf.norm, relu=cf.relu,
+        C3_layers.append(self.block(start_filts_exp, start_filts * 2, conv=conv, stride=2, norm=norm, relu=relu,
                                     downsample=(start_filts_exp, 2, 2)))
         for i in range(1, self.n_blocks[1]):
-            C3_layers.append(self.block(start_filts_exp * 2, start_filts * 2, conv=conv, norm=cf.norm, relu=cf.relu))
+            C3_layers.append(self.block(start_filts_exp * 2, start_filts * 2, conv=conv, norm=norm, relu=relu))
         self.C3 = nn.Sequential(*C3_layers)
 
         C4_layers = []
         C4_layers.append(self.block(
-            start_filts_exp * 2, start_filts * 4, conv=conv, stride=2, norm=cf.norm, relu=cf.relu, downsample=(start_filts_exp * 2, 2, 2)))
+            start_filts_exp * 2, start_filts * 4, conv=conv, stride=2, norm=norm, relu=relu, downsample=(start_filts_exp * 2, 2, 2)))
         for i in range(1, self.n_blocks[2]):
-            C4_layers.append(self.block(start_filts_exp * 4, start_filts * 4, conv=conv, norm=cf.norm, relu=cf.relu))
+            C4_layers.append(self.block(start_filts_exp * 4, start_filts * 4, conv=conv, norm=norm, relu=relu))
         self.C4 = nn.Sequential(*C4_layers)
 
         C5_layers = []
         C5_layers.append(self.block(
-            start_filts_exp * 4, start_filts * 8, conv=conv, stride=2, norm=cf.norm, relu=cf.relu, downsample=(start_filts_exp * 4, 2, 2)))
+            start_filts_exp * 4, start_filts * 8, conv=conv, stride=2, norm=norm, relu=relu, downsample=(start_filts_exp * 4, 2, 2)))
         for i in range(1, self.n_blocks[3]):
-            C5_layers.append(self.block(start_filts_exp * 8, start_filts * 8, conv=conv, norm=cf.norm, relu=cf.relu))
+            C5_layers.append(self.block(start_filts_exp * 8, start_filts * 8, conv=conv, norm=norm, relu=relu))
         self.C5 = nn.Sequential(*C5_layers)
 
         if self.sixth_pooling:
             C6_layers = []
             C6_layers.append(self.block(
-                start_filts_exp * 8, start_filts * 16, conv=conv, stride=2, norm=cf.norm, relu=cf.relu, downsample=(start_filts_exp * 8, 2, 2)))
+                start_filts_exp * 8, start_filts * 16, conv=conv, stride=2, norm=norm, relu=relu, downsample=(start_filts_exp * 8, 2, 2)))
             for i in range(1, self.n_blocks[3]):
-                C6_layers.append(self.block(start_filts_exp * 16, start_filts * 16, conv=conv, norm=cf.norm, relu=cf.relu))
+                C6_layers.append(self.block(start_filts_exp * 16, start_filts * 16, conv=conv, norm=norm, relu=relu))
             self.C6 = nn.Sequential(*C6_layers)
 
         if conv.dim == 2:
@@ -104,26 +114,25 @@ class FPN(nn.Module):
             self.P1_upsample = Interpolate(scale_factor=(2, 2, 1), mode='trilinear')
             self.P2_upsample = Interpolate(scale_factor=(2, 2, 1), mode='trilinear')
 
-        self.out_channels = cf.end_filts
-        self.P5_conv1 = conv(start_filts*32 + cf.n_latent_dims, self.out_channels, ks=1, stride=1, relu=None) #
-        self.P4_conv1 = conv(start_filts*16, self.out_channels, ks=1, stride=1, relu=None)
-        self.P3_conv1 = conv(start_filts*8, self.out_channels, ks=1, stride=1, relu=None)
-        self.P2_conv1 = conv(start_filts*4, self.out_channels, ks=1, stride=1, relu=None)
-        self.P1_conv1 = conv(start_filts, self.out_channels, ks=1, stride=1, relu=None)
+        self.P5_conv1 = conv(start_filts*32 + n_latent_dims, out_channels, ks=1, stride=1, relu=None) #
+        self.P4_conv1 = conv(start_filts*16, out_channels, ks=1, stride=1, relu=None)
+        self.P3_conv1 = conv(start_filts*8, out_channels, ks=1, stride=1, relu=None)
+        self.P2_conv1 = conv(start_filts*4, out_channels, ks=1, stride=1, relu=None)
+        self.P1_conv1 = conv(start_filts, out_channels, ks=1, stride=1, relu=None)
 
         if operate_stride1:
-            self.P0_conv1 = conv(start_filts, self.out_channels, ks=1, stride=1, relu=None)
-            self.P0_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
+            self.P0_conv1 = conv(start_filts, out_channels, ks=1, stride=1, relu=None)
+            self.P0_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
 
-        self.P1_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
-        self.P2_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
-        self.P3_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
-        self.P4_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
-        self.P5_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
+        self.P1_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
+        self.P2_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
+        self.P3_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
+        self.P4_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
+        self.P5_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
 
         if self.sixth_pooling:
-            self.P6_conv1 = conv(start_filts * 64, self.out_channels, ks=1, stride=1, relu=None)
-            self.P6_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
+            self.P6_conv1 = conv(start_filts * 64, out_channels, ks=1, stride=1, relu=None)
+            self.P6_conv2 = conv(out_channels, out_channels, ks=3, stride=1, pad=1, relu=None)
 
 
     def forward(self, x):

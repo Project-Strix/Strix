@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils
-
+import models.backbone
 
 ############################################################
 #  Network Heads
@@ -36,23 +36,23 @@ import torch.utils
 
 class Classifier(nn.Module):
 
-
-    def __init__(self, cf, conv):
+    def __init__(self, head_classes, end_filts, n_rpn_features, n_anchors_per_pos, rpn_anchor_stride, relu, conv):
         """
         Builds the classifier sub-network.
         """
+
         super(Classifier, self).__init__()
         self.dim = conv.dim
-        self.n_classes = cf.head_classes
-        n_input_channels = cf.end_filts
-        n_features = cf.n_rpn_features
-        n_output_channels = cf.n_anchors_per_pos * cf.head_classes
-        anchor_stride = cf.rpn_anchor_stride
+        self.n_classes = head_classes
+        n_input_channels = end_filts
+        n_features = n_rpn_features
+        n_output_channels = n_anchors_per_pos * head_classes
+        anchor_stride = rpn_anchor_stride
 
-        self.conv_1 = conv(n_input_channels, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_2 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_3 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_4 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
+        self.conv_1 = conv(n_input_channels, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_2 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_3 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_4 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
         self.conv_final = conv(n_features, n_output_channels, ks=3, stride=anchor_stride, pad=1, relu=None)
 
 
@@ -78,22 +78,21 @@ class Classifier(nn.Module):
 
 class BBRegressor(nn.Module):
 
-
-    def __init__(self, cf, conv):
+    def __init__(self, end_filts, n_rpn_features, n_anchors_per_pos, rpn_anchor_stride, relu, conv):
         """
         Builds the bb-regression sub-network.
         """
         super(BBRegressor, self).__init__()
         self.dim = conv.dim
-        n_input_channels = cf.end_filts
-        n_features = cf.n_rpn_features
-        n_output_channels = cf.n_anchors_per_pos * self.dim * 2
-        anchor_stride = cf.rpn_anchor_stride
+        n_input_channels = end_filts
+        n_features = n_rpn_features
+        n_output_channels = n_anchors_per_pos * self.dim * 2
+        anchor_stride = rpn_anchor_stride
 
-        self.conv_1 = conv(n_input_channels, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_2 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_3 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
-        self.conv_4 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=cf.relu)
+        self.conv_1 = conv(n_input_channels, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_2 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_3 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
+        self.conv_4 = conv(n_features, n_features, ks=3, stride=anchor_stride, pad=1, relu=relu)
         self.conv_final = conv(n_features, n_output_channels, ks=3, stride=anchor_stride,
                                pad=1, relu=None)
 
@@ -337,10 +336,46 @@ def get_results(cf, img_shape, detections, seg_logits, box_results_list=None):
 
 class RetinaUNet(nn.Module):
 
-
-    def __init__(self, cf, logger):
+    def __init__(self, spatial_dims, num_seg_classes, 
+                 # pyramid anchors parameters
+                 rpn_anchor_scales, rpn_anchor_ratios, backbone_shapes, 
+                 rpn_anchor_stride, pyramid_levels, backbone_strides, 
+                 # FPN parameters
+                 fpn_in_channels, fpn_out_channels, fpn_conv, fpn_start_filts, 
+                 fpn_res_archi, fpn_norm, fpn_relu, fpn_sixth_pooling, 
+                 fpn_n_latent_dims, fpn_operate_stride1,
+                 # Classifer parameters
+                 cls_head_classes, cls_end_filts, cls_n_rpn_features, 
+                 cls_n_anchors_per_pos, cls_rpn_anchor_stride, cls_relu, cls_conv,
+                 cf, logger):
 
         super(RetinaUNet, self).__init__()
+        self.spatial_dims = spatial_dims
+        self.num_seg_classes = num_seg_classes
+        self.rpn_anchor_scales = rpn_anchor_scales
+        self.rpn_anchor_ratios = rpn_anchor_ratios
+        self.backbone_shapes = backbone_shapes
+        self.rpn_anchor_stride = rpn_anchor_stride
+        self.pyramid_levels = pyramid_levels
+        self.backbone_strides = backbone_strides
+        self.fpn_in_channels = fpn_in_channels
+        self.fpn_out_channels = fpn_out_channels
+        self.fpn_conv = fpn_conv
+        self.fpn_start_filts = fpn_start_filts
+        self.fpn_res_archi = fpn_res_archi
+        self.fpn_norm = fpn_norm
+        self.fpn_relu = fpn_relu
+        self.fpn_sixth_pooling = fpn_sixth_pooling
+        self.fpn_n_latent_dims = fpn_n_latent_dims
+        self.fpn_operate_stride1 = fpn_operate_stride1
+        self.cls_head_classes = cls_head_classes
+        self.cls_end_filts = cls_end_filts
+        self.cls_n_rpn_features = cls_n_rpn_features
+        self.cls_n_anchors_per_pos = cls_n_anchors_per_pos
+        self.cls_rpn_anchor_stride = cls_rpn_anchor_stride
+        self.cls_relu = cls_relu
+        self.cls_conv = cls_conv
+
         self.cf = cf
         self.logger = logger
         self.build()
@@ -355,25 +390,21 @@ class RetinaUNet(nn.Module):
         """
         Build Retina Net architecture.
         """
-
-        # Image size must be dividable by 2 multiple times.
-        h, w = self.cf.patch_size[:2]
-        if h / 2 ** 5 != int(h / 2 ** 5) or w / 2 ** 5 != int(w / 2 ** 5):
-            raise Exception("Image size must be dividable by 2 at least 5 times "
-                            "to avoid fractions when downscaling and upscaling."
-                            "For example, use 256, 320, 384, 448, 512, ... etc. ")
-
         # instanciate abstract multi dimensional conv class and backbone model.
-        conv = NDConvGenerator(self.cf.dim)
-        backbone = import_module('bbone', self.cf.backbone_path)
+        conv = NDConvGenerator(self.spatial_dims)
+        #backbone = import_module('bbone', self.cf.backbone_path)
 
         # build Anchors, FPN, Classifier / Bbox-Regressor -head
-        self.np_anchors = generate_pyramid_anchors(self.logger, self.cf)
+        self.np_anchors = generate_pyramid_anchors(self.logger, self.rpn_anchor_scales, self.rpn_anchor_ratios, self.backbone_shapes, self.rpn_anchor_stride, self.pyramid_levels, self.backbone_strides)
         self.anchors = torch.from_numpy(self.np_anchors).float().cuda()
-        self.Fpn = backbone.FPN(self.cf, conv, operate_stride1=self.cf.operate_stride1)
-        self.Classifier = Classifier(self.cf, conv)
+        self.Fpn = backbone.FPN(self.fpn_in_channels, self.fpn_out_channels, self.fpn_conv, self.fpn_start_filts,
+                                self.fpn_res_archi, self.fpn_norm, self.fpn_relu, self.fpn_sixth_pooling,
+                                self.fpn_n_latent_dims, self.fpn_operate_stride1)
+        self.Classifier = Classifier(self.cls_head_classes, self.cls_end_filts, self.cls_n_rpn_features, 
+                                     self.cls_n_anchors_per_pos, self.cls_rpn_anchor_stride, self.cls_relu, self.cls_conv)
+
         self.BBRegressor = BBRegressor(self.cf, conv)
-        self.final_conv = conv(self.cf.end_filts, self.cf.num_seg_classes, ks=1, pad=0, norm=None, relu=None)
+        self.final_conv = conv(self.cf.end_filts, self.num_seg_classes, ks=1, pad=0, norm=None, relu=None)
 
 
     def train_forward(self, batch, **kwargs):
@@ -390,7 +421,7 @@ class RetinaUNet(nn.Module):
         img = batch['data']
         gt_class_ids = batch['roi_labels']
         gt_boxes = batch['bb_target']
-        var_seg_ohe = torch.FloatTensor(get_one_hot_encoding(batch['seg'], self.cf.num_seg_classes)).cuda()
+        var_seg_ohe = torch.FloatTensor(get_one_hot_encoding(batch['seg'], self.num_seg_classes)).cuda()
         var_seg = torch.LongTensor(batch['seg']).cuda()
 
         img = torch.from_numpy(img).float().cuda()
