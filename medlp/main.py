@@ -23,7 +23,11 @@ if __name__ == '__main__':
     from picc_detection import train
     from picc_detection import train_cfg
     from picc_detection import test_cfg
+    from nni_search import nni_search
+    from nni_search import train_nni
     main.add_command(train)
     main.add_command(train_cfg)
     main.add_command(test_cfg)
+    main.add_command(nni_search)
+    main.add_command(train_nni)
     main()

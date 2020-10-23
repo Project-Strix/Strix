@@ -28,8 +28,8 @@ from utilities.handlers import TensorboardGraph
 @click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
-@click.option('--experiment-name', type=str, callback=clb.get_exp_name, default='')
-@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_name',save_code=True,exist_ok=False))
+@click.option('--experiment-path', type=str, callback=clb.get_exp_name, default='')
+@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_path',save_code=True,exist_ok=False))
 def train(**args):
     cargs = sn(**args)
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
@@ -43,7 +43,6 @@ def train(**args):
         os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
 
     cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
-    cargs.out_dir = cargs.experiment_name
 
     data_list = get_picc_datalist(cargs.data_list)
     assert os.path.isfile(data_list), 'Data list not exists!'
@@ -56,20 +55,20 @@ def train(**args):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
 
     # Save param and datalist
-    with open(os.path.join(cargs.out_dir, 'train_files'), 'w') as f:
+    with open(os.path.join(cargs.experiment_path, 'train_files'), 'w') as f:
         json.dump(files_train, f, indent=2)
-    with open(os.path.join(cargs.out_dir, 'test_files'), 'w') as f:
+    with open(os.path.join(cargs.experiment_path, 'test_files'), 'w') as f:
         json.dump(files_valid, f, indent=2)
 
     train_loader = get_dataloader(cargs, files_train, phase='train')
     valid_loader = get_dataloader(cargs, files_valid, phase='valid')
 
     # Tensorboard Logger
-    writer = SummaryWriter(log_dir=os.path.join(cargs.out_dir, 'tensorboard'))
+    writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, 'tensorboard'))
     if not cargs.debug:
-        tb_dir = check_dir(os.path.dirname(cargs.out_dir),'tb')
-        os.symlink(os.path.join(cargs.out_dir, 'tensorboard'), 
-                   os.path.join(tb_dir, os.path.basename(cargs.experiment_name)), target_is_directory=True)
+        tb_dir = check_dir(os.path.dirname(cargs.experiment_path),'tb')
+        os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'), 
+                   os.path.join(tb_dir, os.path.basename(cargs.experiment_path)), target_is_directory=True)
     
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
     trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
@@ -127,7 +126,7 @@ def test_cfg(**args):
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args['gpus'])
 
-    exp_dir = args.get('experiment_name', os.path.dirname(args['config']))
+    exp_dir = args.get('experiment_path', os.path.dirname(args['config']))
     if os.path.isfile(args['test_files']):
         test_files = get_items_from_file(args['test_files'], format='json')
     else:
@@ -135,7 +134,7 @@ def test_cfg(**args):
         test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
 
     configures['model_path'] = clb.get_trained_models(exp_dir)
-    configures['out_dir'] = check_dir(exp_dir, 'Test')
+    configures['experiment_path'] = check_dir(exp_dir, 'Test')
     configures['preload'] = 0.0
     
     Print(f'{len(test_files)} test files', color='g')
@@ -144,3 +143,4 @@ def test_cfg(**args):
     engine = get_test_engine(sn(**configures), test_loader)
     Print("Begin testing...", color='g')
     engine.run()
+

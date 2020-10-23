@@ -1,5 +1,6 @@
 import os, time, click
-from utils_cw import Print, check_dir, prompt_when, recursive_glob
+from types import SimpleNamespace as sn
+from utils_cw import Print, check_dir, prompt_when, recursive_glob, get_items_from_file
 from functools import partial, wraps
 
 def get_trained_models(exp_folder):
@@ -32,6 +33,13 @@ def get_exp_name(ctx, param, value):
     exp_name = exp_name + '-' + input_str.strip('+') if '+' in input_str else input_str
 
     return os.path.join(ctx.params['out_dir'], ctx.params['framework'], datalist_name, exp_name)
+
+def get_nni_exp_name(ctx, param, value):
+    param_list = get_items_from_file(ctx.params['param_list'], format='json')
+    param_list['out_dir'] = ctx.params['out_dir']
+    param_list['timestamp'] = time.strftime("%m%d_%H%M")
+    context_ = sn(**{'params':param_list})
+    return get_exp_name(context_, param, value)
 
 def split_input_str(value):
     return [ float(s) for s in value.split(',')] if value is not None else None
@@ -89,7 +97,7 @@ LOSSES = ['CE', 'WCE', 'MSE', 'DCE']
 LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe','cB']
-OPTIM_TYPES = ['sgd', 'adam']
+OPTIM_TYPES = ['sgd', 'adam', 'adagrad']
 
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
@@ -126,11 +134,12 @@ def network_params(func):
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')
     @click.option('--layer-norm', prompt=True, type=click.Choice(NORM_TYPES, show_index=True), default=0, help='Layer norm type')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
-    @click.option('--n-level', type=int, default=4, help='Network depth')
+    @click.option('--n-depth', type=int, default=-1, help='Network depth. -1: use default depth')
     @click.option('--is-deconv', type=bool, default=False, help='use deconv or interplate')
     @click.option('--optim', type=click.Choice(OPTIM_TYPES, show_index=True), default=1)
+    @click.option('--momentum', type=float, default=0.0, help='Momentum for optimizer')
     @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
-    @click.option('-l2', '--l2-reg-weight', type=float, default=0, help='l2 reg weight')
+    @click.option('-WD', '--l2-weight-decay', type=float, default=0, help='weight decay (L2 penalty)')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
     @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')

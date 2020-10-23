@@ -82,12 +82,12 @@ class NNIReporterHandler:
         engine.add_event_handler(Events.TERMINATE, self.report_final_result)
 
     def report_intermediate_result(self, engine):
-        print('*'*20, f'{engine.state.epoch} report intermediate')
+        self.logger.info(f'{engine.state.epoch} report intermediate')
         NNi.report_intermediate_result(engine.state.metrics[self.metric_name])
 
     def report_final_result(self, engine):
         if engine.state.epoch == self.max_epochs:
-            print('-'*20, f'{engine.state.epoch} report final')
+            self.logger.info(f'{engine.state.epoch} report final')
             NNi.report_final_result(engine.state.metrics[self.metric_name])
 
 

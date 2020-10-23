@@ -4,13 +4,14 @@ from utils_cw import check_dir
 import numpy as np
 
 import torch
-from .unet3d import UNet3D
 #from .unet2d import UNet2D
-from .vgg import vgg13_bn, vgg16_bn
-from .resnet import resnet34, resnet50
-from .scnn import SCNN
-from .utils import print_network, output_onehot_transform
-from .losses import DeepSupervisionLoss
+from medlp.models.unet3d import UNet3D
+from medlp.models.vgg import vgg13_bn, vgg16_bn
+from medlp.models.resnet import resnet34, resnet50
+from medlp.models.scnn import SCNN
+from medlp.models.utils import print_network, output_onehot_transform
+from medlp.models.losses import DeepSupervisionLoss
+from medlp.utilities.handlers import NNIReporterHandler
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
@@ -21,6 +22,7 @@ from monai.networks.nets import UNet, DynUNet, HighResNet
 from monai.networks import predict_segmentation
 from monai.utils import Activation, ChannelMatching, Normalisation
 from ignite.metrics import Accuracy, MeanSquaredError
+
 
 from monai.handlers import (
     StatsHandler,
@@ -59,19 +61,19 @@ def _get_model_instance(name, tensor_dim):
         'highresnet':{'3D':None, '2D': HighResNet},
     }[name][tensor_dim]
 
+def get_attr_(obj, name, default):
+    return getattr(obj, name) if hasattr(obj, name) else default
+
 def get_network(opts):
     assert hasattr(opts,'model_type') and hasattr(opts,'input_nc') and \
            hasattr(opts, 'tensor_dim') and hasattr(opts,'output_nc')
-    
-    def get_attr_(obj, name, default):
-        return getattr(obj, name) if hasattr(obj, name) else default
 
     name = opts.model_type
     framework_type = opts.framework
     in_channels, out_channels = opts.input_nc, opts.output_nc
     is_deconv = get_attr_(opts, 'is_deconv', False)
     f_maps = get_attr_(opts, 'n_features', 64)
-    n_depth = get_attr_(opts, 'n_level', 4)
+    n_depth = get_attr_(opts, 'n_depth', -1)
     skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     n_groups = get_attr_(opts, 'n_groups', 8)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
@@ -79,6 +81,7 @@ def get_network(opts):
     image_size = get_attr_(opts, 'image_size', (512,512))
     layer_order = get_attr_(opts, 'layer_order', 'crb')
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
+    
     # bottleneck = get_attr_(opts, 'bottleneck', False)
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
@@ -91,13 +94,20 @@ def get_network(opts):
     if name == 'unet' or name == 'res-unet':
         last_act = 'sigmoid' if framework_type == 'selflearning' else None
 
+        if n_depth == -1:
+            kernel_size = (3, 3, 3, 3, 3, 3)
+            strides = (1, 2, 2, 2, 2, 2)
+        else:
+            kernel_size = (3,)+(3,)*n_depth
+            strides = (1,)+(2,)*n_depth
+
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
             out_channels=out_channels,
             norm_name=layer_norm,
-            kernel_size=(3, 3, 3, 3, 3, 3),
-            strides=(1, 2, 2, 2, 2, 2),
+            kernel_size=kernel_size,
+            strides=strides,
             #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
@@ -139,16 +149,18 @@ def get_network(opts):
 def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     # Print the model type
     print('\nInitialising model {}'.format(opts.model_type))
+    weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
 
     framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
-    model_dir = check_dir(opts.out_dir,'Models')
+    model_dir = check_dir(opts.experiment_path,'Models')
 
     loss = lr_scheduler = None
     if opts.criterion == 'CE':
         loss = torch.nn.CrossEntropyLoss()
     elif opts.criterion == 'WCE':
-        loss = torch.nn.CrossEntropyLoss(weight=torch.tensor(opts.loss_params).to(device))
+        w_ = torch.tensor(opts.loss_params).to(device)
+        loss = torch.nn.CrossEntropyLoss(weight=w_)
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':
@@ -169,9 +181,11 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         print_network(net)
 
     if opts.optim == 'adam':
-        optim = torch.optim.Adam(net.parameters(), opts.lr)
+        optim = torch.optim.Adam(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == 'sgd':
-        optim = torch.optim.SGD(net.parameters(), opts.lr)
+        optim = torch.optim.SGD(net.parameters(), opts.lr, weight_decay=weight_decay)
+    elif opts.optim == 'adagrad':
+        optim = torch.optim.Adagrad(net.parameters(), opts.lr, weight_decay=weight_decay)
     else:
         raise NotImplementedError
     
@@ -201,7 +215,8 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
                 max_channels=opts.output_nc,
                 prefix_name='Val'
             ),
-            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3)
+            CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3),
+            NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch),
         ]
 
         trainval_post_transforms = Compose(
@@ -423,12 +438,12 @@ def get_test_engine(opts, test_loader):
             StatsHandler(output_transform=lambda x: None),
             CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
             # ClassificationSaver(
-            #     output_dir=opts.out_dir,
+            #     output_dir=opts.experiment_path,
             #     output_transform=lambda x : (x['image'], x['pred'].cpu().numpy()),
             #     save_img = True
             # )
             SegmentationSaver(
-                output_dir=opts.out_dir,
+                output_dir=opts.experiment_path,
                 batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["affine"]},
                 output_transform=lambda output: output["pred"],#[:,0:1,:,:],
             )
@@ -459,7 +474,7 @@ def get_test_engine(opts, test_loader):
             StatsHandler(output_transform=lambda x: None),
             CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
             SegmentationSaver(
-                output_dir=opts.out_dir,
+                output_dir=opts.experiment_path,
                 batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["image_meta_dict"]["affine"]},
                 output_transform=lambda output: predict_segmentation(output["pred"])
             ),

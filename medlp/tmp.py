@@ -174,3 +174,9 @@ for i, file in enumerate(files):
 
 
 # %%
+import pathlib
+from utils_cw import  get_items_from_file
+
+nni_config_path = pathlib.Path(__file__).parent.joinpath('misc/template_config.yml')
+nni_config = get_items_from_file(nni_config_path, format='yaml')
+# %%
