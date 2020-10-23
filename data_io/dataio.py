@@ -88,7 +88,7 @@ def get_dataloader(args, files_list, phase='train'):
                                    crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'picc_h5':
         params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.4,0.4], in_channels=args.input_nc, image_size=args.image_size, 
+        dataset_ = get_PICC_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, image_size=args.image_size, 
                                     crop_size=args.crop_size, preload=args.preload, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
     elif args.data_list == 'Obj_CXR':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)

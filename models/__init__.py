@@ -4,7 +4,6 @@ from utils_cw import check_dir
 import numpy as np
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from .unet3d import UNet3D
 #from .unet2d import UNet2D
 from .vgg import vgg13_bn, vgg16_bn
@@ -40,7 +39,7 @@ from monai.handlers import (
 )
 
 NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 
-                 'FCN':['unet','scnn','highresnet'],
+                 'FCN':['unet','scnn','highresnet','res-unet'],
                  'RCNN':['retina_unet']}
 
 def _get_network_type(name):
@@ -51,6 +50,7 @@ def _get_network_type(name):
 def _get_model_instance(name, tensor_dim):
     return {
         'unet':{'3D': None, '2D': DynUNet},
+        'res-unet':{'3D': None, '2D': DynUNet},
         'scnn':{'3D': None, '2D': SCNN},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
@@ -72,12 +72,13 @@ def get_network(opts):
     is_deconv = get_attr_(opts, 'is_deconv', False)
     f_maps = get_attr_(opts, 'n_features', 64)
     n_depth = get_attr_(opts, 'n_level', 4)
-    layer_order = get_attr_(opts, 'layer_order', 'crb')
     skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     n_groups = get_attr_(opts, 'n_groups', 8)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
     crop_size = get_attr_(opts, 'crop_size', (512,512))
     image_size = get_attr_(opts, 'image_size', (512,512))
+    layer_order = get_attr_(opts, 'layer_order', 'crb')
+    layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     # bottleneck = get_attr_(opts, 'bottleneck', False)
     # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
@@ -87,20 +88,20 @@ def get_network(opts):
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
                  np.any(np.less_equal(crop_size,0)) else crop_size
-    if name == 'unet':
+    if name == 'unet' or name == 'res-unet':
         last_act = 'sigmoid' if framework_type == 'selflearning' else None
 
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
             out_channels=out_channels,
-            norm_name="batch",
+            norm_name=layer_norm,
             kernel_size=(3, 3, 3, 3, 3, 3),
             strides=(1, 2, 2, 2, 2, 2),
             #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
-            res_block=True,
+            res_block=(name=='res-unet'),
             last_activation=last_act
         )
     elif name == 'highresnet':
@@ -108,7 +109,7 @@ def get_network(opts):
             spatial_dims=dim,
             in_channels=in_channels,
             out_channels=out_channels,
-            norm_type=Normalisation.BATCH,
+            norm_type=layer_norm,
             acti_type=Activation.RELU,
             dropout_prob=0.5,
         )
@@ -135,19 +136,13 @@ def get_network(opts):
     return model
 
 
-def get_engine(opts, train_loader, test_loader, show_network=True):
+def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     # Print the model type
     print('\nInitialising model {}'.format(opts.model_type))
 
     framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
     model_dir = check_dir(opts.out_dir,'Models')
-    # Tensorboard Logger
-    writer = SummaryWriter(log_dir=os.path.join(opts.out_dir, 'tensorboard'))
-    if not opts.debug:
-        tb_dir = check_dir(os.path.dirname(opts.out_dir),'tb')
-        os.symlink(os.path.join(opts.out_dir, 'tensorboard'), 
-                   os.path.join(tb_dir, os.path.basename(opts.experiment_name)), target_is_directory=True)
 
     loss = lr_scheduler = None
     if opts.criterion == 'CE':

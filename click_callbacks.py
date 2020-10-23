@@ -82,15 +82,18 @@ def model_select(ctx, param, value):
 
     return value
 
-dataset_list = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib']
-model_types = ['unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
-losses = ['CE', 'WCE', 'MSE', 'DCE']
-lr_schedule = ['const', 'lambda', 'step', 'SGDR', 'plateau']
-framework_types = ['segmentation','classification','siamese','selflearning','detection']
-layer_orders = ['crb','cbr', 'cgr','cbe','cB']
+DATASET_LIST = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib']
+MODEL_TYPES = ['unet', 'res-unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
+NORM_TYPES = ['batch','instance','group','auto']
+LOSSES = ['CE', 'WCE', 'MSE', 'DCE']
+LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
+FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
+LAYER_ORDERS = ['crb','cbr', 'cgr','cbe','cB']
+OPTIM_TYPES = ['sgd', 'adam']
+
 def common_params(func):
-    @click.option('--data-list', prompt=True, type=click.Choice(dataset_list,show_index=True), default=0, help='Data file list (json)')
-    @click.option('--framework', prompt=True, type=click.Choice(framework_types,show_index=True), default=1, help='Choose your framework type')
+    @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
+    @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=1, help='Choose your framework type')
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=5000, help='Epoch number')
     @click.option('--n-epoch-len', type=int, default=None, help='Num of iterations for one epoch')
@@ -100,15 +103,14 @@ def common_params(func):
     @click.option('--smooth', type=float, default=0, help='Smooth rate, disable:0')
     @click.option('--input-nc', type=int, default=1, help='input data channels')
     @click.option('--output-nc', type=int, default=3, help='output channels (classes)')
-    # @click.option('--continue-train', type=bool, default=False, help='continue train mode flag')
-    # @click.option('--which-epoch', type=int, default=0, callback=partial(prompt_when,trigger='continue_train'), help='used if continue train mode')
     @click.option('--tensor-dim', type=str, default='2D', help='2D or 3D')
     @click.option('--split', type=float, default=0.1, help='Training/testing split ratio')
     @click.option('-W', '--pretrained-model-path', type=str, default='', help='pretrained model path')
     @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/picc/exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
-    @click.option('-p', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
-    @click.option('--save-epoch-freq', type=int, default=20, help='Save model freq')
+    @click.option('-P', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
+    @click.option('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
+    @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
@@ -118,20 +120,21 @@ def common_params(func):
     return wrapper
 
 def network_params(func):
-    @click.option('--model-type', prompt=True, type=click.Choice(model_types,show_index=True), callback=model_select, default=1, help='Choose model type')
-    @click.option('-L', '--criterion', prompt=True, type=click.Choice(losses,show_index=True), callback=loss_params, default=0, help='loss criterion type')
+    @click.option('--model-type', prompt=True, type=click.Choice(MODEL_TYPES,show_index=True), callback=model_select, default=1, help='Choose model type')
+    @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
     @click.option('--image-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Input Image size')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')
+    @click.option('--layer-norm', prompt=True, type=click.Choice(NORM_TYPES, show_index=True), default=0, help='Layer norm type')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-level', type=int, default=4, help='Network depth')
     @click.option('--is-deconv', type=bool, default=False, help='use deconv or interplate')
-    @click.option('--optim', type=click.Choice(['sgd', 'adam']), default='adam')
+    @click.option('--optim', type=click.Choice(OPTIM_TYPES, show_index=True), default=1)
     @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
     @click.option('-l2', '--l2-reg-weight', type=float, default=0, help='l2 reg weight')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
-    @click.option('--lr-policy', prompt=True, type=click.Choice(lr_schedule,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
+    @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
-    #@click.option('--layer-order', prompt=True, type=click.Choice(layer_orders,show_index=True), default=0, help='conv layer order')
+    #@click.option('--layer-order', prompt=True, type=click.Choice(LAYER_ORDERS,show_index=True), default=0, help='conv layer order')
     # @click.option('--snip', is_flag=True)
     # @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
     # @click.option('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')

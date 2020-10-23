@@ -2,6 +2,7 @@ import os, sys, shutil, json, logging, warnings, time, random, torch
 import numpy as np
 from functools import partial
 from torch import from_numpy, reshape, cuda, cat
+from torch.utils.tensorboard import SummaryWriter
 from types import SimpleNamespace as sn
 import nibabel as nib
 
@@ -16,6 +17,7 @@ from click.parser import OptionParser
 import click_callbacks as clb
 from ignite.engine import Events
 from monai.handlers import CheckpointLoader
+from utilities.handlers import TensorboardGraph
 
 @click.command('train', context_settings={'allow_extra_args':True})
 @click.option('--config', type=str, help="tmp var for train_from_cfg")
@@ -62,13 +64,26 @@ def train(**args):
     train_loader = get_dataloader(cargs, files_train, phase='train')
     valid_loader = get_dataloader(cargs, files_valid, phase='valid')
 
-    trainer, net = get_engine(cargs, train_loader, valid_loader, show_network=True)
+    # Tensorboard Logger
+    writer = SummaryWriter(log_dir=os.path.join(cargs.out_dir, 'tensorboard'))
+    if not cargs.debug:
+        tb_dir = check_dir(os.path.dirname(cargs.out_dir),'tb')
+        os.symlink(os.path.join(cargs.out_dir, 'tensorboard'), 
+                   os.path.join(tb_dir, os.path.basename(cargs.experiment_name)), target_is_directory=True)
+    
+    trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
     trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
+
     if os.path.isfile(cargs.pretrained_model_path):
         Print("Load pretrained model for contiune training:\n\t", cargs.pretrained_model_path, color='g')
         trainer.add_event_handler(event_name=Events.STARTED, 
                                   handler=CheckpointLoader(load_path=cargs.pretrained_model_path,
                                                            load_dict={"net": net}, strict=False, skip_mismatch=True))
+    if cargs.visualize:
+        Print('Visualize the architecture to tensorboard', color='g')
+        trainer.add_event_handler(event_name=Events.ITERATION_COMPLETED(once=1),
+                                  handler=TensorboardGraph(net, writer, lambda x:x['image']))
+        
     trainer.run()
         
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
@@ -82,12 +97,14 @@ def train_cfg(**args):
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
     
     #Convert args to index
-    configures['data_list'] = clb.dataset_list.index(configures['data_list'])
-    configures['model_type'] = clb.model_types.index(configures['model_type'])
-    configures['criterion'] = clb.losses.index(configures['criterion'])
-    configures['lr_policy'] = clb.lr_schedule.index(configures['lr_policy'])
-    configures['framework'] = clb.framework_types.index(configures['framework'])
-    #configures['layer_order'] = clb.layer_orders.index(configures['layer_order'])
+    configures['data_list'] = clb.DATASET_LIST.index(configures['data_list'])
+    configures['model_type'] = clb.MODEL_TYPES.index(configures['model_type'])
+    configures['criterion'] = clb.LOSSES.index(configures['criterion'])
+    configures['lr_policy'] = clb.LR_SCHEDULE.index(configures['lr_policy'])
+    configures['framework'] = clb.FRAMEWORK_TYPES.index(configures['framework'])
+    configures['optim']     = clb.OPTIM_TYPES.index(configures['optim'])
+    configures['layer_norm']= clb.NORM_TYPES.index(configures['layer_norm'])
+    #configures['layer_order'] = clb.LAYER_ORDERS.index(configures['layer_order'])
     configures['smi'] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id
