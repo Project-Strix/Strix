@@ -167,7 +167,7 @@ Project Link: [https://gitlab.com/ChingRyu/MeDLP](https://gitlab.com/ChingRyu/Me
 [issues-shield]: https://img.shields.io/github/issues/ChingRyu/repo.svg?style=flat-square
 [issues-url]: https://gitlab.com/ChingRyu/medlp/-/issues
 [license-shield]: https://img.shields.io/github/license/ChingRyu/repo.svg?style=flat-square
-[license-url]: https://gitlab.com/ChingRyu/medlp/-/blob/master/LICENSE.txt
+[license-url]: https://gitlab.com/ChingRyu/medlp/-/blob/master/LICENSE
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/ChingRyu
 [product-screenshot]: images/screenshot.png

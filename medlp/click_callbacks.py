@@ -20,9 +20,13 @@ def get_exp_name(ctx, param, value):
     model_name = ctx.params['model_type']
     datalist_name = str(ctx.params['data_list'])
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
-
-    input_size = ctx.params['image_size'] if ctx.params['crop_size'] == (0,0) else ctx.params['crop_size']
-    input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
+    
+    use_img_size = (ctx.params['crop_size'] == (0,0) or ctx.params['crop_size'] == [0,0])
+    input_size = ctx.params['image_size'] if use_img_size else ctx.params['crop_size']
+    if '(' in str(input_size):
+        input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
+    else:
+        input_size_str = str(input_size).strip('[').strip(']').replace(' ','')
 
     exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{ctx.params['timestamp']}"
@@ -118,6 +122,7 @@ def common_params(func):
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
     @click.option('-P', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
     @click.option('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
+    @click.option('--valid-interval', type=int, default=4, help='Interval of validation during training')
     @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--verbose-log', is_flag=True, help='Output verbose log info')

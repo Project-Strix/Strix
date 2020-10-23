@@ -150,6 +150,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     # Print the model type
     print('\nInitialising model {}'.format(opts.model_type))
     weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
+    valid_interval = get_attr_(opts, 'valid_interval', 5)
 
     framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
@@ -251,7 +252,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
 
         train_handlers = [
             LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
-            ValidationHandler(validator=evaluator, interval=5, epoch_level=True),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
             CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
@@ -330,7 +331,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
 
         train_handlers = [
             LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
-            ValidationHandler(validator=evaluator, interval=4, epoch_level=True),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
             CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
@@ -392,7 +393,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
 
         train_handlers = [
             LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
-            ValidationHandler(validator=evaluator, interval=3, epoch_level=True),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"]),
             TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
             CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),

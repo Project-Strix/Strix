@@ -7,6 +7,7 @@ import click_callbacks as clb
 from models import get_engine, get_test_engine
 from data_io.dataio import get_dataloader, get_picc_datalist
 import click_callbacks as clb
+from medlp.utilities.utils import detect_port
 
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
@@ -15,6 +16,7 @@ from monai.handlers import CheckpointLoader
 
 import nni
 from nni.utils import merge_parameter
+
 
 @click.command('train-nii')
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
@@ -122,10 +124,15 @@ def nni_search(**args):
         yaml.dump(nni_config, f, default_flow_style=False)
     shutil.copyfile(cargs.search_space, searchspace_file)
 
+    port = cargs.port
+    while detect_port(port):
+        Print(f'Port {port} is used by another process, automatically change to {port+1}!',color='y')
+        port += 1
+
     if not cargs.background:
-        command = f'nnictl create --config {nniconfig_file} --port {cargs.port} --foreground'
+        command = f'nnictl create --config {nniconfig_file} --port {port} --foreground'
     else:
-        command =  f'nnictl create --config {nniconfig_file} --port {cargs.port}'
+        command =  f'nnictl create --config {nniconfig_file} --port {port}'
 
     os.system(command)
     
