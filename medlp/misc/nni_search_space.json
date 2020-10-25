@@ -1,0 +1,19 @@
+{
+    "optim": {
+        "_type":"choice", 
+        "_value":["adam","sgd","adagrad"]
+    },
+    "lr": {
+        "_type":"choice",
+        "_value":[0.00001, 0.0001, 0.001, 0.01]
+    },
+    "n_depth": {
+        "_type":"choice", 
+        "_value":[4,5]
+    },
+    "augment_ratio": {
+        "_type":"choice",
+        "_value":[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    }
+}
+
