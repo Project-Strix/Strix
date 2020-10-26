@@ -1,12 +1,8 @@
 import os, sys, time, torch, random, tqdm
 import numpy as np
-#from torch.utils.data import Dataset
 from utils_cw import Print, load_h5
 import nibabel as nib
 
-# dataio_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# sys.path.append( os.path.join(os.path.dirname(dataio_dir), 'utils') )
-# sys.path.append( dataio_dir )
 #from dataio import load_picc_data_once
 from scipy.ndimage.morphology import binary_dilation
 from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union

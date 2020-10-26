@@ -103,7 +103,7 @@ deform = Rand2DElastic(
 loader = LoadPNG(image_only=True)
 
 fname = r"\\alg-cloud2\Incoming\YYQ\object-CXR\raw-data\data-jpg\dev\08001.jpg"
-for i in range(10):
+for i in range(1):
     gamma = 0.6 + i*0.2 
     print('Gamma:', gamma)
     deform = Compose([
@@ -113,7 +113,7 @@ for i in range(10):
     #data = nonlinear_transformation(loader(fname).squeeze())
     data = deform(loader(fname)[np.newaxis,...])
     print('Range:', np.min(data), np.max(data))
-    plt.imshow(data.squeeze(), cmap=plt.cm.gray)
+    plt.imshow(data.squeeze(), cmap=plt.cm.gray, vmin=0.2, vmax=1.8)
     plt.show()
 
 # %%
@@ -174,9 +174,23 @@ for i, file in enumerate(files):
 
 
 # %%
-import pathlib
-from utils_cw import  get_items_from_file
+import os, tqdm, json
+from pathlib import Path
+from PIL import Image
+import matplotlib.pyplot as plt
+from monai.transforms import *
+from scipy import ndimage
 
-nni_config_path = pathlib.Path(__file__).parent.joinpath('misc/template_config.yml')
-nni_config = get_items_from_file(nni_config_path, format='yaml')
+transforms = Compose([
+    LoadHdf5d(keys=["image","label"], h5_keys=["data","label"], dtype=[np.float32, np.int64]),
+    AddChanneld(keys=["image", "label"]),
+    RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.9,1.1)),
+    RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False),
+    RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
+    RandRotated(keys=["image","label"], range_x=10, range_y=10, range_z=5, prob=augment_ratio),
+    RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
+    CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
+    ToTensord(keys=["image", "label"])
+])
+
 # %%
