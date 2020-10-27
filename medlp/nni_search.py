@@ -4,8 +4,8 @@ from types import SimpleNamespace as sn
 from utils_cw import Print, get_items_from_file, check_dir
 
 import click_callbacks as clb
-from models import get_engine, get_test_engine
-from data_io.dataio import get_dataloader, get_picc_datalist
+from medlp.models import get_engine, get_test_engine
+from medlp.data_io.dataio import get_dataloader, get_picc_datalist
 import click_callbacks as clb
 from medlp.utilities.utils import detect_port
 

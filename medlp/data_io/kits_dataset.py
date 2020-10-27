@@ -28,13 +28,14 @@ def get_kits_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
         Print('No cropping!', color='g')
         cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        cropper = =(keys=["image", "label"], roi_size=crop_size, random_size=False)
+        cropper = RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False)
 
     if phase == 'train':
         transforms = Compose([
             data_reader,
             AddChanneld(keys=["image", "label"]),
-            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.9,1.1)),
+            #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,2.0)),
             cropper,
             RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
             RandRotated(keys=["image","label"], range_x=10, range_y=10, range_z=5, prob=augment_ratio),
@@ -46,6 +47,7 @@ def get_kits_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
         transforms = Compose([
             data_reader,
             AddChanneld(keys=["image", "label"]),
+            Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
             cropper,
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])

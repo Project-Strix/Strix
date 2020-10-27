@@ -6,8 +6,8 @@ from torch.utils.tensorboard import SummaryWriter
 from types import SimpleNamespace as sn
 import nibabel as nib
 
-from models import get_engine, get_test_engine
-from data_io.dataio import get_dataloader, get_picc_datalist
+from medlp.models import get_engine, get_test_engine
+from medlp.data_io.dataio import get_dataloader, get_picc_datalist
 
 from sklearn.model_selection import train_test_split
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
@@ -24,6 +24,7 @@ from utilities.handlers import TensorboardGraph
 @click.option('--debug', is_flag=True)
 @clb.latent_auxilary_params
 @clb.common_params
+@clb.solver_params
 @clb.network_params
 @click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
@@ -84,7 +85,8 @@ def train(**args):
                                   handler=TensorboardGraph(net, writer, lambda x:x['image']))
         
     trainer.run()
-        
+
+
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)

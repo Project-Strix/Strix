@@ -1,26 +1,5 @@
-from __future__ import print_function
-import os, math, random, copy
-import socket
-from medlp.click_callbacks import NETWORK_TYPES
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-
-def detect_port(port):
-    '''Detect if the port is used'''
-    socket_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        socket_test.connect(('127.0.0.1', int(port)))
-        socket_test.close()
-        return True
-    except:
-        return False
-
-def get_network_type(name):
-    for k, v in NETWORK_TYPES.items():
-        if name in v:
-            return k
-
-def assert_network_type(model_type, target_type):
-    assert get_network_type(model_type) == target_type, f"Only accept {target_type} arch: {NETWORK_TYPES[target_type]}"
 
 def _register_generic(module_dict, module_name, module):
     assert module_name not in module_dict
@@ -64,6 +43,3 @@ class Registry(dict):
             return fn
 
         return register_fn
-
-
-ENGINES = Registry()

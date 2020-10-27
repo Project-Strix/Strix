@@ -95,13 +95,19 @@ def model_select(ctx, param, value):
     return value
 
 DATASET_LIST = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib']
-MODEL_TYPES = ['unet', 'res-unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
 NORM_TYPES = ['batch','instance','group','auto']
 LOSSES = ['CE', 'WCE', 'MSE', 'DCE']
 LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe','cB']
-OPTIM_TYPES = ['sgd', 'adam', 'adagrad']
+OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'adagrad']
+MODEL_TYPES = ['unet', 'res-unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
+NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 
+                 'FCN':['unet','scnn','highresnet','res-unet'],
+                 'RCNN':['retina_unet']}
+RCNN_MODEL_TYPES = ['mask_rcnn', 'faster_rcnn', 'fcos', 'retina']
+RCNN_BACKBONE = ["R-50-C4","R-50-C5","R-101-C4","R-101-C5","R-50-FPN","R-101-FPN",
+                 "R-152-FPN","R-50-FPN-RETINANET","R-101-FPN-RETINANET","MNV2-FPN-RETINANET"]
 
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
@@ -124,6 +130,7 @@ def common_params(func):
     @click.option('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
     @click.option('--valid-interval', type=int, default=4, help='Interval of validation during training')
     @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
+    @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
@@ -132,8 +139,19 @@ def common_params(func):
         return func(*args, **kwargs)
     return wrapper
 
+def solver_params(func):
+    @click.option('--optim', type=click.Choice(OPTIM_TYPES, show_index=True), default=1)
+    @click.option('--momentum', type=float, default=0.0, help='Momentum for optimizer')
+    @click.option('-WD', '--l2-weight-decay', type=float, default=0, help='weight decay (L2 penalty)')
+    @click.option('--lr', type=float, default=1e-3, help='learning rate')
+    @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
 def network_params(func):
-    @click.option('--model-type', prompt=True, type=click.Choice(MODEL_TYPES,show_index=True), callback=model_select, default=1, help='Choose model type')
+    @click.option('--model-type', prompt=True, type=click.Choice(MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
     @click.option('--image-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Input Image size')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')
@@ -141,12 +159,6 @@ def network_params(func):
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-depth', type=int, default=-1, help='Network depth. -1: use default depth')
     @click.option('--is-deconv', type=bool, default=False, help='use deconv or interplate')
-    @click.option('--optim', type=click.Choice(OPTIM_TYPES, show_index=True), default=1)
-    @click.option('--momentum', type=float, default=0.0, help='Momentum for optimizer')
-    @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
-    @click.option('-WD', '--l2-weight-decay', type=float, default=0, help='weight decay (L2 penalty)')
-    @click.option('--lr', type=float, default=1e-3, help='learning rate')
-    @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
     @click.option('--feature-scale', type=int, default=4, help='not used')
     #@click.option('--layer-order', prompt=True, type=click.Choice(LAYER_ORDERS,show_index=True), default=0, help='conv layer order')
     # @click.option('--snip', is_flag=True)
@@ -168,6 +180,16 @@ def latent_auxilary_params(func):
     @click.option('--load-imagenet', type=bool, default=False, help='Load pretrain Imagenet for some net')
     @click.option('--deep-supervision', type=bool, default=False, help='Use deep supervision module')
     @click.option('--deep-supr-num', type=int, default=1, help='Num of features will be output')
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+def rcnn_params(func):
+    @click.option('--model-type', type=click.Choice(RCNN_MODEL_TYPES,show_index=True), default=0, help='RCNN model type')
+    @click.option('--backbone', type=click.Choice(RCNN_BACKBONE,show_index=True), default=0, help='RCNN backbone net')
+    @click.option('--min-size', type=int, default=800)
+    @click.option('--max-size', type=int, default=1000)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
