@@ -1,7 +1,7 @@
 from __future__ import print_function
 import os, math, random, copy
 import socket
-from medlp.click_callbacks import NETWORK_TYPES
+from medlp.utilities.enum import NETWORK_TYPES
 
 
 def detect_port(port):

@@ -3,11 +3,10 @@ from pathlib import Path
 from types import SimpleNamespace as sn
 from utils_cw import Print, get_items_from_file, check_dir
 
-import click_callbacks as clb
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io.dataio import get_dataloader, get_picc_datalist
-import click_callbacks as clb
 from medlp.utilities.utils import detect_port
+import medlp.utilities.click_callbacks as clb
 
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split

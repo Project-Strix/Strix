@@ -1,7 +1,9 @@
+from medlp.utilities.enum import CNN_MODEL_TYPES
 import os, time, click
 from types import SimpleNamespace as sn
 from utils_cw import Print, check_dir, prompt_when, recursive_glob, get_items_from_file
 from functools import partial, wraps
+from medlp.utilities.enum import *
 
 def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder,'Models')
@@ -10,7 +12,6 @@ def get_trained_models(exp_folder):
     prompt = { i:f.stem.split('=')[-1] for i, f in enumerate(files)}
     selected = click.prompt(f"Choose model: {prompt}", type=int)
     return str(files[selected])
-
 
 def get_exp_name(ctx, param, value):
     if 'debug' in ctx.params and ctx.params['debug']:
@@ -94,20 +95,6 @@ def model_select(ctx, param, value):
 
     return value
 
-DATASET_LIST = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib']
-NORM_TYPES = ['batch','instance','group','auto']
-LOSSES = ['CE', 'WCE', 'MSE', 'DCE']
-LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
-FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
-LAYER_ORDERS = ['crb','cbr', 'cgr','cbe','cB']
-OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'adagrad']
-MODEL_TYPES = ['unet', 'res-unet', 'vgg13', 'vgg16', 'resnet34','resnet50','scnn','highresnet']
-NETWORK_TYPES = {'CNN':['vgg13','vgg16','resnet34','resnet50'], 
-                 'FCN':['unet','scnn','highresnet','res-unet'],
-                 'RCNN':['retina_unet']}
-RCNN_MODEL_TYPES = ['mask_rcnn', 'faster_rcnn', 'fcos', 'retina']
-RCNN_BACKBONE = ["R-50-C4","R-50-C5","R-101-C4","R-101-C5","R-50-FPN","R-101-FPN",
-                 "R-152-FPN","R-50-FPN-RETINANET","R-101-FPN-RETINANET","MNV2-FPN-RETINANET"]
 
 def common_params(func):
     @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
@@ -151,7 +138,7 @@ def solver_params(func):
     return wrapper
 
 def network_params(func):
-    @click.option('--model-type', prompt=True, type=click.Choice(MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
+    @click.option('--model-type', prompt=True, type=click.Choice(FCN_MODEL_TYPES+CNN_MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
     @click.option('--image-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Input Image size')
     @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')

@@ -13,6 +13,7 @@ from medlp.models.cnn.utils import print_network, output_onehot_transform
 from medlp.models.cnn.losses import DeepSupervisionLoss
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES
+from medlp.utilities.enum import RCNN_MODEL_TYPES
 from monai.networks.nets import UNet, DynUNet, HighResNet
 from monai.losses import DiceLoss
 from monai.utils import Activation, ChannelMatching, Normalisation
@@ -50,9 +51,6 @@ def get_network(opts):
     image_size = get_attr_(opts, 'image_size', (512,512))
     layer_order = get_attr_(opts, 'layer_order', 'crb')
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
-    
-    # bottleneck = get_attr_(opts, 'bottleneck', False)
-    # sep_conv   = get_attr_(opts, 'sep_conv', False)
 
     model = get_model_instance(name, opts.tensor_dim)
     assert model is not None, f"Cannot get your network {name} for {opts.tensor_dim}"
@@ -60,7 +58,7 @@ def get_network(opts):
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
                  np.any(np.less_equal(crop_size,0)) else crop_size
-                 
+
     if name == 'unet' or name == 'res-unet':
         last_act = 'sigmoid' if framework_type == 'selflearning' else None
 
@@ -110,6 +108,8 @@ def get_network(opts):
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
+    elif name in []:
+        pass
     else:
         raise ValueError(f'Model {name} not available')  
 
