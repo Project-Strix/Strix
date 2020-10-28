@@ -7,7 +7,7 @@ from types import SimpleNamespace as sn
 import nibabel as nib
 
 from medlp.models import get_engine, get_test_engine
-from medlp.data_io.dataio import get_dataloader, get_picc_datalist
+from medlp.data_io.dataio import get_dataloader, get_datalist
 from medlp.utilities.handlers import TensorboardGraph
 import medlp.utilities.click_callbacks as clb
 
@@ -45,7 +45,7 @@ def train(**args):
 
     cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
 
-    data_list = get_picc_datalist(cargs.data_list)
+    data_list = get_datalist(cargs.data_list)
     assert os.path.isfile(data_list), 'Data list not exists!'
     files_list = get_items_from_file(data_list, format='json')
     if cargs.partial < 1:

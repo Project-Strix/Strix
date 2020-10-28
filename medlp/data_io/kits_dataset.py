@@ -13,33 +13,36 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
-def get_kits_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,
+def get_kits_dataset(files_list, phase, spacing=[], winlevel=[-80,304], in_channels=1, image_size=None,
                      crop_size=None, preload=1.0, augment_ratio=0.4, downsample=1, verbose=False):
-    all_data = all_roi = files_list
-    data_reader = LoadHdf5d(keys=["image","label"], h5_keys=["data","label"], dtype=[np.float32, np.int64])
-    input_data = all_data
+    #data_reader = LoadHdf5d(keys=["image","label"], h5_keys=["data","label"], dtype=[np.float32, np.int64])
+    data_reader = LoadNiftid(keys=["image","label"], dtype=np.float32)
 
     if spacing:
         spacer = Spacingd(keys=["image","label"], pixdim=spacing)
     else:
-        spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
+        spacer = Lambdad(keys=["image","label"], func=lambda x : x)
 
     if crop_size is None or np.any(np.less_equal(crop_size,0)):
         Print('No cropping!', color='g')
-        cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
+        cropper = Lambdad(keys=["image","label"], func=lambda x : x)
     else:
-        cropper = RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False)
+        cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', spatial_size=crop_size)
+
+    normalizer = ScaleIntensityRanged(keys="image", a_min=winlevel[0], a_max=winlevel[1], b_min=0, b_max=1, clip=True)
 
     if phase == 'train':
         transforms = Compose([
             data_reader,
             AddChanneld(keys=["image", "label"]),
-            #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
-            RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.7,2.0)),
+            normalizer,
+            spacer,
             cropper,
-            RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
-            RandRotated(keys=["image","label"], range_x=10, range_y=10, range_z=5, prob=augment_ratio),
-            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
+            Rand3DElasticd(keys="image", prob=augment_ratio, sigma_range=(5,10), 
+                           magnitude_range=(50,150), padding_mode='zeros', device=torch.device('cuda')),
+            RandGaussianNoised(keys="image", prob=augment_ratio, std=0.02),
+            RandRotated(keys=["image","label"], range_x=5, range_y=5, range_z=10, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=0),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
         ])
@@ -47,7 +50,8 @@ def get_kits_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
         transforms = Compose([
             data_reader,
             AddChanneld(keys=["image", "label"]),
-            Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
+            normalizer,
+            spacer,
             cropper,
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
@@ -55,5 +59,6 @@ def get_kits_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
     elif phase == 'test':
         pass
 
-
+    dataset_ = CacheDataset(files_list, transform=transforms, cache_rate=preload)
+    return dataset_
        

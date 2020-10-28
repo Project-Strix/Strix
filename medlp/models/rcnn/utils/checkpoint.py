@@ -4,10 +4,10 @@ import os
 
 import torch
 
-from maskrcnn_benchmark.utils.model_serialization import load_state_dict
-from maskrcnn_benchmark.utils.c2_model_loading import load_c2_format
-from maskrcnn_benchmark.utils.imports import import_file
-from maskrcnn_benchmark.utils.model_zoo import cache_url
+from medlp.models.rcnn.utils.model_serialization import load_state_dict
+from medlp.models.rcnn.utils.c2_model_loading import load_c2_format
+from medlp.models.rcnn.utils.imports import import_file
+from medlp.models.rcnn.utils.model_zoo import cache_url
 
 
 class Checkpointer(object):
@@ -118,7 +118,7 @@ class DetectronCheckpointer(Checkpointer):
         # catalog lookup
         if f.startswith("catalog://"):
             paths_catalog = import_file(
-                "maskrcnn_benchmark.config.paths_catalog", self.cfg.PATHS_CATALOG, True
+                "medlp.models.rcnn.config.paths_catalog", self.cfg.PATHS_CATALOG, True
             )
             catalog_f = paths_catalog.ModelCatalog.get(f[len("catalog://") :])
             self.logger.info("{} points to {}".format(f, catalog_f))

@@ -2,9 +2,9 @@
 import numpy as np
 import torch
 from torch import nn
-from maskrcnn_benchmark.layers.misc import interpolate
+from medlp.models.rcnn.layers.misc import interpolate
 
-from maskrcnn_benchmark.structures.bounding_box import BoxList
+from medlp.models.rcnn.structures.bounding_box import BoxList
 
 
 # TODO check if want to return a single BoxList or a composite

@@ -14,6 +14,7 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
+from medlp.models.rcnn.structures.bounding_box import BoxList
 
 def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
     #Pre-load all training data once.
@@ -36,13 +37,11 @@ def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpo
     return data.values()
 
 
-def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,
+def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,
                      crop_size=None, preload=1.0, augment_ratio=0.4, downsample=1, verbose=False):
 
-    all_data = all_roi = all_coord = files_list
     data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], 
                             affine_keys=["affine","affine",None], dtype=[np.float32, np.int64, np.float32])
-    input_data = all_data
 
     if spacing:
         spacer = Spacingd(keys=["image","label"], pixdim=spacing)
@@ -100,11 +99,11 @@ def get_PICC_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             CastToTyped(keys=["image"], dtype=[np.float32]),
             ToTensord(keys=["image"])
         ])
-    dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
+    dataset_ = CacheDataset(files_list, transform=transforms, cache_rate=preload)
     return dataset_
 
 
-def get_RIB_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
+def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
                     crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
 
     input_data = []
@@ -183,3 +182,38 @@ def get_RIB_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
+class DetDateSet(object):
+    def __init__(self, file_list, bbox_radius=(20,20), transforms=None):
+        self.file_list = file_list
+        self.transforms = transforms
+        self.bbox_radius = bbox_radius
+
+    def __getitem__(self, idx):
+        # load the image as a PIL Image
+        image, coord = load_h5(self.file_list[idx], keywords=['image','coord'])
+
+        # load the bounding boxes as a list of list of boxes
+        # in this case, for illustrative purposes, we use x1, y1, x2, y2 order.
+        boxes = [[coord[0]-self.bbox_radius[0], coord[1]-self.bbox_radius[1], 
+                  coord[0]+self.bbox_radius[0], coord[1]+self.bbox_radius[1]]]
+        boxes = torch.as_tensor(boxes).reshape(-1, 4)
+        # and labels
+        labels = torch.tensor([1])
+
+        # create a BoxList from the boxes
+        boxlist = BoxList(boxes, image.shape, mode="xyxy")
+        # add the labels to the boxlist
+        boxlist.add_field("labels", labels)
+
+        if self.transforms:
+            image, boxlist = self.transforms(image, boxlist)
+
+        # return the image, the boxlist and the idx in your dataset
+        return image, boxlist, idx
+
+    def get_img_info(self, idx):
+        return None
+
+def PICC_det_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
+                     crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
+    pass

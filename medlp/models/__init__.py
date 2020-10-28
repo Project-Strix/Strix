@@ -1,16 +1,18 @@
 import os, time
 from types import SimpleNamespace as sn
+from pathlib import Path
 from utils_cw import check_dir
 import numpy as np
 
 import torch
-#from .unet2d import UNet2D
+from utils_cw.utils import get_items_from_file
 from medlp.models.cnn.unet3d import UNet3D
 from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn
 from medlp.models.cnn.resnet import resnet34, resnet50
 from medlp.models.cnn.scnn import SCNN
 from medlp.models.cnn.utils import print_network, output_onehot_transform
 from medlp.models.cnn.losses import DeepSupervisionLoss
+from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
@@ -19,7 +21,7 @@ from monai.losses import DiceLoss
 from monai.utils import Activation, ChannelMatching, Normalisation
 
 
-def get_model_instance(name, tensor_dim):
+def get_model_instance(archi, tensor_dim):
     return {
         'unet':{'3D': None, '2D': DynUNet},
         'res-unet':{'3D': None, '2D': DynUNet},
@@ -29,7 +31,30 @@ def get_model_instance(name, tensor_dim):
         'resnet34':{'3D': None, '2D': resnet34},
         'resnet50':{'3D': None, '2D': resnet50},
         'highresnet':{'3D':None, '2D': HighResNet},
-    }[name][tensor_dim]
+    }[archi][tensor_dim]
+
+def get_rcnn_config(archi, backbone):
+    folder = Path(__file__).parent.parent.joinpath('misc/config')
+    return {
+        'mask_rcnn': {
+            'R-50-C4': folder/'e2e_mask_rcnn_R_50_C4_1x.yaml',
+            'R-50-FPN': folder/'e2e_mask_rcnn_R_50_FPN_1x.yaml',
+            'R-101-FPN': folder/'e2e_mask_rcnn_R_101_FPN_1x.yaml'
+        },
+        'faster_rcnn': {
+            'R-50-FPN': folder/'fcos_R_50_FPN_1x.yaml',
+            'R-101-FPN': folder/'fcos_R_101_FPN_2x.yaml'
+        },
+        'fcos': {
+            'R-50-C4': folder/'e2e_mask_rcnn_R_50_C4_1x.yaml',
+            'R-50-FPN': folder/'e2e_mask_rcnn_R_50_FPN_1x.yaml',
+            'R-101-FPN': folder/'e2e_mask_rcnn_R_101_FPN_1x.yaml'
+        },
+        'retina':{
+            'R-50-FPN': folder/'retinanet_R-50-FPN_1x.yaml',
+            'R-101-FPN': folder/'retinanet_R-101-FPN_1x.yaml'
+        }
+    }[archi][backbone]
 
 def get_attr_(obj, name, default):
     return getattr(obj, name) if hasattr(obj, name) else default
@@ -38,7 +63,7 @@ def get_network(opts):
     assert hasattr(opts,'model_type') and hasattr(opts,'input_nc') and \
            hasattr(opts, 'tensor_dim') and hasattr(opts,'output_nc')
 
-    name = opts.model_type
+    archi = opts.model_type
     framework_type = opts.framework
     in_channels, out_channels = opts.input_nc, opts.output_nc
     is_deconv = get_attr_(opts, 'is_deconv', False)
@@ -52,14 +77,14 @@ def get_network(opts):
     layer_order = get_attr_(opts, 'layer_order', 'crb')
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
 
-    model = get_model_instance(name, opts.tensor_dim)
-    assert model is not None, f"Cannot get your network {name} for {opts.tensor_dim}"
+    model = get_model_instance(archi, opts.tensor_dim)
+    assert model is not None, f"Cannot get your network {archi} for {opts.tensor_dim}"
 
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
                  np.any(np.less_equal(crop_size,0)) else crop_size
 
-    if name == 'unet' or name == 'res-unet':
+    if archi == 'unet' or archi == 'res-unet':
         last_act = 'sigmoid' if framework_type == 'selflearning' else None
 
         if n_depth == -1:
@@ -79,10 +104,10 @@ def get_network(opts):
             #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
-            res_block=(name=='res-unet'),
+            res_block=(archi=='res-unet'),
             last_activation=last_act
         )
-    elif name == 'highresnet':
+    elif archi == 'highresnet':
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -91,7 +116,7 @@ def get_network(opts):
             acti_type=Activation.RELU,
             dropout_prob=0.5,
         )
-    elif name == 'scnn':
+    elif archi == 'scnn':
         model = model(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -100,18 +125,21 @@ def get_network(opts):
             is_deconv=is_deconv,
             use_dilated_conv=True,
             pretrained=load_imagenet)
-    elif 'vgg' in name:
+    elif 'vgg' in archi:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
-    elif 'resnet' in name:
+    elif 'resnet' in archi:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
-    elif name in []:
-        pass
+    elif archi in RCNN_MODEL_TYPES:
+        config_file = get_rcnn_config(archi, opts.backbone)
+        assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
+        config_content = get_items_from_file(config_file, format='yaml')
+        model = GeneralizedRCNN(config_content)
     else:
-        raise ValueError(f'Model {name} not available')  
+        raise ValueError(f'Model {archi} not available')  
 
     return model
 

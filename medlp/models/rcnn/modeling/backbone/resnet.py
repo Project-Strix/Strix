@@ -22,10 +22,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from maskrcnn_benchmark.layers import FrozenBatchNorm2d
-from maskrcnn_benchmark.layers import Conv2d
-from maskrcnn_benchmark.modeling.make_layers import group_norm
-from maskrcnn_benchmark.utils.registry import Registry
+from medlp.models.rcnn.layers import FrozenBatchNorm2d
+from medlp.models.rcnn.layers import Conv2d
+from medlp.models.rcnn.modeling.make_layers import group_norm
+from medlp.models.rcnn.utils.registry import Registry
 
 
 # ResNet stage specification

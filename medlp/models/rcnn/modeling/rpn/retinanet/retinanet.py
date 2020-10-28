@@ -7,7 +7,7 @@ from .inference import  make_retinanet_postprocessor
 from .loss import make_retinanet_loss_evaluator
 from ..anchor_generator import make_anchor_generator_retinanet
 
-from maskrcnn_benchmark.modeling.box_coder import BoxCoder
+from medlp.models.rcnn.modeling.box_coder import BoxCoder
 
 
 class RetinaNetHead(torch.nn.Module):

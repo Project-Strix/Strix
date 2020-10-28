@@ -180,17 +180,27 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from monai.transforms import *
 from scipy import ndimage
+from utils_cw.utils import volume_snapshot
 
 transforms = Compose([
-    LoadHdf5d(keys=["image","label"], h5_keys=["data","label"], dtype=[np.float32, np.int64]),
+    LoadNiftid(keys=["image","label"], dtype=np.float32),
     AddChanneld(keys=["image", "label"]),
-    RandAdjustContrastd(keys=["image","label"], prob=augment_ratio, gamma=(0.9,1.1)),
-    RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False),
-    RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
-    RandRotated(keys=["image","label"], range_x=10, range_y=10, range_z=5, prob=augment_ratio),
-    RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
-    CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-    ToTensord(keys=["image", "label"])
+    ScaleIntensityRanged(keys=["image"], a_min=-80, a_max=300, b_min=0, b_max=1, clip=True),
+    #RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', neg=0, spatial_size=[120,120,30]),
+    #Rand3DElasticd(keys="image", prob=1, sigma_range=(5,10), magnitude_range=(50,150), padding_mode='zeros'),
+    RandGaussianNoised(keys="image", prob=1, std=0.02),
+    RandRotated(keys=["image","label"], range_x=5, range_y=5, range_z=10, prob=1, padding_mode='zeros'),
+    RandFlipd(keys=["image","label"], prob=1, spatial_axis=0),
 ])
+
+file = {'image':r"\\mega\clwang\Data\jsph_rcc\kidney_rcc\Test\2374947\data.nii.gz", 
+        'label':r"\\mega\clwang\Data\jsph_rcc\kidney_rcc\Test\2374947\roi.nii.gz"}
+
+ret = transforms(file)
+nii = nib.load(file['image'])
+print(ret['image'].shape)
+nib.save(nib.Nifti1Image(np.squeeze(ret['image']), nii.affine), './crop.nii.gz')
+#volume_snapshot(np.squeeze(ret['image']).transpose(2,1,0), slice_percentile=(40,70), output_fname='./crop1.gif', duration=50)
+
 
 # %%
