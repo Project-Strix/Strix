@@ -44,3 +44,6 @@ class DeepSupervisionLoss(Module):
         for w, ret in zip(weights, inputs):
             losses.append(w*self.base_loss(ret, gt))
         return torch.mean(torch.stack(losses))
+
+class CEDiceLoss(Module):
+    pass

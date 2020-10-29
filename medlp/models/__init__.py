@@ -23,8 +23,8 @@ from monai.utils import Activation, ChannelMatching, Normalisation
 
 def get_model_instance(archi, tensor_dim):
     return {
-        'unet':{'3D': None, '2D': DynUNet},
-        'res-unet':{'3D': None, '2D': DynUNet},
+        'unet':{'3D': DynUNet, '2D': DynUNet},
+        'res-unet':{'3D': DynUNet, '2D': DynUNet},
         'scnn':{'3D': None, '2D': SCNN},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
@@ -214,6 +214,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         'valid_interval': valid_interval,
         'device': device,
         'model_dir': model_dir,
+        'logger_name': f'{opts.tensor_dim}-Trainer'
     }
     return ENGINES[framework_type](**params)
 

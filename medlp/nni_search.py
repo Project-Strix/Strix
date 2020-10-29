@@ -23,29 +23,22 @@ def train_nni(**kwargs):
     logger = logging.getLogger('nni_search')
     logger.info('-'*10+'start'+'-'*10)
     configures = get_items_from_file(kwargs['config'], format='json')
+    configures['nni'] = True
     cargs = sn(**configures)
     
     try:
         # get parameters from tuner
         tuner_params = nni.get_next_parameter()
         logger.info(f'tuner_params: {tuner_params}')
-        # if 'optim' in tuner_params:
-        #     if tuner_params['optim']['_name'] == 'sgd':
-        #         tuner_params['sgd_momentum'] = tuner_params['optim']['sgd_momentum']
-        #         tuner_params['optim'] = tuner_params['optim']['_name']
-        #     else:
-        #         tuner_params['optim'] = tuner_params['optim']['_name']
 
         cargs = merge_parameter(cargs, tuner_params)
         logger.info(f'Current args: {cargs}')
 
-        
         # logging_level = logging.DEBUG if cargs.debug else logging.INFO
         # logging.basicConfig(stream=sys.stderr, level=logging_level)
         # if not cargs.verbose_log and not cargs.debug:
         #     logging.StreamHandler.terminator = "\r"
         
-
         cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
 
         data_list = get_datalist(cargs.data_list)

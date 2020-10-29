@@ -185,22 +185,44 @@ from utils_cw.utils import volume_snapshot
 transforms = Compose([
     LoadNiftid(keys=["image","label"], dtype=np.float32),
     AddChanneld(keys=["image", "label"]),
+    Orientationd(keys=['image','label'], axcodes='LPI'),
     ScaleIntensityRanged(keys=["image"], a_min=-80, a_max=300, b_min=0, b_max=1, clip=True),
-    #RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', neg=0, spatial_size=[120,120,30]),
+    RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', neg=0, spatial_size=[120,120,30]),
     #Rand3DElasticd(keys="image", prob=1, sigma_range=(5,10), magnitude_range=(50,150), padding_mode='zeros'),
-    RandGaussianNoised(keys="image", prob=1, std=0.02),
+    RandGaussianNoised(keys="image", prob=0, std=0.02),
     RandRotated(keys=["image","label"], range_x=5, range_y=5, range_z=10, prob=1, padding_mode='zeros'),
-    RandFlipd(keys=["image","label"], prob=1, spatial_axis=0),
+    RandFlipd(keys=["image","label"], prob=0, spatial_axis=0),
 ])
 
-file = {'image':r"\\mega\clwang\Data\jsph_rcc\kidney_rcc\Test\2374947\data.nii.gz", 
-        'label':r"\\mega\clwang\Data\jsph_rcc\kidney_rcc\Test\2374947\roi.nii.gz"}
+file = {'image':r"\\mega\MRIData\kits19\data\case_00003\imaging.nii.gz", 
+        'label':r"\\mega\MRIData\kits19\data\case_00003\segmentation.nii.gz"}
 
-ret = transforms(file)
+ret = transforms(file)[0]
 nii = nib.load(file['image'])
 print(ret['image'].shape)
-nib.save(nib.Nifti1Image(np.squeeze(ret['image']), nii.affine), './crop.nii.gz')
-#volume_snapshot(np.squeeze(ret['image']).transpose(2,1,0), slice_percentile=(40,70), output_fname='./crop1.gif', duration=50)
+#nib.save(nib.Nifti1Image(np.squeeze(ret['image']), nii.affine), './crop.nii.gz')
+volume_snapshot(np.squeeze(ret['image']).transpose(2,1,0), slice_percentile=(50,60), output_fname='./crop1.gif', duration=50)
 
+
+# %%
+import nibabel as nib 
+from utils_cw.utils import volume_snapshot
+from monai.transforms import *
+
+jsph = {'image':r"\\mega\clwang\Data\jsph_rcc\kidney_rcc\Test\2374947\data.nii.gz"}
+kits = {'image':r"\\mega\MRIData\kits19\data\case_00003\imaging.nii.gz"}
+
+# jsph_data = nib.load(jsph).get_fdata()
+# kits_data = nib.load(kits).get_fdata()
+
+transforms = Compose([
+    LoadNiftid(keys='image', dtype=np.float32),
+    AddChanneld(keys=["image"]),
+    Orientationd(keys='image', axcodes='RAI'),
+    ScaleIntensityRanged(keys='image',a_min=-80, a_max=300, b_min=0, b_max=1, clip=True),
+    ])
+
+volume_snapshot(transforms(jsph)['image'].squeeze(), slice_percentile=(40,60), output_fname='./jsph.gif', duration=50)
+volume_snapshot(transforms(kits)['image'].squeeze(), slice_percentile=(40,60), output_fname='./kits.gif', duration=50)
 
 # %%

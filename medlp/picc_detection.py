@@ -10,6 +10,7 @@ from medlp.models import get_engine, get_test_engine
 from medlp.data_io.dataio import get_dataloader, get_datalist
 from medlp.utilities.handlers import TensorboardGraph
 import medlp.utilities.click_callbacks as clb
+from medlp.utilities import enum
 
 from sklearn.model_selection import train_test_split
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
@@ -17,6 +18,7 @@ from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2,
 import click
 from click.parser import OptionParser
 from ignite.engine import Events
+from ignite.utils import setup_logger
 from monai.handlers import CheckpointLoader
 
 @click.command('train', context_settings={'allow_extra_args':True})
@@ -33,10 +35,6 @@ from monai.handlers import CheckpointLoader
 @click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_path',save_code=True,exist_ok=False))
 def train(**args):
     cargs = sn(**args)
-    logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    logging.basicConfig(stream=sys.stderr, level=logging_level)
-    if not cargs.verbose_log and not cargs.debug:
-        logging.StreamHandler.terminator = "\r"
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
         Print('CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag')
@@ -72,6 +70,12 @@ def train(**args):
                    os.path.join(tb_dir, os.path.basename(cargs.experiment_path)), target_is_directory=True)
     
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
+
+    logging_level = logging.DEBUG if cargs.debug else logging.INFO
+    trainer.logger = setup_logger(f'{cargs.tensor_dim}-Trainer', level=logging_level)
+    if not cargs.verbose_log and not cargs.debug:
+        logging.StreamHandler.terminator = "\r"
+    
     trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
 
     if os.path.isfile(cargs.pretrained_model_path):
@@ -98,14 +102,14 @@ def train_cfg(**args):
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
     
     #Convert args to index
-    configures['data_list'] = clb.DATASET_LIST.index(configures['data_list'])
-    configures['model_type'] = clb.MODEL_TYPES.index(configures['model_type'])
-    configures['criterion'] = clb.LOSSES.index(configures['criterion'])
-    configures['lr_policy'] = clb.LR_SCHEDULE.index(configures['lr_policy'])
-    configures['framework'] = clb.FRAMEWORK_TYPES.index(configures['framework'])
-    configures['optim']     = clb.OPTIM_TYPES.index(configures['optim'])
-    configures['layer_norm']= clb.NORM_TYPES.index(configures['layer_norm'])
-    #configures['layer_order'] = clb.LAYER_ORDERS.index(configures['layer_order'])
+    # configures['data_list'] = enum.DATASET_LIST.index(configures['data_list'])
+    # configures['model_type'] = enum.MODEL_TYPES.index(configures['model_type'])
+    # configures['criterion'] = enum.LOSSES.index(configures['criterion'])
+    # configures['lr_policy'] = enum.LR_SCHEDULE.index(configures['lr_policy'])
+    # configures['framework'] = enum.FRAMEWORK_TYPES.index(configures['framework'])
+    # configures['optim']     = enum.OPTIM_TYPES.index(configures['optim'])
+    # configures['layer_norm']= enum.NORM_TYPES.index(configures['layer_norm'])
+    # configures['layer_order'] = clb.LAYER_ORDERS.index(configures['layer_order'])
     configures['smi'] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id

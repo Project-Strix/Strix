@@ -3,9 +3,10 @@ from PIL import Image
 import inspect, re, os, h5py, collections, json, csv
 import numpy as np
 from skimage.exposure import rescale_intensity
-from utils_cw import Print, load_h5
+from utils_cw import Print, load_h5, check_dir
 from data_io.picc_dataset import PICC_seg_dataset, RIB_seg_dataset, CacheDataset
 from data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
+from data_io.kits_dataset import get_kits_dataset
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -31,7 +32,10 @@ def get_datalist(dataset_name):
         fname = "/homes/clwang/Data/NIH-CXR_TRAIN_VAL_LIST.json"
     elif dataset_name == 'rib':
         fname = "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json"
-        #fname = "/homes/yliu/Code/picc/raw_data2.json"
+    elif dataset_name == 'kits':
+        fname = '/MRIData/kits19/data/train_data_list.json'
+    elif dataset_name == 'jsph_rcc':
+        fname = "/homes/clwang/Data/jsph_rcc/kidney_rcc/Train/data_list.json"
     else:
         raise ValueError
     
@@ -84,20 +88,77 @@ def get_default_setting(phase, **kwargs):
 def get_dataloader(args, files_list, phase='train'):
     if args.data_list == 'rib':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
-        dataset_ = RIB_seg_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
-                                   crop_size=args.crop_size, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+        dataset_ = RIB_seg_dataset(files_list,
+                                   phase=phase,
+                                   in_channels=args.input_nc,
+                                   preload=args.preload,
+                                   image_size=args.image_size,
+                                   crop_size=args.crop_size,
+                                   augment_ratio=args.augment_ratio,
+                                   downsample=args.downsample,
+                                   verbose=args.debug
+                                   )
     elif args.data_list == 'picc_h5':
         params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = PICC_seg_dataset(files_list, phase=phase, spacing=[0.3,0.3], in_channels=args.input_nc, image_size=args.image_size, 
-                                    crop_size=args.crop_size, preload=args.preload, augment_ratio=args.augment_ratio, downsample=args.downsample, verbose=args.debug)
+        dataset_ = PICC_seg_dataset(files_list,
+                                    phase=phase,
+                                    spacing=[0.3, 0.3],
+                                    in_channels=args.input_nc,
+                                    image_size=args.image_size,
+                                    crop_size=args.crop_size,
+                                    preload=args.preload,
+                                    augment_ratio=args.augment_ratio,
+                                    downsample=args.downsample,
+                                    verbose=args.debug
+                                    )
     elif args.data_list == 'Obj_CXR':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
-        dataset_ = get_ObjCXR_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
-                                      crop_size=args.crop_size, augment_ratio=args.augment_ratio, verbose=args.debug)
+        dataset_ = get_ObjCXR_dataset(files_list, 
+                                      phase=phase, 
+                                      in_channels=args.input_nc, 
+                                      preload=args.preload, 
+                                      image_size=args.image_size,
+                                      crop_size=args.crop_size, 
+                                      augment_ratio=args.augment_ratio, 
+                                      verbose=args.debug
+                                      )
     elif args.data_list == 'NIH_CXR':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
-        dataset_ = get_NIHXray_dataset(files_list, phase=phase, in_channels=args.input_nc, preload=args.preload, image_size=args.image_size,
-                                       crop_size=args.crop_size, augment_ratio=args.augment_ratio, verbose=args.debug)
+        dataset_ = get_NIHXray_dataset(files_list,
+                                       phase=phase,
+                                       in_channels=args.input_nc,
+                                       preload=args.preload,
+                                       image_size=args.image_size,
+                                       crop_size=args.crop_size,
+                                       augment_ratio=args.augment_ratio,
+                                       verbose=args.debug
+                                       )
+    elif args.data_list == 'kits':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
+        dataset_  = get_kits_dataset(files_list, 
+                                     phase=phase,
+                                     spacing=[1,1,1],
+                                     winlevel=[-80,304],
+                                     in_channels=args.input_nc,
+                                     crop_size=args.crop_size,
+                                     preload=args.preload,
+                                     augment_ratio=args.augment_ratio,
+                                     cache_dir=check_dir(args.experiment_path,'caches'),
+                                     verbose=args.debug
+                                     )
+    elif args.data_list == 'jsph_rcc':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
+        dataset_  = get_kits_dataset(files_list, 
+                                     phase=phase,
+                                     spacing=[],
+                                     winlevel=[-80,304],
+                                     in_channels=args.input_nc,
+                                     crop_size=args.crop_size,
+                                     preload=args.preload,
+                                     augment_ratio=args.augment_ratio,
+                                     cache_dir=check_dir(args.experiment_path,'caches'),
+                                     verbose=args.debug
+                                     )
     else:
         raise ValueError(f'No {args.data_list} dataset')
 

@@ -108,6 +108,9 @@ class TensorboardGraph:
         self.logger = logging.getLogger(logger_name)
     
     def attach(self, engine: Engine) -> None:
+        if self.logger_name is None:
+            self.logger = engine.logger
+        
         engine.add_event_handler(Events.STARTED, self)
 
     def __call__(self, engine: Engine) -> None:

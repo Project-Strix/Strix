@@ -22,8 +22,19 @@ def get_exp_name(ctx, param, value):
     datalist_name = str(ctx.params['data_list'])
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
-    use_img_size = (ctx.params['crop_size'] == (0,0) or ctx.params['crop_size'] == [0,0])
-    input_size = ctx.params['image_size'] if use_img_size else ctx.params['crop_size']
+    # Todo: Unify 2d&3d crop_size and image_size
+    if ctx.params['tensor_dim'] == '2D':
+        crop_size = ctx.params['crop_size_2d']
+        image_size = ctx.params['image_size_2d']
+        use_img_size = (crop_size == (0,0) or crop_size == [0,0])
+    else:
+        crop_size = ctx.params['crop_size_3d']
+        image_size = ctx.params['image_size_3d']
+        use_img_size = (crop_size == (0,0,0) or crop_size == [0,0,0])
+
+    input_size = image_size if use_img_size else crop_size
+    ctx.params['image_size'] = image_size
+    ctx.params['crop_size']  = crop_size 
     if '(' in str(input_size):
         input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
     else:
@@ -46,8 +57,18 @@ def get_nni_exp_name(ctx, param, value):
     context_ = sn(**{'params':param_list})
     return get_exp_name(context_, param, value)
 
-def split_input_str(value):
-    return [ float(s) for s in value.split(',')] if value is not None else None
+def split_input_str_(value):
+    if value is not None:
+        value = value.strip()
+        if ',' in value:
+            sep = ','
+        elif ';' in value:
+            sep = ';'
+        else:
+            sep = ' '
+        return [ float(s) for s in value.split(',')]
+    else:
+        return None
 
 def _prompt(prompt_str, data_type, default_value, value_proc=None):
     return click.prompt('\tInput {}'.format(prompt_str),\
@@ -77,7 +98,7 @@ def loss_params(ctx, param, value):
     #     return value
 
     if value == 'WCE':
-        weights = _prompt('Loss weights', tuple, (0.01,1), split_input_str)
+        weights = _prompt('Loss weights', tuple, (0.1,0.9), split_input_str_)
         ctx.params['loss_params'] = weights
     return value
 
@@ -97,6 +118,7 @@ def model_select(ctx, param, value):
 
 
 def common_params(func):
+    @click.option('--tensor-dim', prompt=True, type=click.Choice(['2D','3D'],show_index=True), default=0, help='2D or 3D')
     @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
     @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=1, help='Choose your framework type')
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
@@ -108,16 +130,16 @@ def common_params(func):
     @click.option('--smooth', type=float, default=0, help='Smooth rate, disable:0')
     @click.option('--input-nc', type=int, default=1, help='input data channels')
     @click.option('--output-nc', type=int, default=3, help='output channels (classes)')
-    @click.option('--tensor-dim', type=str, default='2D', help='2D or 3D')
     @click.option('--split', type=float, default=0.1, help='Training/testing split ratio')
     @click.option('-W', '--pretrained-model-path', type=str, default='', help='pretrained model path')
-    @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/picc/exp')
+    @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/medlp_exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
-    @click.option('-P', '--partial', type=float, default=1, callback=partial(prompt_when,trigger='debug'), help='Only load part of data')
+    @click.option('-P', '--partial', type=float, default=1, callback=partial(prompt_when,keyword='debug'), help='Only load part of data')
     @click.option('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
     @click.option('--valid-interval', type=int, default=4, help='Interval of validation during training')
     @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
     @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
+    @click.option('--nni', is_flag=True, help='Flag of using nni-search, you dont need to modify this.')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
@@ -140,8 +162,10 @@ def solver_params(func):
 def network_params(func):
     @click.option('--model-type', prompt=True, type=click.Choice(FCN_MODEL_TYPES+CNN_MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
-    @click.option('--image-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Input Image size')
-    @click.option('--crop-size', prompt=True, show_default=True, type=(int,int), default=(0,0), help='Crop patch size')
+    @click.option('--image-size-2d', type=(int,int), default=(0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='2D'), help='Input 2D Image size')
+    @click.option('--crop-size-2d', type=(int,int), default=(0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='2D'), help='Crop 2D patch size')
+    @click.option('--image-size-3d', type=(int,int,int), default=(0,0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='3D'), help='Input 3D Image size')
+    @click.option('--crop-size-3d', type=(int,int,int), default=(0,0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='3D'), help='Crop 3D patch size')
     @click.option('--layer-norm', prompt=True, type=click.Choice(NORM_TYPES, show_index=True), default=0, help='Layer norm type')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-depth', type=int, default=-1, help='Network depth. -1: use default depth')
@@ -149,7 +173,7 @@ def network_params(func):
     @click.option('--feature-scale', type=int, default=4, help='not used')
     #@click.option('--layer-order', prompt=True, type=click.Choice(LAYER_ORDERS,show_index=True), default=0, help='conv layer order')
     # @click.option('--snip', is_flag=True)
-    # @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,trigger='snip'), help='Pruning ratio of wights/channels')
+    # @click.option('--snip_percent', type=float, default=0.4, callback=partial(prompt_when,keyword='snip'), help='Pruning ratio of wights/channels')
     # @click.option('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
     # @click.option('--sep-conv', type=bool, default=False, help='Use Depthwise Separable Convolution')
     # @click.option('--use-apex', is_flag=True, help='Use NVIDIA apex module')

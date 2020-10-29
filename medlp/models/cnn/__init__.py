@@ -40,12 +40,13 @@ def build_segmentation_engine(**kwargs):
     writer = kwargs['writer'] 
     valid_interval = kwargs['valid_interval'] 
     device = kwargs['device'] 
-    model_dir = kwargs['model_dir'] 
+    model_dir = kwargs['model_dir']
+    logger_name = kwargs.get('logger_name', None)
 
     assert_network_type(opts.model_type, 'FCN')
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None),
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
         MyTensorBoardImageHandler(
             summary_writer=writer, 
@@ -54,9 +55,11 @@ def build_segmentation_engine(**kwargs):
             max_channels=opts.output_nc,
             prefix_name='Val'
         ),
-        CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3),
-        NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch),
+        CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3)
     ]
+    # If in nni search mode
+    if opts.nni: 
+        val_handlers += [NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch, logger_name=logger_name)]
 
     trainval_post_transforms = Compose(
         [
@@ -91,7 +94,7 @@ def build_segmentation_engine(**kwargs):
     train_handlers = [
         LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
-        StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
+        StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"], name=logger_name),
         CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
         MyTensorBoardImageHandler(
