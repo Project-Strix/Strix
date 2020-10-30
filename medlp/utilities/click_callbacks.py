@@ -126,7 +126,7 @@ def common_params(func):
     @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=0, help='Choose your framework type')
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=5000, help='Epoch number')
-    @click.option('--n-epoch-len', type=int, default=None, help='Num of iterations for one epoch')
+    @click.option('--n-epoch-len', type=float, default=1.0, help='Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch')
     @click.option('--n-batch', prompt=True, show_default=True, type=int, default=50, help='Batch size')
     @click.option('--istrain', type=bool, default=True, help="train/test phase flag")
     @click.option('--downsample', type=int, default=-1, help='Downsample rate. disable:-1')

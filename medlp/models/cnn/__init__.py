@@ -1,6 +1,7 @@
 import torch
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES, assert_network_type
+from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
@@ -80,7 +81,7 @@ def build_segmentation_engine(**kwargs):
         device=device,
         val_data_loader=test_loader,
         network=net,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
         post_transform=trainval_post_transforms,
@@ -112,7 +113,7 @@ def build_segmentation_engine(**kwargs):
         network=net,
         optimizer=optim,
         loss_function=loss,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(train_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=trainval_post_transforms,
@@ -162,7 +163,7 @@ def build_classification_engine(**kwargs):
         device=device,
         val_data_loader=test_loader,
         network=net,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_val_metric={"val_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
@@ -191,7 +192,7 @@ def build_classification_engine(**kwargs):
         network=net,
         optimizer=optim,
         loss_function=loss,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(train_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_train_metric={"train_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
@@ -239,7 +240,7 @@ def build_selflearning_engine(**kwargs):
         device=device,
         val_data_loader=test_loader,
         network=net,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         key_val_metric={
@@ -270,7 +271,7 @@ def build_selflearning_engine(**kwargs):
         network=net,
         optimizer=optim,
         loss_function=loss,
-        epoch_length=opts.n_epoch_len,
+        epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(train_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         train_handlers=train_handlers,

@@ -66,7 +66,7 @@ def train(**args):
     writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, 'tensorboard'))
     if not cargs.debug:
         tb_dir = check_dir(os.path.dirname(cargs.experiment_path),'tb')
-        os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'), 
+        os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'),
                    os.path.join(tb_dir, os.path.basename(cargs.experiment_path)), target_is_directory=True)
     
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
@@ -150,3 +150,20 @@ def test_cfg(**args):
     Print("Begin testing...", color='g')
     engine.run()
 
+
+@click.command('unlink')
+@click.option('--root-dir', type=click.Path(exists=True), help='Root dir contains symbolic dirs')
+@click.option('-a', '--all-dir', is_flag=True, help='Unlink all dirs including both avalible and unavailable dirs')
+def unlink_dirs(root_dir, all_dir):
+    for d in os.listdir(root_dir):
+        d = os.path.join(root_dir, d)
+        if os.path.islink(d):
+            if not os.path.isdir(d):
+                os.unlink(d)
+                print('Unlinked unavailable symbolic dir:', d)
+            elif all_dir:
+                os.unlink(d)
+                print('Unlinked symbolic dir:', d)
+            else:
+                pass
+        
