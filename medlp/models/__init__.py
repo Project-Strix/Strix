@@ -12,11 +12,12 @@ from medlp.models.cnn.resnet import resnet34, resnet50
 from medlp.models.cnn.scnn import SCNN
 from medlp.models.cnn.utils import print_network, output_onehot_transform
 from medlp.models.cnn.losses import DeepSupervisionLoss
+from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
-from monai.networks.nets import UNet, DynUNet, HighResNet
+from monai.networks.nets import UNet, HighResNet
 from monai.losses import DiceLoss
 from monai.utils import Activation, ChannelMatching, Normalisation
 
@@ -90,9 +91,11 @@ def get_network(opts):
         if n_depth == -1:
             kernel_size = (3, 3, 3, 3, 3, 3)
             strides = (1, 2, 2, 2, 2, 2)
+            upsample_kernel_size=(1, 2, 2, 2, 2, 2),
         else:
             kernel_size = (3,)+(3,)*n_depth
             strides = (1,)+(2,)*n_depth
+            upsample_kernel_size=(1,)+(2,)*n_depth
 
         model = model(
             spatial_dims=dim,
@@ -101,7 +104,7 @@ def get_network(opts):
             norm_name=layer_norm,
             kernel_size=kernel_size,
             strides=strides,
-            #upsample_kernel_size=(3, 3, 3, 3, 3, 3),
+            upsample_kernel_size=upsample_kernel_size,
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
             res_block=(archi=='res-unet'),

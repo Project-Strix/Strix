@@ -14,10 +14,6 @@ def get_trained_models(exp_folder):
     return str(files[selected])
 
 def get_exp_name(ctx, param, value):
-    if 'debug' in ctx.params and ctx.params['debug']:
-        ctx.params['preload'] = 0.0 #emmm...
-        return check_dir(ctx.params['out_dir'], 'test')
-
     model_name = ctx.params['model_type']
     datalist_name = str(ctx.params['data_list'])
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
@@ -27,18 +23,25 @@ def get_exp_name(ctx, param, value):
         crop_size = ctx.params['crop_size_2d']
         image_size = ctx.params['image_size_2d']
         use_img_size = (crop_size == (0,0) or crop_size == [0,0])
-    else:
+    elif ctx.params['tensor_dim'] == '3D':
         crop_size = ctx.params['crop_size_3d']
         image_size = ctx.params['image_size_3d']
         use_img_size = (crop_size == (0,0,0) or crop_size == [0,0,0])
+    else:
+        raise ValueError(f"Unrecognized tensor dim {ctx.params['tensor_dim']}")
 
-    input_size = image_size if use_img_size else crop_size
     ctx.params['image_size'] = image_size
-    ctx.params['crop_size']  = crop_size 
+    ctx.params['crop_size']  = crop_size
+    
+    input_size = image_size if use_img_size else crop_size
     if '(' in str(input_size):
         input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
     else:
         input_size_str = str(input_size).strip('[').strip(']').replace(' ','')
+
+    if 'debug' in ctx.params and ctx.params['debug']:
+        ctx.params['preload'] = 0.0 #emmm...
+        return check_dir(ctx.params['out_dir'], 'test')
 
     exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-"\
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{ctx.params['timestamp']}"
@@ -120,7 +123,7 @@ def model_select(ctx, param, value):
 def common_params(func):
     @click.option('--tensor-dim', prompt=True, type=click.Choice(['2D','3D'],show_index=True), default=0, help='2D or 3D')
     @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
-    @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=1, help='Choose your framework type')
+    @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=0, help='Choose your framework type')
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=5000, help='Epoch number')
     @click.option('--n-epoch-len', type=int, default=None, help='Num of iterations for one epoch')
@@ -191,6 +194,8 @@ def latent_auxilary_params(func):
     @click.option('--load-imagenet', type=bool, default=False, help='Load pretrain Imagenet for some net')
     @click.option('--deep-supervision', type=bool, default=False, help='Use deep supervision module')
     @click.option('--deep-supr-num', type=int, default=1, help='Num of features will be output')
+    @click.option('--image-size', type=list)
+    @click.option('--crop-size', type=list)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

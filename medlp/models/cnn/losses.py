@@ -46,4 +46,17 @@ class DeepSupervisionLoss(Module):
         return torch.mean(torch.stack(losses))
 
 class CEDiceLoss(Module):
-    pass
+    def __init__(self, ce_loss, dice_loss, aggregate="sum"):
+        super(CEDiceLoss, self).__init__()
+        self.aggregate = aggregate
+        self.ce = ce_loss
+        self.dc = dice_loss
+
+    def forward(self, net_output, target):
+        dc_loss = self.dc(net_output, target)
+        ce_loss = self.ce(net_output, target)
+        if self.aggregate == "sum":
+            result = ce_loss + dc_loss
+        else:
+            raise NotImplementedError
+        return result
