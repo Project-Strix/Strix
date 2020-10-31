@@ -2,14 +2,14 @@
 # All enum variables
 DATASET_LIST = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc']
 NORM_TYPES = ['batch','instance','group','auto']
-LOSSES = ['CE', 'WCE', 'MSE', 'DCE']
+LOSSES = ['CE', 'WCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
-LAYER_ORDERS = ['crb','cbr', 'cgr','cbe','cB']
+LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']
 OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'adagrad']
 
 CNN_MODEL_TYPES = ['vgg13', 'vgg16', 'resnet34', 'resnet50']
-FCN_MODEL_TYPES = ['unet', 'res-unet', 'scnn', 'highresnet']
+FCN_MODEL_TYPES = ['unet', 'res-unet', 'unetv2', 'res-unetv2', 'scnn', 'highresnet']
 RCNN_MODEL_TYPES = ['mask_rcnn', 'faster_rcnn', 'fcos', 'retina']
 NETWORK_TYPES = {'CNN':CNN_MODEL_TYPES, 
                  'FCN':FCN_MODEL_TYPES,

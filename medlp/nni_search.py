@@ -82,7 +82,7 @@ def train_nni(**kwargs):
 @click.option('--nni-config', type=str, default='', help='NNI config file (.yaml)')
 @click.option('--port', type=int, default=8080, help='Port of nni server')
 @click.option('--background', is_flag=True, help='Run nii in background')
-@click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/picc/exp/NNI')
+@click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/medlp_exp/NNI')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 @click.option('--experiment-path', type=str, callback=clb.get_nni_exp_name, default='nni-search')
 def nni_search(**args):
@@ -90,6 +90,7 @@ def nni_search(**args):
     configures = get_items_from_file(args['param_list'], format='json')
     configures['out_dir'] = cargs.out_dir
     configures['gpus'] = cargs.gpus
+    configures['nni'] = True
     configures['experiment_path'] = cargs.experiment_path
     # os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
 

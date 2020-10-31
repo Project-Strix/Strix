@@ -102,7 +102,7 @@ def get_dataloader(args, files_list, phase='train'):
         params = get_default_setting(phase, train_n_batch=args.n_batch)
         dataset_ = PICC_seg_dataset(files_list,
                                     phase=phase,
-                                    spacing=[0.3, 0.3],
+                                    spacing=args.spacing,
                                     in_channels=args.input_nc,
                                     image_size=args.image_size,
                                     crop_size=args.crop_size,
@@ -137,7 +137,7 @@ def get_dataloader(args, files_list, phase='train'):
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
         dataset_  = get_kits_dataset(files_list, 
                                      phase=phase,
-                                     spacing=[1,1,1],
+                                     spacing=args.spacing,
                                      winlevel=[-80,304],
                                      in_channels=args.input_nc,
                                      crop_size=args.crop_size,
@@ -150,7 +150,7 @@ def get_dataloader(args, files_list, phase='train'):
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
         dataset_  = get_kits_dataset(files_list, 
                                      phase=phase,
-                                     spacing=[],
+                                     spacing=args.spacing,
                                      winlevel=[-80,304],
                                      in_channels=args.input_nc,
                                      crop_size=args.crop_size,

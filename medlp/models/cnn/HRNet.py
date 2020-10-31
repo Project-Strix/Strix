@@ -10,7 +10,6 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import logging
 
 import torch
 import torch.nn as nn
@@ -19,7 +18,6 @@ import torch.nn.functional as F
 
 BatchNorm2d = nn.BatchNorm2d
 BN_MOMENTUM = 0.01
-logger = logging.getLogger(__name__)
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -99,6 +97,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 blocks_dict = {
     'BASIC': BasicBlock,
     'BOTTLENECK': Bottleneck
@@ -127,19 +126,19 @@ class HighResolutionModule(nn.Module):
         if num_branches != len(num_blocks):
             error_msg = 'NUM_BRANCHES({}) <> NUM_BLOCKS({})'.format(
                 num_branches, len(num_blocks))
-            logger.error(error_msg)
+            print(error_msg)
             raise ValueError(error_msg)
 
         if num_branches != len(num_channels):
             error_msg = 'NUM_BRANCHES({}) <> NUM_CHANNELS({})'.format(
                 num_branches, len(num_channels))
-            logger.error(error_msg)
+            print(error_msg)
             raise ValueError(error_msg)
 
         if num_branches != len(num_inchannels):
             error_msg = 'NUM_BRANCHES({}) <> NUM_INCHANNELS({})'.format(
                 num_branches, len(num_inchannels))
-            logger.error(error_msg)
+            print(error_msg)
             raise ValueError(error_msg)
 
     def _make_one_branch(self, branch_index, block, num_blocks, num_channels,
@@ -445,7 +444,6 @@ class HighResolutionNet(nn.Module):
         return x
 
     def init_weights(self, pretrained=''):
-        logger.info('=> init weights from normal distribution')
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -456,13 +454,12 @@ class HighResolutionNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)
-            logger.info('=> loading pretrained model {}'.format(pretrained))
+            print('=> loading pretrained model {}'.format(pretrained))
             model_dict = self.state_dict()
             pretrained_dict = {k: v for k, v in pretrained_dict.items()
                                if k in model_dict.keys()}
             for k, _ in pretrained_dict.items():
-                logger.info(
-                    '=> loading {} pretrained model {}'.format(k, pretrained))
+                print('=> loading {} pretrained model {}'.format(k, pretrained))
             model_dict.update(pretrained_dict)
             self.load_state_dict(model_dict)
 

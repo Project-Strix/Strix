@@ -11,7 +11,7 @@ from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn
 from medlp.models.cnn.resnet import resnet34, resnet50
 from medlp.models.cnn.scnn import SCNN
 from medlp.models.cnn.utils import print_network, output_onehot_transform
-from medlp.models.cnn.losses import DeepSupervisionLoss
+from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
@@ -26,6 +26,8 @@ def get_model_instance(archi, tensor_dim):
     return {
         'unet':{'3D': DynUNet, '2D': DynUNet},
         'res-unet':{'3D': DynUNet, '2D': DynUNet},
+        'unetv2':{'3D': UNet, '2D': UNet},
+        'res-unetv2':{'3D': UNet, '2D': UNet},
         'scnn':{'3D': None, '2D': SCNN},
         'vgg13':{'3D': None, '2D': vgg13_bn},
         'vgg16':{'3D': None, '2D': vgg16_bn},
@@ -60,6 +62,9 @@ def get_rcnn_config(archi, backbone):
 def get_attr_(obj, name, default):
     return getattr(obj, name) if hasattr(obj, name) else default
 
+def create_feature_maps(init_channel_number, number_of_fmaps):
+    return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
+
 def get_network(opts):
     assert hasattr(opts,'model_type') and hasattr(opts,'input_nc') and \
            hasattr(opts, 'tensor_dim') and hasattr(opts,'output_nc')
@@ -87,15 +92,10 @@ def get_network(opts):
 
     if archi == 'unet' or archi == 'res-unet':
         last_act = 'sigmoid' if framework_type == 'selflearning' else None
-
-        if n_depth == -1:
-            kernel_size = (3, 3, 3, 3, 3, 3)
-            strides = (1, 2, 2, 2, 2, 2)
-            upsample_kernel_size=(1, 2, 2, 2, 2, 2),
-        else:
-            kernel_size = (3,)+(3,)*n_depth
-            strides = (1,)+(2,)*n_depth
-            upsample_kernel_size=(1,)+(2,)*n_depth
+        n_depth = 5 if n_depth == -1 else n_depth
+        kernel_size = (3,)+(3,)*n_depth
+        strides = (1,)+(2,)*n_depth
+        upsample_kernel_size=(1,)+(2,)*n_depth
 
         model = model(
             spatial_dims=dim,
@@ -109,6 +109,26 @@ def get_network(opts):
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
             res_block=(archi=='res-unet'),
             last_activation=last_act
+        )
+    elif archi == 'unetv2' or archi == 'res-unetv2':
+        init_feat = get_attr_(opts, 'n_features', 64)
+        n_depth = 5 if n_depth == -1 else n_depth
+        strides = (2,)*(n_depth-1)
+        upsample_kernel_size=(1,)+(2,)*n_depth
+        channels = create_feature_maps(init_feat, n_depth)
+
+        model = model(
+            dimensions=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            channels=channels,
+            strides=strides,
+            kernel_size = 3,
+            up_kernel_size = 3,
+            num_res_units = 2 if archi=='res-unet' else 0,
+            act='prelu',
+            norm=layer_norm,
+            dropout=0,
         )
     elif archi == 'highresnet':
         model = model(
@@ -167,6 +187,13 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':
         loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
+    elif opts.criterion == 'CE-DCE':
+        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(), 
+                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
+    elif opts.criterion == 'WCE-DCE':
+        w_ = torch.tensor(opts.loss_params).to(device)
+        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(weight=w_), 
+                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
     else:
         raise NotImplementedError
     

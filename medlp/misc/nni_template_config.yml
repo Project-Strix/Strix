@@ -20,9 +20,9 @@ assessor:
     builtinAssessorName: Curvefitting
     classArgs:
       epoch_num: 100
-      start_step: 10
-      threshold: 0.9
-      gap: 2
+      start_step: 20
+      threshold: 0.95
+      gap: 1
 trial:
     command: python main.py train-fcfg --config "/homes/yliu/Code/medlp/param.list"
     codeDir: .

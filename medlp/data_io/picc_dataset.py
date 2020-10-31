@@ -43,28 +43,28 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
     data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], 
                             affine_keys=["affine","affine",None], dtype=[np.float32, np.int64, np.float32])
 
-    if spacing:
-        spacer = Spacingd(keys=["image","label"], pixdim=spacing)
-    else:
-        spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
-
     if in_channels > 1:
         repeater = RepeatChanneld(keys="image", repeats=in_channels)
     else:
         repeater = Lambdad(keys="image", func=lambda x : x)
 
-    if image_size is None or np.any(np.less_equal(image_size,0)):
+    if spacing is None or spacing == [] or np.any(np.less_equal(spacing,0)):
+        Print('No respacing!', color='g')
+        spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
+    else:
+        spacer = Spacingd(keys=["image","label"], pixdim=spacing)
+
+    if image_size is None or image_size == [] or np.any(np.less_equal(image_size,0)):
         Print('No resizing!', color='g')
         resizer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
         resizer = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size)
 
-    def debug(x):
-        print("image type:", type(x), x.dtype, "image shape:", x.shape)
-        return x
-        nib.save(nib.Nifti1Image(x, np.eye(4)), f'./{str(time.time())}.nii.gz')
-        return x
-    debugger = Lambdad(keys=["image", "label"], func=debug)
+    if crop_size is None or crop_size == [] or np.any(np.less_equal(crop_size,0)):
+        Print('No cropping!', color='g')
+        cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
+    else:
+        cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=2, neg=1, spatial_size=crop_size)
 
     if phase == 'train':
         transforms = Compose([
@@ -72,8 +72,9 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             AddChanneld(keys=["image", "label"]),
             spacer,
             resizer,
-            RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
-            #RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,1.4)),
+            cropper,
+            #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
+            RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,1.4)),
             #Rand2DElasticd(keys=["image","label"], prob=augment_ratio, spacing=(300, 300), magnitude_range=(10, 20), padding_mode="border"),
             RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
@@ -87,6 +88,7 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             AddChanneld(keys=["image", "label"]),
             spacer,
             resizer,
+            cropper,
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
         ])
@@ -182,6 +184,7 @@ def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
+
 class DetDateSet(object):
     def __init__(self, file_list, bbox_radius=(20,20), transforms=None):
         self.file_list = file_list
@@ -213,6 +216,7 @@ class DetDateSet(object):
 
     def get_img_info(self, idx):
         return None
+
 
 def PICC_det_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
                      crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):

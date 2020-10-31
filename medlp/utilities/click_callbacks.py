@@ -1,9 +1,32 @@
 from medlp.utilities.enum import CNN_MODEL_TYPES
 import os, time, click
+import numpy as np
+from click.types import convert_type
 from types import SimpleNamespace as sn
 from utils_cw import Print, check_dir, prompt_when, recursive_glob, get_items_from_file
 from functools import partial, wraps
 from medlp.utilities.enum import *
+
+
+class DynamicTuple(click.ParamType):
+
+    def __init__(self, input_type):
+        self.type = click.types.convert_type(input_type)
+
+    @property
+    def name(self):
+        return "< Dynamic Tuple >"
+
+    def convert(self, value, param, ctx):
+        # Hotfix for prompt input 
+        if isinstance(value, str):
+            value = value.strip().split(',')
+            value = list(filter(lambda x : x is not ' ', value))
+            
+        types = (self.type,) * len(value)
+        return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
+
+
 
 def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder,'Models')
@@ -18,20 +41,9 @@ def get_exp_name(ctx, param, value):
     datalist_name = str(ctx.params['data_list'])
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
-    # Todo: Unify 2d&3d crop_size and image_size
-    if ctx.params['tensor_dim'] == '2D':
-        crop_size = ctx.params['crop_size_2d']
-        image_size = ctx.params['image_size_2d']
-        use_img_size = (crop_size == (0,0) or crop_size == [0,0])
-    elif ctx.params['tensor_dim'] == '3D':
-        crop_size = ctx.params['crop_size_3d']
-        image_size = ctx.params['image_size_3d']
-        use_img_size = (crop_size == (0,0,0) or crop_size == [0,0,0])
-    else:
-        raise ValueError(f"Unrecognized tensor dim {ctx.params['tensor_dim']}")
-
-    ctx.params['image_size'] = image_size
-    ctx.params['crop_size']  = crop_size
+    crop_size = ctx.params['crop_size']
+    image_size = ctx.params['image_size']
+    use_img_size = np.all(np.equal(crop_size, 0))
     
     input_size = image_size if use_img_size else crop_size
     if '(' in str(input_size):
@@ -165,10 +177,9 @@ def solver_params(func):
 def network_params(func):
     @click.option('--model-type', prompt=True, type=click.Choice(FCN_MODEL_TYPES+CNN_MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
-    @click.option('--image-size-2d', type=(int,int), default=(0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='2D'), help='Input 2D Image size')
-    @click.option('--crop-size-2d', type=(int,int), default=(0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='2D'), help='Crop 2D patch size')
-    @click.option('--image-size-3d', type=(int,int,int), default=(0,0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='3D'), help='Input 3D Image size')
-    @click.option('--crop-size-3d', type=(int,int,int), default=(0,0,0), callback=partial(prompt_when,keyword='tensor_dim',trigger='3D'), help='Crop 3D patch size')
+    @click.option('--image-size', prompt=True, type=DynamicTuple(int), default=(0,0), help='Input Image size')
+    @click.option('--crop-size', prompt=True, type=DynamicTuple(int), default=(0,0), help='Crop patch size')
+    @click.option('--spacing', prompt=True, type=DynamicTuple(float), default=(0,0), help='Image spacing')
     @click.option('--layer-norm', prompt=True, type=click.Choice(NORM_TYPES, show_index=True), default=0, help='Layer norm type')
     @click.option('--n-features', type=int, default=64, help='Feature num of first layer')
     @click.option('--n-depth', type=int, default=-1, help='Network depth. -1: use default depth')
