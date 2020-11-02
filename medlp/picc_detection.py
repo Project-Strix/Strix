@@ -66,9 +66,13 @@ def train(**args):
     writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, 'tensorboard'))
     if not cargs.debug:
         tb_dir = check_dir(os.path.dirname(cargs.experiment_path),'tb')
-        os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'),
-                   os.path.join(tb_dir, os.path.basename(cargs.experiment_path)), target_is_directory=True)
-    
+        target_dir = os.path.join(tb_dir, os.path.basename(cargs.experiment_path))
+        if os.path.islink(target_dir):
+            os.unlink(target_dir)
+
+        os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'), target_dir, target_is_directory=True)
+
+
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
