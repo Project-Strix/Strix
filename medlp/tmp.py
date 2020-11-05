@@ -230,3 +230,55 @@ transforms = Compose([
     ])
 
 # %%
+from utils_cw import load_h5
+
+file = r"\\219.228.149.7\clwang\Data\picc\prepared_h5\1.3.12.2.1107.5.4.4.1451.30000020080101102448400000265\1.3.12.2.1107.5.4.4.1451.30000020080101102448400000265.h5"
+
+data = load_h5(file, keywords=[], verbose=True)
+# %%
+# SN统计值
+import os, json
+import numpy as np
+import nibabel as nib 
+from utils_cw import get_items_from_file, Print
+
+def get_connected_comp(data, topK=2, binary_output=True, min_th=50, verbose=False):
+    from scipy.ndimage import label, generate_binary_structure
+    from scipy.ndimage.morphology import binary_opening, binary_dilation
+
+    ccs, num_features = label(data, structure=generate_binary_structure(3,1))
+    component_sizes = np.bincount(ccs.ravel())
+    if len(component_sizes) > topK+1:
+        Print('{} components found!'.format(len(component_sizes)), color='y', verbose=verbose)
+        # Get biggest 2 components
+        biggest_indices = component_sizes[1:].argsort()[-topK:][::-1] + 1
+        
+        output = np.zeros_like(data).astype(np.int8)
+        for i, idx in enumerate(biggest_indices):
+            biggest = np.zeros(len(component_sizes)).astype(np.bool)
+            biggest[idx] = True
+            biggest_mask = biggest[ccs]
+            if np.count_nonzero(biggest_mask)>min_th:
+                output[biggest_mask] = 1 if binary_output else i+1
+        #mask = binary_dilation(output,generate_binary_structure(3,2), iterations=2)
+        #output[mask==0] = 0
+        return output
+    else:
+        return data
+
+json_files = r"\\mega\clwang\Data\RJH\RJ_data\all_files.json"
+files = get_items_from_file(json_files, format='json')
+
+all_sn = None
+for idx, f in enumerate(files):
+    image_file = f['image'].replace('/homes',r'\\mega').replace('/', r'\\')
+    label_file = f['label'].replace('/homes',r'\\mega').replace('/', r'\\')
+    image = nib.load(image_file).get_fdata()
+    label = nib.load(label_file).get_fdata().astype(np.int)
+    sn = get_connected_comp(label, topK=2)
+    all_sn = image[sn>0].ravel() if all_sn is None else np.concatenate([all_sn, image[sn>0].ravel()])
+    print(idx, all_sn.shape)
+Print('SN statistic:', all_sn.shape, 'Min:', np.min(all_sn), 'Max:', np.max(all_sn))
+Print('10 90 percentile:', np.percentile(all_sn, 10), np.percentile(all_sn, 90))
+
+# %%

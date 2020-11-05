@@ -1,7 +1,7 @@
 import os, sys, time, torch, random, tqdm
 import numpy as np
 import nibabel as nib
-from utils_cw import Print, load_h5
+from utils_cw import Print
 from scipy.ndimage.morphology import binary_dilation
 from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
 

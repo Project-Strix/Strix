@@ -185,11 +185,14 @@ def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
     return dataset_
 
 
-class DetDateSet(object):
+class DetDateSet(Dataset):
     def __init__(self, file_list, bbox_radius=(20,20), transforms=None):
         self.file_list = file_list
         self.transforms = transforms
         self.bbox_radius = bbox_radius
+
+    def __len__(self) -> int:
+        return len(self.file_list)
 
     def __getitem__(self, idx):
         # load the image as a PIL Image

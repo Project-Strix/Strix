@@ -127,6 +127,8 @@ def nni_search(**args):
     else:
         command =  f'nnictl create --config {nniconfig_file} --port {port}'
 
-    os.system(command)
-    
-    # train_nni(**configures)
+    try:
+        os.system(command)
+    except KeyboardInterrupt:
+        print('Experimented is terminated by user!')
+        os.system(f'nnictl stop --port {port}')

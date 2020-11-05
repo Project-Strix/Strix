@@ -16,7 +16,6 @@ from sklearn.model_selection import train_test_split
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
 
 import click
-from click.parser import OptionParser
 from ignite.engine import Events
 from ignite.utils import setup_logger
 from monai.handlers import CheckpointLoader
@@ -105,15 +104,6 @@ def train_cfg(**args):
     configures = get_items_from_file(args['config'], format='json')
     #click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
     
-    #Convert args to index
-    # configures['data_list'] = enum.DATASET_LIST.index(configures['data_list'])
-    # configures['model_type'] = enum.MODEL_TYPES.index(configures['model_type'])
-    # configures['criterion'] = enum.LOSSES.index(configures['criterion'])
-    # configures['lr_policy'] = enum.LR_SCHEDULE.index(configures['lr_policy'])
-    # configures['framework'] = enum.FRAMEWORK_TYPES.index(configures['framework'])
-    # configures['optim']     = enum.OPTIM_TYPES.index(configures['optim'])
-    # configures['layer_norm']= enum.NORM_TYPES.index(configures['layer_norm'])
-    # configures['layer_order'] = clb.LAYER_ORDERS.index(configures['layer_order'])
     configures['smi'] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id

@@ -60,6 +60,6 @@ class GeneralizedRCNN(nn.Module):
             losses = {}
             losses.update(detector_losses)
             losses.update(proposal_losses)
-            return losses
+            return result, losses
 
         return result
