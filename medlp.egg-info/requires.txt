@@ -1,8 +1,0 @@
-torch>=1.5.0
-tqdm
-scikit-image>=0.14
-scipy
-numpy
-scikit-learn
-nibabel
-nni
