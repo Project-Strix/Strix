@@ -1,5 +1,4 @@
-from data_io.dataio import *
-from data_io.picc_dataset import *
+from medlp.data_io.dataio import *
 
-__all__ = ["dataio", "picc_dataset"]
+__all__ = ["dataio"]
 

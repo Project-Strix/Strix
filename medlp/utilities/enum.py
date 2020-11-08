@@ -1,6 +1,6 @@
 
 # All enum variables
-DATASET_LIST = ['picc_h5', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi']
+DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi']
 NORM_TYPES = ['batch','instance','group','auto']
 LOSSES = ['CE', 'WCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']

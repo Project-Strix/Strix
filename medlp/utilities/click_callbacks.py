@@ -20,9 +20,18 @@ class DynamicTuple(click.ParamType):
     def convert(self, value, param, ctx):
         # Hotfix for prompt input 
         if isinstance(value, str):
-            value = value.strip().split(',')
+            if ',' in value:
+                sep = ','
+            elif ';' in value:
+                sep = ';'
+            else:
+                sep = ' '
+
+            value = value.strip().split(sep)
             value = list(filter(lambda x : x is not ' ', value))
-            
+        elif value is None or value == '':
+            return None
+
         types = (self.type,) * len(value)
         return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
 
@@ -50,8 +59,12 @@ def get_exp_name(ctx, param, value):
         input_size_str = str(input_size).strip('(').strip(')').replace(' ','')
     else:
         input_size_str = str(input_size).strip('[').strip(']').replace(' ','')
+    
+    if ctx.params['lr_policy'] == 'plateau' and ctx.params['valid_interval'] != 1:
+        Print('Warning: recommand set valid-interval = 1 when using ReduceLROnPlateau', color='y')
 
     if 'debug' in ctx.params and ctx.params['debug']:
+        Print('You are in Debug mode with preload=0, out_dir=test', color='y')
         ctx.params['preload'] = 0.0 #emmm...
         return check_dir(ctx.params['out_dir'], 'test')
 
@@ -149,7 +162,7 @@ def common_params(func):
     @click.option('-W', '--pretrained-model-path', type=str, default='', help='pretrained model path')
     @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/medlp_exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
-    @click.option('-P', '--partial', type=float, default=1, callback=partial(prompt_when,keyword='debug'), help='Only load part of data')
+    @click.option('-P', '--partial', type=float, default=1, help='Only load part of data')
     @click.option('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
     @click.option('--valid-interval', type=int, default=4, help='Interval of validation during training')
     @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
@@ -168,7 +181,7 @@ def solver_params(func):
     @click.option('--momentum', type=float, default=0.0, help='Momentum for optimizer')
     @click.option('-WD', '--l2-weight-decay', type=float, default=0, help='weight decay (L2 penalty)')
     @click.option('--lr', type=float, default=1e-3, help='learning rate')
-    @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default=0, help='learning rate strategy')
+    @click.option('--lr-policy', prompt=True, type=click.Choice(LR_SCHEDULE,show_index=True), callback=lr_schedule_params, default='plateau', help='learning rate strategy')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

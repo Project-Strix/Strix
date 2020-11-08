@@ -1,4 +1,5 @@
-import torch
+import os, torch
+
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES, assert_network_type
 from medlp.models.cnn.utils import output_onehot_transform
@@ -61,7 +62,7 @@ def build_segmentation_engine(**kwargs):
     # If in nni search mode
     if opts.nni: 
         val_handlers += [NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch, logger_name=logger_name)]
-
+    
     trainval_post_transforms = Compose(
         [
             Activationsd(keys="pred", softmax=True),
@@ -92,8 +93,13 @@ def build_segmentation_engine(**kwargs):
         amp=opts.amp
     )
 
+    if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+        lr_step_transform = lambda x : evaluator.state.metrics["val_mean_dice"]
+    else:
+        lr_step_transform = lambda x: ()
+
     train_handlers = [
-        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
+        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"], name=logger_name),
         CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
@@ -139,6 +145,7 @@ def build_classification_engine(**kwargs):
     valid_interval = kwargs['valid_interval'] 
     device = kwargs['device'] 
     model_dir = kwargs['model_dir'] 
+    logger_name = kwargs.get('logger_name', None)
 
     assert_network_type(opts.model_type, 'CNN')
 
@@ -171,8 +178,13 @@ def build_classification_engine(**kwargs):
         amp=opts.amp
     )
 
+    if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+        lr_step_transform = lambda x : evaluator.state.metrics["val_acc"]
+    else:
+        lr_step_transform = lambda x: ()
+
     train_handlers = [
-        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
+        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"]),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
@@ -215,7 +227,8 @@ def build_selflearning_engine(**kwargs):
     writer = kwargs['writer'] 
     valid_interval = kwargs['valid_interval'] 
     device = kwargs['device'] 
-    model_dir = kwargs['model_dir'] 
+    model_dir = kwargs['model_dir']
+    logger_name = kwargs.get('logger_name', None)
 
     assert_network_type(opts.model_type, 'FCN')
 
@@ -250,8 +263,13 @@ def build_selflearning_engine(**kwargs):
         amp=opts.amp
     )
 
+    if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+        lr_step_transform = lambda x : evaluator.state.metrics["val_mse"]
+    else:
+        lr_step_transform = lambda x: ()
+
     train_handlers = [
-        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer),
+        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
         CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),

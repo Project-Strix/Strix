@@ -2,7 +2,7 @@ from __future__ import print_function
 import os, math, random, copy
 import socket
 from medlp.utilities.enum import NETWORK_TYPES
-
+import numpy as np
 
 def detect_port(port):
     '''Detect if the port is used'''
@@ -26,6 +26,11 @@ def _register_generic(module_dict, module_name, module):
     assert module_name not in module_dict
     module_dict[module_name] = module
 
+def is_avaible_size(value):
+    if isinstance(value, (list, tuple)):
+        if np.all( np.greater(value, 0) ):
+            return True
+    return False
 
 class Registry(dict):
     '''

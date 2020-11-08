@@ -4,10 +4,12 @@ import inspect, re, os, h5py, collections, json, csv
 import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5, check_dir
-from data_io.picc_dataset import PICC_seg_dataset, RIB_seg_dataset, CacheDataset
-from data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
-from data_io.kits_dataset import get_kits_dataset
-from data_io.rjh_dataset import get_rjh_tswi_seg_dataset
+
+from medlp.data_io.picc_dataset import *
+from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
+from medlp.data_io.kits_dataset import get_kits_dataset
+from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset
+
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -27,6 +29,10 @@ def get_datalist(dataset_name):
             fname = r"\\mega\clwang\Data\picc\prepared_h5\data_list.json"
         elif os.name == 'posix':
             fname = "/homes/clwang/Data/picc/prepared_h5/data_list_linux.json"
+    elif dataset_name == 'picc_nii':
+        fname = "/homes/clwang/Data/picc/picc_seg_nii.json"
+    elif dataset_name == 'picc_dcm':
+        fname = "/homes/clwang/Data/picc/picc_dcm_nii.json"
     elif dataset_name == 'Obj_CXR':
         fname = "/homes/clwang/Data/object-CXR/train_data_list.json"
     elif dataset_name == 'NIH_CXR':
@@ -44,25 +50,6 @@ def get_datalist(dataset_name):
     
     return fname
 
-def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
-    #Pre-load all training data once.
-    data = { i:[] for i in h5_keys }
-    Print('\nPreload all {} training data'.format(len(file_list)), color='g')
-    for fname in tqdm.tqdm(file_list):
-        try:
-            data_ = load_h5(fname, keywords=h5_keys, transpose=transpose)
-            # if ds>1:
-            #     data = data[::ds,::ds]
-            #     roi  = roi[::ds,::ds]
-            #     coord = coord[0]/ds, coord[1]/ds
-        except Exception as e:
-            Print('Data not exist!', fname, color='r')
-            print(e)
-            continue
-
-        for i, key in enumerate(h5_keys):
-            data[key].append(data_[i])
-    return data.values()
 
 def get_default_setting(phase, **kwargs):
     if phase == 'train': #Todo: move this part to each dataset
@@ -114,6 +101,28 @@ def get_dataloader(args, files_list, phase='train'):
                                     downsample=args.downsample,
                                     verbose=args.debug
                                     )
+    elif args.data_list == 'picc_nii':
+        params = get_default_setting(phase, train_n_batch=args.n_batch)
+        dataset_ = PICC_nii_seg_dataset(files_list,
+                                        phase=phase,
+                                        spacing=args.spacing,
+                                        in_channels=args.input_nc,
+                                        image_size=args.image_size,
+                                        crop_size=args.crop_size,
+                                        preload=args.preload,
+                                        augment_ratio=args.augment_ratio
+                                        )
+    elif args.data_list == 'picc_dcm':
+        params = get_default_setting(phase, train_n_batch=args.n_batch)
+        dataset_ = PICC_dcm_seg_dataset(files_list,
+                                        phase=phase,
+                                        spacing=args.spacing,
+                                        in_channels=args.input_nc,
+                                        image_size=args.image_size,
+                                        crop_size=args.crop_size,
+                                        preload=args.preload,
+                                        augment_ratio=args.augment_ratio
+                                        )
     elif args.data_list == 'Obj_CXR':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
         dataset_ = get_ObjCXR_dataset(files_list, 

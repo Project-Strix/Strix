@@ -226,6 +226,8 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 
                                                        step_size=opts.lr_policy_params['step_size'], 
                                                        gamma=opts.lr_policy_params['gamma'])
+    elif opts.lr_policy == 'plateau':
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, mode='max', factor=0.2, patience=50, cooldown=50, min_lr=1e-5)
     elif opts.lr_policy == 'SGDR':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, 
                                                                             T_0=opts.lr_policy_params['T_0'],

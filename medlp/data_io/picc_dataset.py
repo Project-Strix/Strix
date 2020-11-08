@@ -15,26 +15,79 @@ from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
+from medlp.data_io.segmentation_dataset import SegmentationDataset2D
+from medlp.utilities.utils import is_avaible_size
 
-def load_picc_h5_data_once(file_list, h5_keys=['image', 'roi', 'coord'], transpose=None):
-    #Pre-load all training data once.
-    data = { i:[] for i in h5_keys }
-    Print('\nPreload all {} training data'.format(len(file_list)), color='g')
-    for fname in tqdm.tqdm(file_list):
-        try:
-            data_ = load_h5(fname, keywords=h5_keys, transpose=transpose)
-            # if ds>1:
-            #     data = data[::ds,::ds]
-            #     roi  = roi[::ds,::ds]
-            #     coord = coord[0]/ds, coord[1]/ds
-        except Exception as e:
-            Print('Data not exist!', fname, color='r')
-            print(e)
-            continue
+def PICC_dcm_seg_dataset(
+    files_list, 
+    phase, 
+    spacing=(0.3,0.3), 
+    in_channels=1, 
+    image_size=(1024,1024),
+    crop_size=None, 
+    preload=1.0, 
+    augment_ratio=0.4
+):
+    assert in_channels == 1, 'Currently only support single channel input'
+    
+    if phase == 'train':
+        additional_transforms = [
+            RandRotated(keys=["image","label"], range_x=5, range_y=5, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+        ]
+    elif phase == 'valid':
+        additional_transforms = []
 
-        for i, key in enumerate(h5_keys):
-           data[key].append(data_[i])
-    return data.values()
+    ignore_dcm_keys = ['0040|0244','0040|0245','0040|0253','0040|0254','0032|1060']
+    dataset = SegmentationDataset2D(
+        files_list,
+        loader=[LoadImageD(keys='image', drop_meta_keys=ignore_dcm_keys), LoadNiftiD(keys='label')],
+        channeler=TransposeD(keys='label'), #to match the axes of itk and numpy
+        orienter=None,
+        spacer=SpacingD(keys=["image","label"], pixdim=spacing),
+        rescaler=ScaleIntensityViaDicomD(keys="image", win_center_key='0028|1050', win_width_key='0028|1051', clip=True),
+        resizer=ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size) if is_avaible_size(image_size) else None,
+        cropper=RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False) if is_avaible_size(crop_size) else None,
+        additional_transforms=additional_transforms,    
+        preload=preload
+    ).get_dataset()
+
+    return dataset
+
+def PICC_nii_seg_dataset(
+    files_list, 
+    phase, 
+    spacing=(0.3,0.3), 
+    winlevel=(421,2515), 
+    in_channels=1, 
+    image_size=(1024,1024),
+    crop_size=None, 
+    preload=1.0, 
+    augment_ratio=0.4
+):
+    assert in_channels == 1, 'Currently only support single channel input'
+    
+    if phase == 'train':
+        additional_transforms = [
+            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+        ]
+    elif phase == 'valid':
+        additional_transforms = []
+
+    dataset = SegmentationDataset2D(
+        files_list,
+        loader=LoadNiftiD(keys=['image','label']),
+        channeler=AsChannelFirstD(keys=['image','label']),
+        spacer=SpacingD(keys=["image","label"], pixdim=spacing),
+        rescaler=ScaleIntensityRangeD(keys=["image"], a_min=winlevel[0], a_max=winlevel[1], b_min=0, b_max=1, clip=True),
+        resizer=ResizeWithPadOrCropD(keys=["image","label"], spatial_size=image_size) if is_avaible_size(image_size) else None,
+        cropper=RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False) if is_avaible_size(crop_size) else None,
+        additional_transforms=additional_transforms,    
+        preload=preload
+    ).get_dataset()
+
+    return dataset
 
 
 def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,

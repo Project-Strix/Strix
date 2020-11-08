@@ -6,12 +6,14 @@ from utils_cw import Print
 from monai.data import CacheDataset, PersistentDataset
 from monai.transforms import *
 from monai.transforms.compose import MapTransform
+from monai.utils import ensure_list
 
 class BasicSelflearningDataset(object):
     def __init__(
         self, 
         files_list,
         loader,
+        channeler,
         orienter,
         repeater,
         spacer,
@@ -23,10 +25,12 @@ class BasicSelflearningDataset(object):
     ):
         self.files_list = files_list
         self.verbose=verbose
-        self.input_data = self.check_filelist()
+        self.input_data = self.get_input_data()
         self.dataset = None
 
-        self.transforms = [loader]
+        self.transforms = ensure_list(loader)
+        if channeler is not None:
+            self.transforms += ensure_list(channeler)
         if orienter is not None:
             self.transforms.append(orienter)
         if repeater is not None:
@@ -43,7 +47,7 @@ class BasicSelflearningDataset(object):
         self.transforms += additional_transforms
         self.transforms = Compose(self.transforms)
     
-    def check_filelist(self):
+    def get_input_data(self):
         '''
         check input file_list format and existence.
         '''
@@ -67,6 +71,7 @@ class SelflearningDataset2D(BasicSelflearningDataset):
         self, 
         files_list,
         loader: MapTransform = LoadPNGd(keys=["image","label"], grayscale=True),
+        channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
         orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
         repeater: Optional[MapTransform] = RepeatChanneld(keys="image", repeats=3),
         spacer: Optional[MapTransform] = Spacingd(keys=["image","label"], pixdim=(0.1,0.1)),
@@ -96,6 +101,7 @@ class SelflearningDataset2D(BasicSelflearningDataset):
 
         super().__init__(files_list, 
                          loader,
+                         channeler,
                          orienter,
                          repeater,
                          spacer,
@@ -114,6 +120,7 @@ class SelflearningDataset3D(BasicSelflearningDataset):
         self, 
         files_list,
         loader: MapTransform = LoadNiftid(keys=["image","label"], dtype=np.float32),
+        channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
         orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
         repeater: Optional[MapTransform] = RepeatChanneld(keys="image", repeats=3),
         spacer: Optional[MapTransform] = Spacingd(keys=["image","label"], pixdim=(0.1,0.1,0.1)),
@@ -144,6 +151,7 @@ class SelflearningDataset3D(BasicSelflearningDataset):
         
         super().__init__(files_list, 
                          loader,
+                         channeler,
                          orienter,
                          repeater,
                          spacer,
