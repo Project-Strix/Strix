@@ -7,6 +7,7 @@ from utils_cw import Print, load_h5, check_dir
 from data_io.picc_dataset import PICC_seg_dataset, RIB_seg_dataset, CacheDataset
 from data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
 from data_io.kits_dataset import get_kits_dataset
+from data_io.rjh_dataset import get_rjh_tswi_seg_dataset
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -36,6 +37,8 @@ def get_datalist(dataset_name):
         fname = '/MRIData/kits19/data/train_data_list.json'
     elif dataset_name == 'jsph_rcc':
         fname = "/homes/clwang/Data/jsph_rcc/kidney_rcc/Train/data_list.json"
+    elif dataset_name == 'rjh_tswi':
+        fname = "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json"
     else:
         raise ValueError
     
@@ -159,6 +162,15 @@ def get_dataloader(args, files_list, phase='train'):
                                      cache_dir=check_dir(args.experiment_path,'caches'),
                                      verbose=args.debug
                                      )
+    elif args.data_list == 'rjh_tswi':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
+        detaset_ = get_rjh_tswi_seg_dataset(files_list,
+                                            phase=phase,
+                                            preload=args.preload,
+                                            augment_ratio=args.augment_ratio,
+                                            cache_dir=check_dir(args.experiment_path,'caches'),
+                                            verbose=args.debug
+                                            )
     else:
         raise ValueError(f'No {args.data_list} dataset')
 
