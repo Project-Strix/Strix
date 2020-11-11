@@ -15,7 +15,7 @@ from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES
+from medlp.utilities.utils import ENGINES, TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.models.cnn.layers.radam import RAdam
 
@@ -231,7 +231,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
                                                        step_size=opts.lr_policy_params['step_size'], 
                                                        gamma=opts.lr_policy_params['gamma'])
     elif opts.lr_policy == 'plateau':
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, mode='max', factor=0.2, patience=50, cooldown=50, min_lr=1e-5)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, mode='max', factor=0.2, patience=70, cooldown=50, min_lr=1e-5)
     elif opts.lr_policy == 'SGDR':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, 
                                                                             T_0=opts.lr_policy_params['T_0'],
@@ -254,87 +254,22 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     }
     return ENGINES[framework_type](**params)
 
+from monai.transforms import *
+from monai.handlers import *
+from monai.engines import SupervisedEvaluator
 def get_test_engine(opts, test_loader):
+
     framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
 
     net = get_network(opts).to(device)
 
-    if framework_type == 'classification':
-        post_transforms = Compose([
-            Activationsd(keys="pred", sigmoid=True),
-            #AsDiscreted(keys="pred", argmax=True)
-        ])
+    params = {
+        'opts': opts,
+        'test_loader': test_loader,
+        'net': net,
+        'device': device,
+        'logger_name': f'{opts.tensor_dim}-Trainer'
+    }
 
-        val_handlers = [
-            StatsHandler(output_transform=lambda x: None),
-            CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-            # ClassificationSaver(
-            #     output_dir=opts.experiment_path,
-            #     output_transform=lambda x : (x['image'], x['pred'].cpu().numpy()),
-            #     save_img = True
-            # )
-            SegmentationSaver(
-                output_dir=opts.experiment_path,
-                batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["affine"]},
-                output_transform=lambda output: output["pred"],#[:,0:1,:,:],
-            )
-        ]
-
-        evaluator = SupervisedEvaluator(
-            device=device,
-            val_data_loader=test_loader,
-            #prepare_batch=lambda x : (x[0]["image"],torch.Tensor(0)),
-            network=net,
-            inferer=SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-            post_transform=post_transforms,
-            val_handlers=val_handlers,
-            amp=opts.amp
-        )
-
-        return evaluator
-    
-    elif framework_type == 'segmentation':
-        post_transforms = Compose(
-            [
-                Activationsd(keys="pred", softmax=True),
-                AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
-            ]
-        )
-
-        val_handlers = [
-            StatsHandler(output_transform=lambda x: None),
-            CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-            SegmentationSaver(
-                output_dir=opts.experiment_path,
-                batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["image_meta_dict"]["affine"]},
-                output_transform=lambda output: predict_segmentation(output["pred"])
-            ),
-        ]
-
-        # if opts.criterion == 'CE' or opts.criterion == 'WCE':
-        #     prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
-        #     key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
-        # else:
-        #     prepare_batch_fn = lambda x : (x["image"], x["label"])
-        #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
-
-        prepare_batch_fn = lambda x : (x["image"], None)
-        key_metric_transform_fn = lambda x : (x["pred"], None)
-
-
-        evaluator = SupervisedEvaluator(
-            device=device,
-            val_data_loader=test_loader,
-            network=net,
-            prepare_batch=prepare_batch_fn,
-            inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
-            # post_transform=post_transforms,
-            # key_val_metric={
-            #     "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
-            # },
-            val_handlers=val_handlers,
-            amp=opts.amp
-        )
-
-        return evaluator
+    return TEST_ENGINES[framework_type](**params)

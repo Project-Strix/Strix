@@ -126,7 +126,7 @@ def test_cfg(**args):
     else:
         os.environ['CUDA_VISIBLE_DEVICES'] = str(args['gpus'])
 
-    exp_dir = args.get('experiment_path', os.path.dirname(args['config']))
+    exp_dir = configures.get('experiment_path', os.path.dirname(args['config']))
     if os.path.isfile(args['test_files']):
         test_files = get_items_from_file(args['test_files'], format='json')
     else:

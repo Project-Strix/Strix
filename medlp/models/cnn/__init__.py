@@ -1,7 +1,7 @@
 import os, torch
 
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES, assert_network_type
+from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -304,3 +304,100 @@ def build_siamese_engine(**kwargs):
     assert_network_type(opts.model_type, 'CNN')
 
     raise NotImplementedError
+
+@TEST_ENGINES.register('segmentation')
+def build_segmentation_test_engine(**kwargs):
+    opts = kwargs['opts'] 
+    test_loader = kwargs['test_loader'] 
+    net = kwargs['net']
+    device = kwargs['device'] 
+    logger_name = kwargs.get('logger_name', None)
+
+    assert_network_type(opts.model_type, 'FCN')
+
+    post_transforms = Compose(
+        [
+            Activationsd(keys="pred", softmax=True),
+            AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
+        ]
+    )
+
+    val_handlers = [
+        StatsHandler(output_transform=lambda x: None),
+        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+        SegmentationSaver(
+            output_dir=opts.experiment_path,
+            batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["image_meta_dict"]["affine"]},
+            output_transform=lambda output: predict_segmentation(output["pred"])
+        ),
+    ]
+
+    # if opts.criterion == 'CE' or opts.criterion == 'WCE':
+    #     prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+    #     key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+    # else:
+    #     prepare_batch_fn = lambda x : (x["image"], x["label"])
+    #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+
+    prepare_batch_fn = lambda x : (x["image"], None)
+    key_metric_transform_fn = lambda x : (x["pred"], None)
+
+
+    evaluator = SupervisedEvaluator(
+        device=device,
+        val_data_loader=test_loader,
+        network=net,
+        prepare_batch=prepare_batch_fn,
+        inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
+        # post_transform=post_transforms,
+        # key_val_metric={
+        #     "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
+        # },
+        val_handlers=val_handlers,
+        amp=opts.amp
+    )
+
+    return evaluator
+
+@TEST_ENGINES.register('classification')
+def build_classification_test_engine(**kwargs):
+    opts = kwargs['opts'] 
+    test_loader = kwargs['test_loader'] 
+    net = kwargs['net']
+    device = kwargs['device'] 
+    logger_name = kwargs.get('logger_name', None)
+
+    assert_network_type(opts.model_type, 'CNN')
+
+    post_transforms = Compose([
+        Activationsd(keys="pred", sigmoid=True),
+        #AsDiscreted(keys="pred", argmax=True)
+    ])
+
+    val_handlers = [
+        StatsHandler(output_transform=lambda x: None),
+        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+        # ClassificationSaver(
+        #     output_dir=opts.experiment_path,
+        #     output_transform=lambda x : (x['image'], x['pred'].cpu().numpy()),
+        #     save_img = True
+        # )
+        SegmentationSaver(
+            output_dir=opts.experiment_path,
+            batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["affine"]},
+            output_transform=lambda output: output["pred"],#[:,0:1,:,:],
+        )
+    ]
+
+    evaluator = SupervisedEvaluator(
+        device=device,
+        val_data_loader=test_loader,
+        #prepare_batch=lambda x : (x[0]["image"],torch.Tensor(0)),
+        network=net,
+        inferer=SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
+        post_transform=post_transforms,
+        val_handlers=val_handlers,
+        amp=opts.amp
+    )
+
+    return evaluator

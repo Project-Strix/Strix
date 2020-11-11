@@ -72,3 +72,4 @@ class Registry(dict):
 
 
 ENGINES = Registry()
+TEST_ENGINES = Registry()
