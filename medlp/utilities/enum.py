@@ -6,7 +6,7 @@ LOSSES = ['CE', 'WCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'lambda', 'step', 'SGDR', 'plateau']
 FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']
-OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'adagrad']
+OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'radam']
 
 CNN_MODEL_TYPES = ['vgg13', 'vgg16', 'resnet34', 'resnet50']
 FCN_MODEL_TYPES = ['unet', 'res-unet', 'unetv2', 'res-unetv2', 'scnn', 'highresnet']

@@ -17,6 +17,8 @@ from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
+from medlp.models.cnn.layers.radam import RAdam
+
 from monai.networks.nets import UNet, HighResNet
 from monai.losses import DiceLoss
 from monai.utils import Activation, ChannelMatching, Normalisation
@@ -217,6 +219,8 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         optim = torch.optim.AdamW(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == 'adagrad':
         optim = torch.optim.Adagrad(net.parameters(), opts.lr, weight_decay=weight_decay)
+    elif opts.optim == 'radam':
+        optim = RAdam(net.parameters(), opts.lr, weight_decay=weight_decay)
     else:
         raise NotImplementedError
     

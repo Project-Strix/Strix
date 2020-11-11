@@ -49,9 +49,9 @@ def get_rjh_tswi_seg_dataset(
     files_list,
     phase,
     spacing=(0.667,0.667,1.34),
-    winlevel=(4517.0,17899.0),
+    winlevel=(4500.0,18000.0),
     in_channels=1,
-    crop_size=(96,96,64),
+    crop_size=(96,96,48),
     preload=0,
     augment_ratio=0.4,
     orientation='RAI',
@@ -78,9 +78,10 @@ def get_rjh_tswi_seg_dataset(
         spacer=SpacingD(keys=["image","label"], pixdim=spacing),
         resizer=None,
         rescaler=ScaleIntensityRanged(keys=["image"], a_min=winlevel[0], a_max=winlevel[1], b_min=0, b_max=1, clip=True),
-        cropper=RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=2, spatial_size=crop_size) if is_avaible_size(crop_size) else None,
+        cropper=RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, spatial_size=crop_size) if is_avaible_size(crop_size) else None,
         additional_transforms=additional_transforms,    
         preload=preload,
+        cache_dir=cache_dir,
     ).get_dataset()
 
     return dataset

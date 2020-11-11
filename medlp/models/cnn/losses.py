@@ -54,7 +54,7 @@ class CEDiceLoss(Module):
 
     def forward(self, net_output, target):
         dc_loss = self.dc(net_output, target)
-        ce_loss = self.ce(net_output, target)
+        ce_loss = self.ce(net_output, target.squeeze(dim=1))
         if self.aggregate == "sum":
             result = ce_loss + dc_loss
         else:

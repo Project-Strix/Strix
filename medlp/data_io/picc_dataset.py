@@ -46,7 +46,7 @@ def PICC_dcm_seg_dataset(
         orienter=None,
         spacer=SpacingD(keys=["image","label"], pixdim=spacing),
         rescaler=ScaleIntensityViaDicomD(keys="image", win_center_key='0028|1050', win_width_key='0028|1051', clip=True),
-        resizer=ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size) if is_avaible_size(image_size) else None,
+        resizer=ResizeD(keys=["image","label"], spatial_size=image_size) if is_avaible_size(image_size) else None,#ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size) 
         cropper=RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False) if is_avaible_size(crop_size) else None,
         additional_transforms=additional_transforms,    
         preload=preload

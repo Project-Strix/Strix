@@ -87,7 +87,7 @@ def build_segmentation_engine(**kwargs):
         inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
         post_transform=trainval_post_transforms,
         key_val_metric={
-            "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
+            "val_mean_dice": MeanDice(include_background=False, to_onehot_y=True, output_transform=key_metric_transform_fn)
         },
         val_handlers=val_handlers,
         amp=opts.amp

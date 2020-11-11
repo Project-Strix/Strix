@@ -173,11 +173,12 @@ def get_dataloader(args, files_list, phase='train'):
                                      )
     elif args.data_list == 'rjh_tswi':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        detaset_ = get_rjh_tswi_seg_dataset(files_list,
+        dataset_ = get_rjh_tswi_seg_dataset(files_list,
                                             phase=phase,
+                                            crop_size=args.crop_size,
                                             preload=args.preload,
                                             augment_ratio=args.augment_ratio,
-                                            cache_dir=check_dir(args.experiment_path,'caches'),
+                                            cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
                                             verbose=args.debug
                                             )
     else:
