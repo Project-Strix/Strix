@@ -1,4 +1,4 @@
-import os, sys, time, torch, random, tqdm
+import os, sys, time, torch, random, tqdm, math
 import numpy as np
 from utils_cw import Print, load_h5
 import nibabel as nib
@@ -32,7 +32,7 @@ def PICC_dcm_seg_dataset(
     
     if phase == 'train':
         additional_transforms = [
-            RandRotated(keys=["image","label"], range_x=5, range_y=5, prob=augment_ratio, padding_mode='zeros'),
+            RandRotated(keys=["image","label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
         ]
     elif phase == 'valid':
@@ -69,7 +69,7 @@ def PICC_nii_seg_dataset(
     
     if phase == 'train':
         additional_transforms = [
-            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio, padding_mode='zeros'),
+            RandRotated(keys=["image","label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
         ]
     elif phase == 'valid':
@@ -129,7 +129,7 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
             #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
             RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,1.4)),
             #Rand2DElasticd(keys=["image","label"], prob=augment_ratio, spacing=(300, 300), magnitude_range=(10, 20), padding_mode="border"),
-            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
+            RandRotated(keys=["image","label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             repeater,
@@ -200,11 +200,11 @@ def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
             ThresholdIntensityd(keys="label", threshold=1, above=False, cval=1),
             Zoomd(keys=["image", "label"], zoom=1/downsample, mode=[InterpolateMode.AREA,InterpolateMode.NEAREST], keep_size=False),
             #RandScaleIntensityd(keys="image",factors=(-0.01,0.01), prob=augment_ratio),
-            RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,2.0)),
+            RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.8,1.8)),
             resizer,
             cropper,
             RandGaussianNoised(keys="image", prob=augment_ratio, std=0.2),
-            RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
+            RandRotated(keys=["image","label"], range_x=math.pi/18, range_y=math.pi/18, prob=augment_ratio),
             RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[0]),
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])

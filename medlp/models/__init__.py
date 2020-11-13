@@ -19,7 +19,7 @@ from medlp.utilities.utils import ENGINES, TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.models.cnn.layers.radam import RAdam
 
-from monai.networks.nets import UNet, HighResNet
+from monai.networks.nets import UNet, HighResNet, VNet
 from monai.losses import DiceLoss
 from monai.utils import Activation, ChannelMatching, Normalisation
 
@@ -36,6 +36,7 @@ def get_model_instance(archi, tensor_dim):
         'resnet34':{'3D': None, '2D': resnet34},
         'resnet50':{'3D': None, '2D': resnet50},
         'highresnet':{'3D':None, '2D': HighResNet},
+        'vnet':{'3D': VNet, '2D': VNet},
     }[archi][tensor_dim]
 
 def get_rcnn_config(archi, backbone):
@@ -158,6 +159,15 @@ def get_network(opts):
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
+    elif archi == 'vnet':
+        model = model(
+            spatial_dims=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            act=("leakyrelu", {"inplace": True}),
+            dropout_prob=0.5,
+            dropout_dim=dim,
+        )
     elif archi in RCNN_MODEL_TYPES:
         config_file = get_rcnn_config(archi, opts.backbone)
         assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
