@@ -10,14 +10,14 @@ from medlp.models.cnn.unet3d import UNet3D
 from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn
 from medlp.models.cnn.resnet import resnet34, resnet50
 from medlp.models.cnn.scnn import SCNN
-from medlp.models.cnn.utils import print_network, output_onehot_transform
+from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
 from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.dynunet import DynUNet
+from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES, TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
-from medlp.models.cnn.layers.radam import RAdam
 
 from monai.networks.nets import UNet, HighResNet, VNet
 from monai.losses import DiceLoss
@@ -236,6 +236,8 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     
     if opts.lr_policy == 'const':
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x:1)
+    elif opts.lr_policy == 'poly':
+        lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=0.0001, power=0.9)
     elif opts.lr_policy == 'step':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 
                                                        step_size=opts.lr_policy_params['step_size'], 

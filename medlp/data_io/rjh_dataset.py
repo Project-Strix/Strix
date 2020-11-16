@@ -60,7 +60,7 @@ def get_rjh_tswi_seg_dataset(
 ):
     assert in_channels == 1, 'Currently only support single channel input'
 
-    cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=2, spatial_size=crop_size) if \
+    cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if \
               is_avaible_size(crop_size) else None,
     if phase == 'train':
         additional_transforms = [

@@ -1,8 +1,0 @@
-# ninja log v5
-3	11504	1603855040587380215	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cuda/ROIAlign_cuda.o	2c53124213360801
-4	11674	1603855040759377395	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cuda/nms.o	c0416f13bbd9c9c6
-4	11701	1603855040787376937	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cuda/ROIPool_cuda.o	5802ba53466fff03
-4	11776	1603855040863375689	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cuda/SigmoidFocalLoss_cuda.o	943f1acdf359f7a0
-2	16002	1603855045079306584	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cpu/nms_cpu.o	740688979c24f7df
-3	16342	1603855045419301010	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/cpu/ROIAlign_cpu.o	1396a507b451d206
-2	18655	1603855047723263244	/homes/clwang/Code/MeDLP/build/temp.linux-x86_64-3.7/homes/clwang/Code/MeDLP/medlp/models/rcnn/csrc/vision.o	ade4e2e09228d4d0
