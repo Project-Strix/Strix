@@ -37,6 +37,8 @@ def PICC_dcm_seg_dataset(
         ]
     elif phase == 'valid':
         additional_transforms = []
+    elif phase == 'test':
+        additional_transforms = []
 
     ignore_dcm_keys = ['0040|0244','0040|0245','0040|0253','0040|0254','0032|1060']
     dataset = SegmentationDataset2D(

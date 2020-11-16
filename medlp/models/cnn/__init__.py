@@ -1,13 +1,13 @@
 import os, torch
 
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type
+from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type, is_avaible_size
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify
+from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
 from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd
 from monai.networks import predict_segmentation
 from monai.utils import Activation, ChannelMatching, Normalisation
@@ -312,6 +312,14 @@ def build_segmentation_test_engine(**kwargs):
     net = kwargs['net']
     device = kwargs['device'] 
     logger_name = kwargs.get('logger_name', None)
+    crop_size = opts.crop_size
+    n_batch = opts.n_batch
+    use_slidingwindow = is_avaible_size(crop_size)
+
+    if use_slidingwindow:
+        print('---Use slidingwindow infer!---')
+    else:
+        print('---Use simple infer!---')
 
     assert_network_type(opts.model_type, 'FCN')
 
@@ -327,7 +335,8 @@ def build_segmentation_test_engine(**kwargs):
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
         SegmentationSaver(
             output_dir=opts.experiment_path,
-            batch_transform=lambda x: {"filename_or_obj":x["image_meta_dict"]["filename_or_obj"] ,"affine":x["image_meta_dict"]["affine"]},
+            #batch_transform=lambda x: {"filename_or_obj": list(map(lambda x: os.path.dirname(x), x["image_meta_dict"]["filename_or_obj"])), "affine":x["image_meta_dict"]["affine"]},
+            batch_transform=lambda x: {"filename_or_obj": x["image_meta_dict"]["filename_or_obj"], "affine":x["image_meta_dict"]["affine"]},
             output_transform=lambda output: predict_segmentation(output["pred"])
         ),
     ]
@@ -341,14 +350,15 @@ def build_segmentation_test_engine(**kwargs):
 
     prepare_batch_fn = lambda x : (x["image"], None)
     key_metric_transform_fn = lambda x : (x["pred"], None)
-
+    inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.3) if \
+              use_slidingwindow else SimpleInferer()
 
     evaluator = SupervisedEvaluator(
         device=device,
         val_data_loader=test_loader,
         network=net,
         prepare_batch=prepare_batch_fn,
-        inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
+        inferer=inferer, #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
         # post_transform=post_transforms,
         # key_val_metric={
         #     "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)

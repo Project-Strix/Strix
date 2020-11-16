@@ -3,7 +3,7 @@ import os, time, click
 import numpy as np
 from click.types import convert_type
 from types import SimpleNamespace as sn
-from utils_cw import Print, check_dir, prompt_when, recursive_glob, get_items_from_file
+from utils_cw import Print, check_dir, prompt_when, recursive_glob2, get_items_from_file
 from functools import partial, wraps
 from medlp.utilities.enum import *
 
@@ -18,7 +18,7 @@ class DynamicTuple(click.ParamType):
         return "< Dynamic Tuple >"
 
     def convert(self, value, param, ctx):
-        # Hotfix for prompt input 
+        # Hotfix for prompt input
         if isinstance(value, str):
             if ',' in value:
                 sep = ','
@@ -36,11 +36,10 @@ class DynamicTuple(click.ParamType):
         return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
 
 
-
 def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder,'Models')
     assert os.path.isdir(model_dir), f"Model dir is not found! {model_dir}"
-    files = recursive_glob(model_dir, '*.pth')
+    files = recursive_glob2(model_dir, '*.pt', '*.pth', logic='or')
     prompt = { i:f.stem.split('=')[-1] for i, f in enumerate(files)}
     selected = click.prompt(f"Choose model: {prompt}", type=int)
     return str(files[selected])
@@ -51,6 +50,7 @@ def get_exp_name(ctx, param, value):
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
     crop_size = ctx.params['crop_size']
+    Print('crop size:', crop_size, color='y')
     image_size = ctx.params['image_size']
     use_img_size = np.all(np.equal(crop_size, 0))
     
