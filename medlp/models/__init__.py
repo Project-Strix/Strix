@@ -281,7 +281,7 @@ def get_test_engine(opts, test_loader):
         'test_loader': test_loader,
         'net': net,
         'device': device,
-        'logger_name': f'{opts.tensor_dim}-Trainer'
+        'logger_name': f'{opts.tensor_dim}-Tester'
     }
 
     return TEST_ENGINES[framework_type](**params)

@@ -72,13 +72,25 @@ def get_rjh_tswi_seg_dataset(
     elif phase == 'test':
         cropper = None
         additional_transforms = []
+    elif phase == 'test_wo_label':
+        return SegmentationDataset3D(
+                    files_list,
+                    orienter=Orientationd(keys='image', axcodes=orientation),
+                    spacer=SpacingD(keys="image", pixdim=spacing),
+                    resizer=None,
+                    rescaler=NormalizeIntensityD(keys='image'),
+                    cropper=None,
+                    additional_transforms=[],    
+                    preload=0,
+                    cache_dir=cache_dir,
+                ).get_dataset()
     else:
         raise ValueError
 
     dataset = SegmentationDataset3D(
         files_list,
         orienter=Orientationd(keys=['image','label'], axcodes=orientation),
-        spacer=SpacingD(keys=["image","label"], pixdim=spacing),
+        spacer=SpacingD(keys=["image","label"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
         resizer=None,
         #rescaler=ScaleIntensityRanged(keys=["image"], a_min=winlevel[0], a_max=winlevel[1], b_min=0, b_max=1, clip=True),
         rescaler=NormalizeIntensityD(keys='image'),

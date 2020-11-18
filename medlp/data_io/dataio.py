@@ -64,7 +64,7 @@ def get_default_setting(phase, **kwargs):
         num_workers = kwargs.get('valid_n_workers', 2)
         drop_last = kwargs.get('valid_drop_last', False)
         pin_memory = kwargs.get('valid_pin_memory', True)
-    elif phase == 'test':
+    elif phase == 'test' or phase == 'test_wo_label':
         shuffle = kwargs.get('test_shuffle', False)
         batch_size = kwargs.get('test_n_batch', 1)
         num_workers = kwargs.get('test_n_workers', 2)

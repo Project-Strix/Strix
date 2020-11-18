@@ -331,15 +331,27 @@ def build_segmentation_test_engine(**kwargs):
     )
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None),
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
         SegmentationSaver(
             output_dir=opts.experiment_path,
-            #batch_transform=lambda x: {"filename_or_obj": list(map(lambda x: os.path.dirname(x), x["image_meta_dict"]["filename_or_obj"])), "affine":x["image_meta_dict"]["affine"]},
-            batch_transform=lambda x: {"filename_or_obj": x["image_meta_dict"]["filename_or_obj"], "affine":x["image_meta_dict"]["affine"]},
-            output_transform=lambda output: predict_segmentation(output["pred"])
+            output_name_uplevel=1,
+            batch_transform = lambda x: x['image_meta_dict'],
+            #batch_transform=lambda x: {"filename_or_obj": list(map(lambda x: os.path.dirname(x), x["image_meta_dict"]["filename_or_obj"])), "affine":x["image_meta_dict"]["prev_affine"]},
+            output_transform=lambda output: output["pred"]
         ),
     ]
+
+    if opts.save_image:
+        val_handlers += [
+            SegmentationSaver(
+                output_dir=opts.experiment_path,
+                output_postfix='image',
+                output_name_uplevel=1,
+                batch_transform = lambda x: x['image_meta_dict'],
+                output_transform=lambda output: output["image"]
+            )
+        ]
 
     # if opts.criterion == 'CE' or opts.criterion == 'WCE':
     #     prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
@@ -348,9 +360,18 @@ def build_segmentation_test_engine(**kwargs):
     #     prepare_batch_fn = lambda x : (x["image"], x["label"])
     #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
 
-    prepare_batch_fn = lambda x : (x["image"], None)
-    key_metric_transform_fn = lambda x : (x["pred"], None)
-    inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.3) if \
+    if opts.phase == 'test_wo_label':
+        prepare_batch_fn = lambda x : (x["image"], None)
+        key_metric_transform_fn = lambda x : (x["pred"], None)
+        key_val_metric = None
+    elif opts.phase == 'test':
+        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        key_metric_transform_fn = lambda x : (x["pred"], x["label"])  
+        key_val_metric = {
+            "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
+        }
+
+    inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5) if \
               use_slidingwindow else SimpleInferer()
 
     evaluator = SupervisedEvaluator(
@@ -358,11 +379,9 @@ def build_segmentation_test_engine(**kwargs):
         val_data_loader=test_loader,
         network=net,
         prepare_batch=prepare_batch_fn,
-        inferer=inferer, #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
-        # post_transform=post_transforms,
-        # key_val_metric={
-        #     "val_mean_dice": MeanDice(include_background=True, to_onehot_y=True, output_transform=key_metric_transform_fn)
-        # },
+        inferer=inferer,
+        post_transform=post_transforms,
+        key_val_metric=key_val_metric,
         val_handlers=val_handlers,
         amp=opts.amp
     )

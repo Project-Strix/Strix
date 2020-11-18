@@ -50,7 +50,7 @@ def get_exp_name(ctx, param, value):
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
     crop_size = ctx.params['crop_size']
-    Print('crop size:', crop_size, color='y')
+    #Print('crop size:', crop_size, color='y')
     image_size = ctx.params['image_size']
     use_img_size = np.all(np.equal(crop_size, 0))
     
@@ -70,8 +70,11 @@ def get_exp_name(ctx, param, value):
 
     mapping = {'batch':'BN','instance':"IN",'group':'GN'}
     layer_norm = mapping[ctx.params['layer_norm']]
+    #update timestamp if train-from-cfg
+    timestamp = time.strftime("%m%d_%H%M") if ctx.params.get('config') is not None else ctx.params['timestamp'] 
+        
     exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-{layer_norm}-"\
-                f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{ctx.params['timestamp']}"
+                f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{timestamp}"
 
     #suffix = '-redo' if ctx.params.get('config') is not None else ''
         

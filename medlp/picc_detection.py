@@ -115,10 +115,13 @@ def train_cfg(**args):
 @click.command('test-from-cfg')
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
 @click.option('--test-files', type=str, default='', help='External files (.json) for testing')
+@click.option('--with-label', is_flag=True, help='whether test data has label')
+@click.option('--save-image', is_flag=True, help='Save the tested image data')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 def test_cfg(**args):
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+    
     configures = get_items_from_file(args['config'], format='json')
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
@@ -136,11 +139,16 @@ def test_cfg(**args):
     configures['model_path'] = clb.get_trained_models(exp_dir)
     configures['experiment_path'] = check_dir(exp_dir, 'Test')
     configures['preload'] = 0.0
+    phase = 'test' if args['with_label'] else 'test_wo_label'
+    configures['phase'] = phase
+    configures['save_image'] = args['save_image']
     
     Print(f'{len(test_files)} test files', color='g')
-    test_loader = get_dataloader(sn(**configures), test_files, phase='test')
+    test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
     engine = get_test_engine(sn(**configures), test_loader)
+    engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
+
     Print("Begin testing...", color='g')
     engine.run()
 
