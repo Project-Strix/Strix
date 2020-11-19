@@ -66,8 +66,8 @@ def get_rjh_tswi_seg_dataset(
         additional_transforms = [
             RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
             RandRotateD(keys=["image","label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='zeros'),
-            Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(9,12),
-                           magnitude_range=(40,70), mode=["bilinear","nearest"], padding_mode='zeros')
+            # Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(9,12),
+            #                magnitude_range=(40,70), mode=["bilinear","nearest"], padding_mode='zeros')
         ]
     elif phase == 'valid':
         additional_transforms = []

@@ -203,7 +203,10 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':
-        loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
+        if opts.output_nc == 1:
+            loss = DiceLoss(include_background=False, to_onehot_y=False, sigmoid=True)
+        else:
+            loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
     elif opts.criterion == 'CE-DCE':
         loss = CEDiceLoss(torch.nn.CrossEntropyLoss(), 
                           DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
