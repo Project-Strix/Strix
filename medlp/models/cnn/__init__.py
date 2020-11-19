@@ -1,4 +1,5 @@
 import os, torch
+import numpy as np
 
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type, is_avaible_size
@@ -8,7 +9,7 @@ from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.engines import multi_gpu_supervised_trainer
 from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd
+from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd, CastToTyped
 from monai.networks import predict_segmentation
 from monai.utils import Activation, ChannelMatching, Normalisation
 from ignite.metrics import Accuracy, MeanSquaredError
@@ -63,17 +64,28 @@ def build_segmentation_engine(**kwargs):
     if opts.nni: 
         val_handlers += [NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch, logger_name=logger_name)]
     
-    trainval_post_transforms = Compose(
-        [
-            Activationsd(keys="pred", softmax=True),
-            AsDiscreted(keys="pred", to_onehot=True, argmax=True, n_classes=opts.output_nc),
-            #KeepLargestConnectedComponentd(keys="pred", applied_labels=[1], independent=False),
-        ]
-    )
+    if opts.output_nc == 1:
+        trainval_post_transforms = Compose(
+            [
+                Activationsd(keys="pred", sigmoid=True),
+                AsDiscreted(keys="pred", threshold_values=True, logit_thresh=0.5),
+            ]
+        )
+    else:
+        trainval_post_transforms = Compose(
+            [
+                Activationsd(keys="pred", softmax=True),
+                AsDiscreted(keys="pred", to_onehot=True, argmax=True, n_classes=opts.output_nc),
+                #KeepLargestConnectedComponentd(keys="pred", applied_labels=[1], independent=False),
+            ]
+        )
 
-    if opts.criterion == 'CE' or opts.criterion == 'WCE':
+    if opts.criterion in ['CE','WCE']:
         prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
         key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+    elif opts.criterion in ['BCE','WBCE']:
+        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"], dtype=torch.float32))
+        key_metric_transform_fn = lambda x : (x["pred"], x["label"])
     else:
         prepare_batch_fn = lambda x : (x["image"], x["label"])
         key_metric_transform_fn = lambda x : (x["pred"], x["label"])

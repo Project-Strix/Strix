@@ -195,6 +195,11 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     elif opts.criterion == 'WCE':
         w_ = torch.tensor(opts.loss_params).to(device)
         loss = torch.nn.CrossEntropyLoss(weight=w_)
+    elif opts.criterion == 'BCE':
+        loss = torch.nn.BCEWithLogitsLoss()
+    elif opts.criterion == 'WBCE':
+        w_ = torch.tensor(opts.loss_params[1]).to(device)
+        loss = torch.nn.BCEWithLogitsLoss(pos_weight=w_)
     elif opts.criterion == 'MSE':
         loss = torch.nn.MSELoss()
     elif opts.criterion == 'DCE':

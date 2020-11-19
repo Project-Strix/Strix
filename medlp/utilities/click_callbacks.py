@@ -130,7 +130,7 @@ def loss_params(ctx, param, value):
     # if ctx.params.get('loss_params', (0,0)) is not (0,0): #loaded config from specified file
     #     return value
 
-    if value == 'WCE':
+    if value == 'WCE' or value == 'WBCE':
         weights = _prompt('Loss weights', tuple, (0.1,0.9), split_input_str_)
         ctx.params['loss_params'] = weights
     return value

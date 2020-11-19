@@ -61,11 +61,13 @@ def get_rjh_tswi_seg_dataset(
     assert in_channels == 1, 'Currently only support single channel input'
 
     cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if \
-              is_avaible_size(crop_size) else None,
+              is_avaible_size(crop_size) else None
     if phase == 'train':
         additional_transforms = [
-            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
-            RandRotated(keys=["image","label"], range_x=math.pi/30, range_y=math.pi/30, range_z=math.pi/30, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
+            RandRotateD(keys=["image","label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='zeros'),
+            Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(9,12),
+                           magnitude_range=(40,70), mode=["bilinear","nearest"], padding_mode='zeros')
         ]
     elif phase == 'valid':
         additional_transforms = []
@@ -75,12 +77,16 @@ def get_rjh_tswi_seg_dataset(
     elif phase == 'test_wo_label':
         return SegmentationDataset3D(
                     files_list,
+                    loader=LoadNiftid(keys="image", dtype=np.float32),
+                    channeler=AddChanneld(keys="image"),
                     orienter=Orientationd(keys='image', axcodes=orientation),
                     spacer=SpacingD(keys="image", pixdim=spacing),
                     resizer=None,
                     rescaler=NormalizeIntensityD(keys='image'),
                     cropper=None,
-                    additional_transforms=[],    
+                    additional_transforms=[],
+                    caster=CastToTyped(keys="image", dtype=np.float32),
+                    to_tensor=ToTensord(keys="image"),
                     preload=0,
                     cache_dir=cache_dir,
                 ).get_dataset()
@@ -94,9 +100,8 @@ def get_rjh_tswi_seg_dataset(
         resizer=None,
         #rescaler=ScaleIntensityRanged(keys=["image"], a_min=winlevel[0], a_max=winlevel[1], b_min=0, b_max=1, clip=True),
         rescaler=NormalizeIntensityD(keys='image'),
-        #rescaler=ScaleIntensityD(keys='image'),
         cropper=cropper,
-        additional_transforms=additional_transforms,    
+        additional_transforms=additional_transforms,
         preload=preload,
         cache_dir=cache_dir,
     ).get_dataset()
