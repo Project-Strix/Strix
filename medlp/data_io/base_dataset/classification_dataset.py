@@ -1,4 +1,4 @@
-import os
+import os, math
 from abc import ABC, abstractmethod
 from typing import Callable, Optional, Sequence
 from utils_cw import Print
@@ -8,7 +8,7 @@ from monai.transforms import *
 from monai.transforms.compose import MapTransform
 from monai.utils import ensure_list
 
-class BasicSegmentationDataset(object):
+class BasicClassificationDataset(object):
     def __init__(
         self, 
         files_list,
@@ -75,20 +75,20 @@ class BasicSegmentationDataset(object):
         return self.dataset
 
 
-class SegmentationDataset2D(BasicSegmentationDataset):
+class ClassificationDataset2D(BasicClassificationDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadPNGd(keys=["image","label"], grayscale=True),
-        channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
-        orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
-        spacer: Optional[MapTransform] = Spacingd(keys=["image","label"], pixdim=(0.1,0.1)),
-        rescaler: Optional[MapTransform] =  ScaleIntensityRanged(keys=["image"], a_min=0, a_max=255, b_min=0, b_max=1, clip=True),
-        resizer: Optional[MapTransform] = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=(768,768)),
-        cropper: Optional[MapTransform] = RandSpatialCropd(keys=["image", "label"], roi_size=(384,384), random_size=False),
+        loader: MapTransform = LoadPNGD(keys="image", grayscale=True),
+        channeler: Optional[MapTransform] = AddChannelD(keys="image"),
+        orienter: Optional[MapTransform] = OrientationD(keys='image', axcodes='LPI'),
+        spacer: Optional[MapTransform] = SpacingD(keys="image", pixdim=(0.1,0.1)),
+        rescaler: Optional[MapTransform] =  ScaleIntensityRangeD(keys="image", a_min=0, a_max=255, b_min=0, b_max=1, clip=True),
+        resizer: Optional[MapTransform] = ResizeD(keys="image", spatial_size=(512,512)),
+        cropper: Optional[MapTransform] = RandSpatialCropD(keys="image", roi_size=(256,256), random_size=False),
         additional_transforms: Optional[Sequence] = None,
-        caster: Optional[MapTransform] = CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
-        to_tensor: Optional[MapTransform] = ToTensord(keys=["image","label"]),
+        caster: Optional[MapTransform] = CastToTypeD(keys=["image","label"], dtype=[np.float32, np.int64]),
+        to_tensor: Optional[MapTransform] = ToTensorD(keys=["image","label"]),
         augment_ratio: Optional[float] = 0.5,
         preload: float = 1.0, 
         verbose: bool = False
@@ -99,8 +99,8 @@ class SegmentationDataset2D(BasicSegmentationDataset):
         if additional_transforms is None: 
             additional_transforms = [
                 RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,1.4)),
-                RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
-                RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+                RandRotated(keys="image", range_x=math.pi/18, range_y=math.pi/18, prob=augment_ratio),
+                RandFlipd(keys="image", prob=augment_ratio, spatial_axis=[1])
             ]
         
         super().__init__(files_list, 
@@ -119,17 +119,18 @@ class SegmentationDataset2D(BasicSegmentationDataset):
 
         self.dataset = CacheDataset(self.input_data, transform=self.transforms, cache_rate=preload)
 
-class SegmentationDataset3D(BasicSegmentationDataset):
+
+class ClassificationDataset3D(BasicClassificationDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadNiftid(keys=["image","label"], dtype=np.float32),
-        channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
-        orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
-        spacer: Optional[MapTransform] = Spacingd(keys=["image","label"], pixdim=(1,1,1)),
-        rescaler: Optional[MapTransform] =  ScaleIntensityRanged(keys=["image"], a_min=0, a_max=65535, b_min=0, b_max=1, clip=True),
-        resizer: Optional[MapTransform] = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=(512,512,256)),
-        cropper: Optional[MapTransform] = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', spatial_size=(96,96,96)),
+        loader: MapTransform = LoadNiftid(keys="image", dtype=np.float32),
+        channeler: Optional[MapTransform] = AddChanneld(keys="image"),
+        orienter: Optional[MapTransform] = Orientationd(keys='image', axcodes='LPI'),
+        spacer: Optional[MapTransform] = Spacingd(keys="image", pixdim=(1,1,1)),
+        rescaler: Optional[MapTransform] =  ScaleIntensityRanged(keys="image", a_min=0, a_max=65535, b_min=0, b_max=1, clip=True),
+        resizer: Optional[MapTransform] = ResizeWithPadOrCropd(keys="image", spatial_size=(512,512,256)),
+        cropper: Optional[MapTransform] = RandSpatialCropD(keys="image", roi_size=(96,96,96), random_size=False),
         additional_transforms: Optional[Sequence] = None,
         caster: Optional[MapTransform] = CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
         to_tensor: Optional[MapTransform] = ToTensord(keys=["image","label"]),
@@ -145,8 +146,8 @@ class SegmentationDataset3D(BasicSegmentationDataset):
             additional_transforms = [
                 RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7,1.4)),
                 RandGaussianNoised(keys="image", prob=augment_ratio, std=0.03),
-                RandRotated(keys=["image","label"], range_x=10, range_y=10, prob=augment_ratio),
-                RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+                RandRotated(keys="image", range_x=math.pi/18, range_y=math.pi/18, prob=augment_ratio),
+                RandFlipd(keys="image", prob=augment_ratio, spatial_axis=[1])
             ]
         
         super().__init__(files_list, 

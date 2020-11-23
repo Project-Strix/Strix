@@ -10,7 +10,7 @@ from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.engines import multi_gpu_supervised_trainer
 from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
 from monai.transforms import Compose, Activationsd, AsDiscreted, KeepLargestConnectedComponentd, CastToTyped
-from monai.networks import predict_segmentation
+from monai.networks import predict_segmentation, one_hot
 from monai.utils import Activation, ChannelMatching, Normalisation
 from ignite.metrics import Accuracy, MeanSquaredError
 
@@ -82,13 +82,16 @@ def build_segmentation_engine(**kwargs):
 
     if opts.criterion in ['CE','WCE']:
         prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
-        key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
+        if opts.output_nc > 1:
+            key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"].unsqueeze(dim=1),num_classes=opts.output_nc))
     elif opts.criterion in ['BCE','WBCE']:
         prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"], dtype=torch.float32))
-        key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+        if opts.output_nc > 1:
+            key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
     else:
         prepare_batch_fn = lambda x : (x["image"], x["label"])
-        key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+        if opts.output_nc > 1:
+            key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -335,12 +338,20 @@ def build_segmentation_test_engine(**kwargs):
 
     assert_network_type(opts.model_type, 'FCN')
 
-    post_transforms = Compose(
-        [
-            Activationsd(keys="pred", softmax=True),
-            AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
-        ]
-    )
+    if opts.output_nc == 1:
+        post_transforms = Compose(
+            [
+                Activationsd(keys="pred", sigmoid=True),
+                AsDiscreted(keys="pred", threshold_values=True, logit_thresh=0.5),
+            ]
+        )
+    else:
+        post_transforms = Compose(
+            [
+                Activationsd(keys="pred", softmax=True),
+                AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
+            ]
+        )
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
@@ -383,7 +394,7 @@ def build_segmentation_test_engine(**kwargs):
             "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
         }
 
-    inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5) if \
+    inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.3) if \
               use_slidingwindow else SimpleInferer()
 
     evaluator = SupervisedEvaluator(

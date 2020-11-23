@@ -15,7 +15,7 @@ from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.data_io.segmentation_dataset import SegmentationDataset2D
+from medlp.data_io.base_dataset.segmentation_dataset import SegmentationDataset2D
 from medlp.utilities.utils import is_avaible_size
 
 def PICC_dcm_seg_dataset(
