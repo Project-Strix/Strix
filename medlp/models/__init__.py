@@ -223,6 +223,11 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         loss = DeepSupervisionLoss(loss)
 
     net_ = get_network(opts)
+
+    if opts.snip:
+        keep_masks = SNIP(net_, loss, prune_percent, train_loader, self.use_cuda, self.out_dir)
+        net_ = apply_prune_mask(net_, keep_masks, True)
+
     if len(opts.gpu_ids)>1: # and not opts.amp:
         net = torch.nn.DataParallel(net_.to(device))
     else:
