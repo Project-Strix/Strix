@@ -224,10 +224,6 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
 
     net_ = get_network(opts)
 
-    if opts.snip:
-        keep_masks = SNIP(net_, loss, prune_percent, train_loader, self.use_cuda, self.out_dir)
-        net_ = apply_prune_mask(net_, keep_masks, True)
-
     if len(opts.gpu_ids)>1: # and not opts.amp:
         net = torch.nn.DataParallel(net_.to(device))
     else:
@@ -284,7 +280,9 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         'model_dir': model_dir,
         'logger_name': f'{opts.tensor_dim}-Trainer'
     }
-    return ENGINES[framework_type](**params)
+    
+    engine = ENGINES[framework_type](**params)
+    return engine, net, loss
 
 from monai.transforms import *
 from monai.handlers import *

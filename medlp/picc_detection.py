@@ -8,7 +8,7 @@ import nibabel as nib
 
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io.dataio import get_dataloader, get_datalist
-from medlp.utilities.handlers import TensorboardGraph
+from medlp.utilities.handlers import TensorboardGraph, SNIP_prune_handler
 import medlp.utilities.click_callbacks as clb
 from medlp.utilities import enum
 
@@ -79,7 +79,7 @@ def train(**args):
 
         os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'), target_dir, target_is_directory=True)
 
-    trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
+    trainer, net, loss_fn = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     trainer.logger = setup_logger(f'{cargs.tensor_dim}-Trainer', level=logging_level)
@@ -97,7 +97,13 @@ def train(**args):
         Print('Visualize the architecture to tensorboard', color='g')
         trainer.add_event_handler(event_name=Events.ITERATION_COMPLETED(once=1),
                                   handler=TensorboardGraph(net, writer, lambda x:x['image']))
-        
+
+    if cargs.snip:
+        Print('Begin SNIP', color='g')
+        device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
+        trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
+                                handler=SNIP_prune_handler(net, loss_fn, 0.3, train_loader, lambda x:x['image'], device=device))
+
     trainer.run()
 
 

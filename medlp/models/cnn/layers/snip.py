@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from layers.snip_conv import PrunableConv3d, PrunableDeconv3d
+from medlp.models.cnn.layers.snip_conv import PrunableConv3d, PrunableDeconv3d
 
 import os, copy, types, time, json
 import numpy as np
@@ -137,14 +137,16 @@ def get_pretrain_pruned_unet(opts, in_model, origin_model, channel_mask, verbose
     
     return new_model 
 
-def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, use_cuda=True, output_dir=None):
+def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_dir=None):
     # TODO: shuffle?
 
     # Grab a single batch from the training dataset
-    inputs, targets = next(iter(train_dataloader))
-    if use_cuda:
-        inputs = inputs.cuda().float()
-        targets = targets.cuda().byte()
+    input_data_dict = next(iter(train_dataloader))
+    inputs = input_data_dict['image']
+    targets = input_data_dict['label']
+
+    inputs = inputs.to(device).float()
+    targets = targets.to(device).byte()
 
     # Let's create a fresh copy of the network so that we're not worried about
     # affecting the actual training-phase
