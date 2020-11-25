@@ -34,7 +34,7 @@ class VGG(nn.Module):
         if dim == 2:
             output_size = (7,7)
         elif dim == 3:
-            output_size = (4,4,4) #For OOM issue
+            output_size = (5,5,4) #For OOM issue
         else:
             raise ValueError(f'Only support 2D&3D data, but got dim = {dim}')
         

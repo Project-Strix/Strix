@@ -76,12 +76,18 @@ def get_exp_name(ctx, param, value):
     exp_name = f"{model_name}-{input_size_str}-{ctx.params['criterion'].split('_')[0]}-{layer_norm}-"\
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{timestamp}"
 
+    if ctx.params['n_fold'] > 0:
+        exp_name = exp_name + '-CV'
+
     #suffix = '-redo' if ctx.params.get('config') is not None else ''
         
     input_str = click.prompt('Experiment name', default=exp_name, type=str)
     exp_name = exp_name + '-' + input_str.strip('+') if '+' in input_str else input_str
 
-    return os.path.join(ctx.params['out_dir'], ctx.params['framework'], datalist_name, exp_name)
+    if ctx.params['ith_fold'] >= 0:
+        return os.path.join(ctx.params['out_dir'], ctx.params['framework'], datalist_name, exp_name, str(ctx.params['ith_fold'])+'-fold')
+    else:
+        return os.path.join(ctx.params['out_dir'], ctx.params['framework'], datalist_name, exp_name)
 
 def get_nni_exp_name(ctx, param, value):
     param_list = get_items_from_file(ctx.params['param_list'], format='json')
@@ -176,6 +182,7 @@ def common_params(func):
     @click.option('--save-epoch-freq', type=int, default=5, help='Save model freq')
     @click.option('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
     @click.option('--nni', is_flag=True, help='Flag of using nni-search, you dont need to modify this.')
+    @click.option('--ith-fold', type=int, default=-1, help='i-th fold of cross-validation')
     @click.option('--seed', type=int, default=101, help='random seed')
     @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
@@ -228,6 +235,7 @@ def latent_auxilary_params(func):
     @click.option('--deep-supr-num', type=int, default=1, help='Num of features will be output')
     @click.option('--image-size', type=list)
     @click.option('--crop-size', type=list)
+    @click.option('--n-fold', type=int, default=0)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

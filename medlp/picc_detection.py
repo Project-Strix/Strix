@@ -12,7 +12,7 @@ from medlp.utilities.handlers import TensorboardGraph
 import medlp.utilities.click_callbacks as clb
 from medlp.utilities import enum
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2, prompt_when, get_items_from_file
 
 import click
@@ -27,7 +27,7 @@ from monai.handlers import CheckpointLoader
 @clb.common_params
 @clb.solver_params
 @clb.network_params
-@click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
+#@click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 @click.option('--experiment-path', type=str, callback=clb.get_exp_name, default='')
@@ -48,8 +48,16 @@ def train(**args):
     if cargs.partial < 1:
         Print('Use {} data'.format(int(len(files_list)*cargs.partial)), color='y')
         files_list = files_list[:int(len(files_list)*cargs.partial)]
-    cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
-    files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+    
+    if cargs.n_fold > 0:
+        Print(f'Processing {cargs.n_fold} cross-validation', color='g')
+        kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
+        all_folds = [ (train_index, test_index) for train_index, test_index in kf.split(files_list)]
+        files_train = list(np.array(files_list)[all_folds[cargs.ith_fold][0]])
+        files_valid = list(np.array(files_list)[all_folds[cargs.ith_fold][1]])
+    else:
+        cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
+        files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
 
     # Save param and datalist
@@ -70,7 +78,6 @@ def train(**args):
             os.unlink(target_dir)
 
         os.symlink(os.path.join(cargs.experiment_path, 'tensorboard'), target_dir, target_is_directory=True)
-
 
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize)
 
@@ -96,6 +103,7 @@ def train(**args):
 
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.option('--n-fold', type=int, default=0, help='K fold cross-validation')
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     if len(args.get('additional_args')) != 0: #parse additional args
@@ -108,8 +116,13 @@ def train_cfg(**args):
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id
     
-    train(default_map=configures)
-    #ctx.invoke(train, **configures) 
+    if args['n_fold'] > 0:
+        for i in range(args['n_fold']):
+            configures['ith_fold'] = i
+            train(default_map=configures)
+    else:
+        train(default_map=configures)
+        #ctx.invoke(train, **configures) 
 
 
 @click.command('test-from-cfg')
