@@ -65,7 +65,15 @@ class BasicClassificationDataset(object):
             elif isinstance(f, dict):
                 assert 'image' in f, f"File {f} doesn't contain keyword 'image'"
                 assert os.path.exists(f['image']), f"File not exists: {f['image']}"
-                input_data.append({"image":f['image'], "label":f['label']})
+
+                input_dict = {"image": f["image"]}
+                if "label" in f:
+                    input_dict.update({"label": f["label"]})
+                if "mask" in f:
+                    input_dict.update({"mask": f["mask"]})
+
+                input_data.append(input_dict)
+                
             else:
                 raise ValueError(f'Not supported file_list format, Got {type(f)}')
             
@@ -75,7 +83,7 @@ class BasicClassificationDataset(object):
         return self.dataset
 
 
-class ClassificationDataset2D(BasicClassificationDataset):
+class SupervisedClassificationDataset2D(BasicClassificationDataset):
     def __init__(
         self, 
         files_list,
@@ -120,7 +128,7 @@ class ClassificationDataset2D(BasicClassificationDataset):
         self.dataset = CacheDataset(self.input_data, transform=self.transforms, cache_rate=preload)
 
 
-class ClassificationDataset3D(BasicClassificationDataset):
+class SupervisedClassificationDataset3D(BasicClassificationDataset):
     def __init__(
         self, 
         files_list,

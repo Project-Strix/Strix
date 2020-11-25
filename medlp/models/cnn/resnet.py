@@ -224,7 +224,9 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     if pretrained:
         num_classes_ = kwargs['num_classes']
         kwargs['num_classes'] = 1000
+    
     model = ResNet(block, layers, **kwargs)
+
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)

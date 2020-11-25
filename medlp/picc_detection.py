@@ -131,13 +131,15 @@ def test_cfg(**args):
 
     exp_dir = configures.get('experiment_path', os.path.dirname(args['config']))
     if os.path.isfile(args['test_files']):
+        test_fpath = args['test_files']
         test_files = get_items_from_file(args['test_files'], format='json')
     else:
         assert os.path.isfile(os.path.join(exp_dir, 'test_files')), f'Test file does not exists in {exp_dir}!'
+        test_fpath = os.path.join(exp_dir, 'test_files')
         test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
 
     configures['model_path'] = clb.get_trained_models(exp_dir)
-    configures['experiment_path'] = check_dir(exp_dir, 'Test')
+    configures['experiment_path'] = check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
     configures['preload'] = 0.0
     phase = 'test' if args['with_label'] else 'test_wo_label'
     configures['phase'] = phase
@@ -150,6 +152,7 @@ def test_cfg(**args):
     engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
 
     Print("Begin testing...", color='g')
+    shutil.copyfile(test_fpath, os.path.join(configures['experiment_path'], os.path.basename(test_fpath)))
     engine.run()
 
 

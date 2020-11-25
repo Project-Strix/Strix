@@ -8,7 +8,7 @@ from utils_cw import Print, load_h5, check_dir
 from medlp.data_io.picc_dataset import *
 from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
 from medlp.data_io.kits_dataset import get_kits_dataset
-from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset
+from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_tswi_cls_dataset
 
 
 from monai.data import DataLoader
@@ -45,6 +45,8 @@ def get_datalist(dataset_name):
         fname = "/homes/clwang/Data/jsph_rcc/kidney_rcc/Train/data_list.json"
     elif dataset_name == 'rjh_tswi':
         fname = "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json"
+    elif dataset_name == 'rjh_tswi_cls':
+        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1124_1034.json"
     else:
         raise ValueError
     
@@ -178,9 +180,21 @@ def get_dataloader(args, files_list, phase='train'):
                                             crop_size=args.crop_size,
                                             preload=args.preload,
                                             augment_ratio=args.augment_ratio,
-                                            cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
+                                            cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'), #! share same caches for large 3D dataset
                                             verbose=args.debug
                                             )
+    elif args.data_list == 'rjh_tswi_cls':
+        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
+        dataset_ =  get_rjh_tswi_cls_dataset(files_list,
+                                             phase=phase,
+                                             spacing=(0.667,0.667,1.34),
+                                             in_channels=1,
+                                             preload=args.preload,
+                                             augment_ratio=args.augment_ratio,
+                                             orientation='RAI',
+                                             cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
+                                             verbose=False
+                                             )
     else:
         raise ValueError(f'No {args.data_list} dataset')
 

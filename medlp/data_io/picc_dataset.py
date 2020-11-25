@@ -15,7 +15,7 @@ from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.data_io.base_dataset.segmentation_dataset import SegmentationDataset2D
+from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset2D as SegmentationDataset2D
 from medlp.utilities.utils import is_avaible_size
 
 def PICC_dcm_seg_dataset(
@@ -164,14 +164,23 @@ def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
                     crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
 
     input_data = []
-    for img, msk in files_list:
-        input_data.append({"image":img, "label":msk})
+    try:
+        no_label = False
+        for img, msk in files_list:
+            input_data.append({"image":img, "label":msk})
+    except:
+        no_label = True
+        for img in files_list:
+            input_data.append({"image":img})
 
     if image_size is None or np.any(np.less_equal(image_size,0)):
         Print('No image resize!', color='g')
         resizer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        resizer = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size)
+        if no_label:
+            resizer = ResizeWithPadOrCropd(keys=["image"], spatial_size=image_size)
+        else:
+            resizer = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size)
 
     if crop_size is None or np.any(np.less_equal(crop_size,0)):
         Print('No cropping!', color='g')
@@ -223,7 +232,7 @@ def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=No
             CastToTyped(keys=["image","label"], dtype=[np.float32, np.int64]),
             ToTensord(keys=["image", "label"])
         ])
-    elif phase == 'test':
+    elif phase == 'test_wo_label':
         transforms = Compose([
             LoadNiftid(keys=["image"]),
             #AddChanneld(keys=["image"]),

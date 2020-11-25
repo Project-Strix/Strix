@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
+from typing import Callable
 from torchvision.models.utils import load_state_dict_from_url
+import numpy as np
 
+from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -25,10 +28,20 @@ class VGG(nn.Module):
 
     def __init__(self, features, num_classes=1000, init_weights=True, **kwargs):
         super(VGG, self).__init__()
+        dim = kwargs.get('dim', 2)
+        pool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
         self.features = features
-        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        if dim == 2:
+            output_size = (7,7)
+        elif dim == 3:
+            output_size = (4,4,4) #For OOM issue
+        else:
+            raise ValueError(f'Only support 2D&3D data, but got dim = {dim}')
+        
+        self.avgpool = pool_type(output_size)
+        num_ = np.prod(output_size)
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
+            nn.Linear(512 * num_, 4096),
             nn.ReLU(True),
             nn.Dropout(),
             nn.Linear(4096, 4096),
@@ -60,23 +73,27 @@ class VGG(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-def make_layers(cfg, in_channels=3, batch_norm=False):
+def make_layers(cfg, dim, in_channels=3, batch_norm=False):
     layers = []
+    conv_type: Callable = Conv[Conv.CONV, dim]
+    norm_type: Callable = Norm[Norm.BATCH, dim]
+    pool_type: Callable = Pool[Pool.MAX, dim]
     input_channels = in_channels
     for v in cfg:
         if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            layers += [pool_type(kernel_size=2, stride=2)]
         else:
-            conv2d = nn.Conv2d(input_channels, v, kernel_size=3, padding=1)
+            conv = conv_type(input_channels, v, kernel_size=3, padding=1)
             if batch_norm:
-                layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
+                layers += [conv, norm_type(v), nn.ReLU(inplace=True)]
             else:
-                layers += [conv2d, nn.ReLU(inplace=True)]
+                layers += [conv, nn.ReLU(inplace=True)]
             input_channels = v
     return nn.Sequential(*layers)
 
 
 cfgs = {
+    'S': [64, 128, 'M', 256, 256, 'M', 512, 512],
     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'B': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'D': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
@@ -89,10 +106,13 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
         kwargs['init_weights'] = False
 
     in_channels = kwargs.get('in_channels', 3)
+    dim = kwargs.get('dim', 2)
+
     if pretrained:
         num_classes_ = kwargs['num_classes']
         kwargs['num_classes'] = 1000
-    model = VGG(make_layers(cfgs[cfg], in_channels=in_channels, batch_norm=batch_norm), **kwargs)
+
+    model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -112,6 +132,21 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
 
     return model
 
+def vgg9(pretrained=False, progress=True, **kwargs):
+    r"""VGG 9-layer model (configuration "S") for small size dataset
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg11', 'S', False, pretrained, progress, **kwargs)
+
+def vgg9_bn(pretrained=False, progress=True, **kwargs):
+    r"""VGG 9-layer model (configuration "S") with batch normalization for small size dataset
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _vgg('vgg11', 'S', True, pretrained, progress, **kwargs)
 
 def vgg11(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") from

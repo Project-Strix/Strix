@@ -1,8 +1,45 @@
 from __future__ import print_function
 import os, math, random, copy
+from pathlib import Path
 import socket
 from medlp.utilities.enum import NETWORK_TYPES
 import numpy as np
+
+
+def bbox_3D(img):
+    r = np.any(img, axis=(1, 2))
+    c = np.any(img, axis=(0, 2))
+    z = np.any(img, axis=(0, 1))
+
+    rmin, rmax = np.where(r)[0][[0, -1]]
+    cmin, cmax = np.where(c)[0][[0, -1]]
+    zmin, zmax = np.where(z)[0][[0, -1]]
+
+    return rmin, rmax, cmin, cmax, zmin, zmax
+
+def bbox_2D(img):
+    rows = np.any(img, axis=1)
+    cols = np.any(img, axis=0)
+    rmin, rmax = np.where(rows)[0][[0, -1]]
+    cmin, cmax = np.where(cols)[0][[0, -1]]
+
+    return rmin, rmax, cmin, cmax
+
+
+def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
+    assert len(torch_dataset)>1, 'dataset must have at least 2 items!'
+    prev_data = torch_dataset[0]
+    next_data = torch_dataset[1]
+
+    if Path(prev_data[meta_key]['filename_or_obj']).stem != Path(next_data[meta_key]['filename_or_obj']).stem:
+        return 0
+
+    for i, (prev_v, next_v) in enumerate(zip(Path(prev_data[meta_key]['filename_or_obj']).parents,
+                                             Path(next_data[meta_key]['filename_or_obj']).parents)):
+        if prev_v.stem != next_v.stem:
+            return i+1
+    
+    return 0
 
 def detect_port(port):
     '''Detect if the port is used'''

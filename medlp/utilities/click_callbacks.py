@@ -121,9 +121,12 @@ def lr_schedule_params(ctx, param, value):
         tmul = _prompt('SGDR T-mult', int, 1)
         #dcay = _prompt('SGDR decay', float, 1)
         ctx.params['lr_policy_params'] = {'T_0':t0, 'eta_min':eta, 'T_mult':tmul}
+    elif value == 'plateau':
+        patience = _prompt('patience', int, 80)
+        ctx.params['lr_policy_params'] = {'patience': patience}
     elif value == 'CLR':
         raise NotImplementedError
-
+    
     return value
 
 def loss_params(ctx, param, value):
@@ -157,7 +160,7 @@ def common_params(func):
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=1000, help='Epoch number')
     @click.option('--n-epoch-len', type=float, default=1.0, help='Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch')
-    @click.option('--n-batch', prompt=True, show_default=True, type=int, default=50, help='Batch size')
+    @click.option('--n-batch', prompt=True, show_default=True, type=int, default=10, help='Batch size')
     @click.option('--istrain', type=bool, default=True, help="train/test phase flag")
     @click.option('--downsample', type=int, default=-1, help='Downsample rate. disable:-1')
     @click.option('--smooth', type=float, default=0, help='Smooth rate, disable:0')

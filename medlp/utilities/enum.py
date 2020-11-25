@@ -1,6 +1,6 @@
 
 # All enum variables
-DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi']
+DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi', 'rjh_tswi_cls']
 NORM_TYPES = ['batch','instance','group']
 LOSSES = ['CE', 'WCE', 'BCE', 'WBCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'poly', 'step', 'SGDR', 'plateau']
@@ -8,7 +8,7 @@ FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','det
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']
 OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'radam']
 
-CNN_MODEL_TYPES = ['vgg13', 'vgg16', 'resnet34', 'resnet50']
+CNN_MODEL_TYPES = ['vgg9', 'vgg13', 'vgg16', 'resnet34', 'resnet50']
 FCN_MODEL_TYPES = ['unet', 'res-unet', 'unetv2', 'res-unetv2', 'scnn', 'highresnet', 'vnet']
 RCNN_MODEL_TYPES = ['mask_rcnn', 'faster_rcnn', 'fcos', 'retina']
 NETWORK_TYPES = {'CNN':CNN_MODEL_TYPES, 

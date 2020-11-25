@@ -1,8 +1,9 @@
 import os, torch
 import numpy as np
+from functools import partial
 
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type, is_avaible_size
+from medlp.utilities.utils import ENGINES, TEST_ENGINES, assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -165,7 +166,7 @@ def build_classification_engine(**kwargs):
     assert_network_type(opts.model_type, 'CNN')
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None),
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
         CheckpointSaver(save_dir=os.path.join(model_dir), save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=4),
         MyTensorBoardImageHandler(
@@ -188,7 +189,7 @@ def build_classification_engine(**kwargs):
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_val_metric={"val_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
+        key_val_metric={"val_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=True)},
         val_handlers=val_handlers,
         amp=opts.amp
     )
@@ -201,7 +202,7 @@ def build_classification_engine(**kwargs):
     train_handlers = [
         LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
-        StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"]),
+        StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
         CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
         MyTensorBoardImageHandler(
@@ -222,7 +223,7 @@ def build_classification_engine(**kwargs):
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(train_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_train_metric={"train_acc": Accuracy(output_transform=output_onehot_transform,is_multilabel=True)},
+        key_train_metric={"train_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=True)},
         train_handlers=train_handlers,
         amp=opts.amp
     )
@@ -353,12 +354,15 @@ def build_segmentation_test_engine(**kwargs):
             ]
         )
 
+    # check output filename
+    uplevel = output_filename_check(test_loader.dataset)
+
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
         SegmentationSaver(
             output_dir=opts.experiment_path,
-            output_name_uplevel=1,
+            output_name_uplevel=uplevel,
             batch_transform = lambda x: x['image_meta_dict'],
             #batch_transform=lambda x: {"filename_or_obj": list(map(lambda x: os.path.dirname(x), x["image_meta_dict"]["filename_or_obj"])), "affine":x["image_meta_dict"]["prev_affine"]},
             output_transform=lambda output: output["pred"]
@@ -370,7 +374,7 @@ def build_segmentation_test_engine(**kwargs):
             SegmentationSaver(
                 output_dir=opts.experiment_path,
                 output_postfix='image',
-                output_name_uplevel=1,
+                output_name_uplevel=uplevel,
                 batch_transform = lambda x: x['image_meta_dict'],
                 output_transform=lambda output: output["image"]
             )
