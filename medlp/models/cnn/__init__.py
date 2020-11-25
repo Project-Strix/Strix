@@ -118,7 +118,7 @@ def build_segmentation_engine(**kwargs):
         LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"], name=logger_name),
-        CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
+        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
         MyTensorBoardImageHandler(
             summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 

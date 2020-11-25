@@ -46,7 +46,7 @@ def get_datalist(dataset_name):
     elif dataset_name == 'rjh_tswi':
         fname = "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json"
     elif dataset_name == 'rjh_tswi_cls':
-        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1124_1034.json"
+        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1124_1034-train.json"
     else:
         raise ValueError
     
