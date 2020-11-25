@@ -50,7 +50,6 @@ def get_exp_name(ctx, param, value):
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
     crop_size = ctx.params['crop_size']
-    #Print('crop size:', crop_size, color='y')
     image_size = ctx.params['image_size']
     use_img_size = np.all(np.equal(crop_size, 0))
     
