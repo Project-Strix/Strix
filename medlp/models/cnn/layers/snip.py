@@ -146,7 +146,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
     targets = input_data_dict['label']
 
     inputs = inputs.to(device).float()
-    targets = targets.to(device).byte()
+    targets = targets.to(device).long()
 
     # Let's create a fresh copy of the network so that we're not worried about
     # affecting the actual training-phase

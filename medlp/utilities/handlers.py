@@ -112,8 +112,7 @@ class SNIP_prune_handler:
     def __call__(self, engine: Engine) -> None:
         print('*'*20, 'snip', '*'*20)
         keep_masks = SNIP(self.net, self.loss_fn, self.prune_percent, self.data_loader, self.device, None)
-        net_ = apply_prune_mask(self.net, keep_masks, True)
-
+        self.net = apply_prune_mask(self.net, keep_masks, True)
 
 class TensorboardGraph:
     """
