@@ -96,15 +96,14 @@ class SNIP_prune_handler:
                  loss_fn,
                  prune_percent,
                  data_loader,
-                 output_transform: Callable = lambda x: x,
                  device = 'cpu',
+                 save_dir: Optional[str] = None,
                  logger_name: Optional[str] = None
     ) -> None:
         self.net = net
         self.loss_fn = loss_fn
         self.prune_percent = prune_percent
         self.data_loader = data_loader
-        self.output_transform = output_transform
         self.device = device
         self.logger_name = logger_name
         self.logger = logging.getLogger(logger_name)
@@ -112,7 +111,8 @@ class SNIP_prune_handler:
     def __call__(self, engine: Engine) -> None:
         print('*'*20, 'snip', '*'*20)
         keep_masks = SNIP(self.net, self.loss_fn, self.prune_percent, self.data_loader, self.device, None)
-        self.net = apply_prune_mask(self.net, keep_masks, True)
+        net_ = apply_prune_mask(self.net, keep_masks, True)
+        self.net.load_state_dict(net_.state_dict())
 
 class TensorboardGraph:
     """

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from medlp.models.cnn.layers.snip_conv import PrunableConv3d, PrunableDeconv3d
+from monai.networks.layers.prunable_conv import PrunableWeights,PrunableConv3d,PrunableConv2d,PrunableDeconv3d, PrunableDeconv2d
 
 import os, copy, types, time, json
 import numpy as np
@@ -17,6 +17,10 @@ def snip_forward_conv3d(self, x):
     return F.conv3d(x, self.weight * self.weight_mask, self.bias,
                     self.stride, self.padding, self.dilation, self.groups)
 
+def snip_forward_deconv2d(self, x):
+    return F.conv_transpose2d(x, self.weight * self.weight_mask, self.bias,
+                              self.stride, self.padding, self.output_padding)
+
 def snip_forward_deconv3d(self, x):
     return F.conv_transpose3d(x, self.weight * self.weight_mask, self.bias,
                               self.stride, self.padding, self.output_padding)
@@ -28,7 +32,7 @@ def apply_prune_mask(net, keep_masks, verbose=False):
     # Before I can zip() layers and pruning masks I need to make sure they match
     # one-to-one by removing all the irelevant modules:
     prunable_layers = filter(
-        lambda layer: isinstance(layer, PrunableConv3d) or isinstance(layer, PrunableDeconv3d),
+        lambda layer: isinstance(layer, PrunableWeights),
         net.modules()
     )
     if verbose:
@@ -82,7 +86,7 @@ def get_pretrain_pruned_unet(opts, in_model, origin_model, channel_mask, verbose
             start_mask = end_mask.copy()
             if layer_idx < len(channel_mask):  # do not change in Final FC
                 end_mask = channel_mask[layer_idx]
-        elif isinstance(m0, PrunableConv3d) or isinstance(m0, PrunableDeconv3d):
+        elif isinstance(m0, PrunableWeights):
             if keep_prev_mask:
                 prev_masks[layer_idx] = [start_mask, end_mask]
 
@@ -144,6 +148,8 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
     input_data_dict = next(iter(train_dataloader))
     inputs = input_data_dict['image']
     targets = input_data_dict['label']
+    spatial_ndim = inputs.ndim - 2 #assume inputs dim [BCHWD]or[BCHW]
+    assert spatial_ndim in [2,3], f'Currently only support 2&3D data, but got dim={spatial_ndim}'
 
     inputs = inputs.to(device).float()
     targets = targets.to(device).long()
@@ -155,17 +161,24 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
     # Monkey-patch the Linear and Conv2d layer to learn the multiplicative mask
     # instead of the weights
     for layer in net.modules():
-        if isinstance(layer, PrunableConv3d) or isinstance(layer, PrunableDeconv3d):
+        if isinstance(layer, PrunableWeights):
             layer.weight_mask = nn.Parameter(torch.ones_like(layer.weight))  
             nn.init.xavier_normal_(layer.weight)
             layer.weight.requires_grad = False
 
-        # Override the forward methods:
-        if isinstance(layer, PrunableConv3d):
-            layer.forward = types.MethodType(snip_forward_conv3d, layer)
+        if spatial_ndim == 3:
+            snip_conv_forward = snip_forward_conv3d
+            snip_deconv_forward = snip_forward_deconv3d
+        elif spatial_ndim == 2:
+            snip_conv_forward = snip_forward_conv2d
+            snip_deconv_forward = snip_forward_deconv2d
 
-        if isinstance(layer, PrunableDeconv3d):
-            layer.forward = types.MethodType(snip_forward_deconv3d, layer)
+        # Override the forward methods:
+        if isinstance(layer, (PrunableConv3d, PrunableConv2d)):
+                layer.forward = types.MethodType(snip_conv_forward, layer)
+
+        if isinstance(layer, (PrunableDeconv3d, PrunableDeconv2d)):
+            layer.forward = types.MethodType(snip_deconv_forward, layer)
 
         # if isinstance(layer, nn.Linear):
         #     layer.forward = types.MethodType(snip_forward_linear, layer)
@@ -178,11 +191,11 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
     grads_abs = []
     for layer in net.modules():
-        if isinstance(layer, PrunableConv3d) or isinstance(layer, PrunableDeconv3d):
+        if isinstance(layer, PrunableWeights):
+            # Print('Layer:', layer, 'weight shape:', layer.weight_mask.shape, color='r')
             grads_abs.append(torch.abs(layer.weight_mask.grad))
-            #Print('Layer:', layer, 'weight shape:', layer.weight.shape, color='r')
-        #if isinstance(layer, nn.BatchNorm3d):
-        #    Print('BN:', layer, 'bn shape:', layer.weight.shape, color='g')
+        # if isinstance(layer, nn.BatchNorm3d):
+        #    Print('BN:', layer, 'bn shape:', layer.weight.shape, color='y')
 
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in grads_abs])
@@ -205,97 +218,14 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
             onehot = torch.zeros(len(msk))
             keep_masks.append(onehot.scatter_(0, torch.argmax(g), 1).float())
 
-    print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks])))
+    # print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks])))
     Print('Scores min:', torch.min(all_scores), 'Scores max:', torch.max(all_scores), 'Scores mean:', torch.mean(all_scores), color='y')
     if output_dir and os.path.isdir(output_dir):
         np.save(os.path.join(output_dir, 'snip_w_scores_{}.npy'.format(time.strftime("%H%M"))), all_scores.cpu().numpy())
 
     return keep_masks
 
-def channel_snip_core(self, inputs, targets, net, loss_fn, keep_ratio, min_chs=3, output_dir=None):
-    for layer in net.modules():
-        if isinstance(layer, PrunableConv3d):
-            #Print('Layer w dim:', layer.weight.shape, color='y')
-            layer.weight_mask = nn.Parameter(torch.ones([layer.weight.shape[0],1,1,1,1]).cuda()) if use_cuda else \
-                                nn.Parameter(torch.ones([layer.weight.shape[0],1,1,1,1]))
-            nn.init.xavier_normal_(layer.weight)
-            layer.weight.requires_grad = False
-        elif isinstance(layer, PrunableDeconv3d):
-            layer.weight_mask = nn.Parameter(torch.ones([1,layer.weight.shape[1],1,1,1]).cuda()) if use_cuda else \
-                                nn.Parameter(torch.ones([1,layer.weight.shape[1],1,1,1]))
-            nn.init.xavier_normal_(layer.weight)
-            layer.weight.requires_grad = False
-
-        # Override the forward methods:
-        if isinstance(layer, PrunableConv3d):
-            layer.forward = types.MethodType(snip_forward_conv3d, layer)
-
-        if isinstance(layer, PrunableDeconv3d):
-            layer.forward = types.MethodType(snip_forward_deconv3d, layer)
-
-    # Compute gradients (but don't apply them)
-    net.zero_grad()
-    outputs = net.forward(inputs)
-    loss = loss_fn(outputs, targets)
-    loss.backward()
-
-    grads_abs, idx = [], []
-    for i, layer in enumerate(net.modules()):
-        if isinstance(layer, PrunableConv3d) or isinstance(layer, PrunableDeconv3d):
-            grads_abs.append(torch.abs(torch.squeeze(layer.weight_mask.grad)))
-            idx.append(i)
-            #Print('Layer:', layer, 'weight shape:', layer.weight.shape, color='r')
-        #if isinstance(layer, nn.BatchNorm3d):
-            #Print('BN:', layer, 'bn shape:', layer.weight.shape, color='g')
-
-    # Gather all scores in a single vector and normalise
-    all_scores = torch.cat([torch.flatten(x) for x in grads_abs])
-    norm_factor = torch.sum(all_scores)
-    all_scores.div_(norm_factor)
-    Print('Scores min:', torch.min(all_scores), 'Scores max:', torch.max(all_scores), 'Scores mean:', torch.mean(all_scores), color='y')
-    if output_dir and os.path.isdir(output_dir):
-        with open(os.path.join(output_dir, 'snip_chs_scores.json'), 'w') as f:
-            json.dump(all_scores.cpu().numpy().tolist(), f)
-
-    if keep_ratio > 0:
-        num_params_to_keep = int(len(all_scores) * keep_ratio)
-        threshold, _ = torch.topk(all_scores, num_params_to_keep, sorted=True)
-        acceptable_score = threshold[-1]
-    else:
-        acceptable_score = np.mean(all_scores)
-
-    keep_masks = []
-    for i, g in enumerate(grads_abs):
-        if 1< i < len(grads_abs)-1:
-            msk = (g / norm_factor) >= acceptable_score
-            if torch.sum(msk) >= min_chs:
-                keep_masks.append(msk.cpu().float())
-            else:
-                ids = torch.topk(g, k=min_chs)[1]
-                keep_masks.append(torch.zeros(len(g)).scatter_(0, ids.cpu(), 1))
-        else: #keep last conv channel num
-            msk = torch.ones(len(g))
-            keep_masks.append(msk)
-
-    if output_dir and os.path.isdir(output_dir):
-        out_mask = [ m.numpy().tolist() for m in keep_masks]
-        with open(os.path.join(output_dir, 'snip_ch_mask_{}.json'.format(keep_ratio)), 'w') as f:
-            json.dump(out_mask, f)
     
-    remains = torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks]))
-    Print('Remain #{} channels'.format(remains), color='g')
-    return keep_masks
-
-def cSNIP_stepwise(input_net, loss_fn, keep_ratio, train_dataloader, pretrain_weight_file, decay_weight=0.9, min_chs=3, use_cuda=True, output_dir=None):
-    net = copy.deepcopy(input_net)
-
-    for i, (inputs, targets) in enumerate(train_dataloader):
-        if use_cuda:
-            inputs = inputs.cuda()
-            targets = targets.cuda()
-
-        mask = channel_snip_core(inputs, targets, net, loss_fn, keep_ratio, min_chs, output_dir)
-        
 def cSNIP(input_net, loss_fn, keep_ratio, train_dataloader, min_chs=3, use_cuda=True, output_dir=None):
     # TODO: shuffle?
 
@@ -314,23 +244,30 @@ def cSNIP(input_net, loss_fn, keep_ratio, train_dataloader, min_chs=3, use_cuda=
     # Monkey-patch the Linear and Conv2d layer to learn the multiplicative mask
     # instead of the weights
     for layer in net.modules():
-        if isinstance(layer, PrunableConv3d):
+        if isinstance(layer, (PrunableConv3d, PrunableConv2d)):
             #Print('Layer w dim:', layer.weight.shape, color='y')
             layer.weight_mask = nn.Parameter(torch.ones([layer.weight.shape[0],1,1,1,1]).cuda()) if use_cuda else \
                                 nn.Parameter(torch.ones([layer.weight.shape[0],1,1,1,1]))
             nn.init.xavier_normal_(layer.weight)
             layer.weight.requires_grad = False
-        elif isinstance(layer, PrunableDeconv3d):
+        elif isinstance(layer, (PrunableDeconv3d, PrunableDeconv2d)):
             layer.weight_mask = nn.Parameter(torch.ones([1,layer.weight.shape[1],1,1,1]).cuda()) if use_cuda else \
                                 nn.Parameter(torch.ones([1,layer.weight.shape[1],1,1,1]))
             nn.init.xavier_normal_(layer.weight)
             layer.weight.requires_grad = False
 
+        if spatial_ndim == 3:
+            snip_conv_forward = snip_forward_conv3d
+            snip_deconv_forward = snip_forward_deconv3d
+        elif spatial_ndim == 2:
+            snip_conv_forward = snip_forward_conv2d
+            snip_deconv_forward = snip_forward_deconv2d
+
         # Override the forward methods:
-        if isinstance(layer, PrunableConv3d):
+        if isinstance(layer, (PrunableConv3d, PrunableConv2d)):
             layer.forward = types.MethodType(snip_forward_conv3d, layer)
 
-        if isinstance(layer, PrunableDeconv3d):
+        if isinstance(layer, (PrunableDeconv3d, PrunableDeconv2d)):
             layer.forward = types.MethodType(snip_forward_deconv3d, layer)
 
     # Compute gradients (but don't apply them)
@@ -341,7 +278,7 @@ def cSNIP(input_net, loss_fn, keep_ratio, train_dataloader, min_chs=3, use_cuda=
 
     grads_abs, idx = [], []
     for i, layer in enumerate(net.modules()):
-        if isinstance(layer, PrunableConv3d) or isinstance(layer, PrunableDeconv3d):
+        if isinstance(layer, PrunableWeights):
             grads_abs.append(torch.abs(torch.squeeze(layer.weight_mask.grad)))
             idx.append(i)
             #Print('Layer:', layer, 'weight shape:', layer.weight.shape, color='r')
