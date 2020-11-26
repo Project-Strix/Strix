@@ -111,7 +111,7 @@ def get_rjh_swim_seg_dataset(
     spacing=None,
     winlevel=None,
     in_channels=1,
-    crop_size=(96,96,32),
+    crop_size=(96,96,48),
     preload=0,
     augment_ratio=0.4,
     orientation='RAI',
@@ -120,8 +120,8 @@ def get_rjh_swim_seg_dataset(
 ):
     assert in_channels == 1, 'Currently only support single channel input'
 
-    # cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if is_avaible_size(crop_size) else None
-    cropper = [RandSpatialCropD(keys=['image','label'], roi_size=crop_size, random_size=False)] if is_avaible_size(crop_size) else []
+    cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, spatial_size=crop_size) if is_avaible_size(crop_size) else None
+    #cropper = [RandSpatialCropD(keys=['image','label'], roi_size=crop_size, random_size=False)] if is_avaible_size(crop_size) else []
     if phase == 'train':
         additional_transforms = [
             RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),

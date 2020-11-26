@@ -20,46 +20,8 @@ from ignite.engine import Events
 from ignite.utils import setup_logger
 from monai.handlers import CheckpointLoader
 
-@click.command('train', context_settings={'allow_extra_args':True})
-@click.option('--config', type=str, help="tmp var for train_from_cfg")
-@click.option('--debug', is_flag=True)
-@clb.latent_auxilary_params
-@clb.common_params
-@clb.solver_params
-@clb.network_params
-#@click.option('--transpose', type=int, nargs=2, default=None, help='Transpose data when loading')
-@click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
-@click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
-@click.option('--experiment-path', type=str, callback=clb.get_exp_name, default='')
-@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_path',save_code=True,exist_ok=False))
-def train(**args):
-    cargs = sn(**args)
-    
-    if 'CUDA_VISIBLE_DEVICES' in os.environ:
-        Print('CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag')
-    else:
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
-
-    cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
-
-    data_list = get_datalist(cargs.data_list)
-    assert os.path.isfile(data_list), 'Data list not exists!'
-    files_list = get_items_from_file(data_list, format='json')
-    if cargs.partial < 1:
-        Print('Use {} data'.format(int(len(files_list)*cargs.partial)), color='y')
-        files_list = files_list[:int(len(files_list)*cargs.partial)]
-    
-    if cargs.n_fold > 0:
-        Print(f'Processing {cargs.n_fold} cross-validation', color='g')
-        kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
-        all_folds = [ (train_index, test_index) for train_index, test_index in kf.split(files_list)]
-        files_train = list(np.array(files_list)[all_folds[cargs.ith_fold][0]])
-        files_valid = list(np.array(files_list)[all_folds[cargs.ith_fold][1]])
-    else:
-        cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
-        files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+def train_core(cargs, files_train, files_valid):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
-
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, 'train_files'), 'w') as f:
         json.dump(files_train, f, indent=2)
@@ -100,10 +62,55 @@ def train(**args):
         
     trainer.run()
 
+@click.command('train', context_settings={'allow_extra_args':True})
+@click.option('--config', type=str, help="tmp var for train_from_cfg")
+@click.option('--debug', is_flag=True)
+@clb.latent_auxilary_params
+@clb.common_params
+@clb.solver_params
+@clb.network_params
+@click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
+@click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
+@click.option('--experiment-path', type=str, callback=clb.get_exp_name, default='')
+@click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_path',save_code=True,exist_ok=False))
+def train(**args):
+    cargs = sn(**args)
+    
+    if 'CUDA_VISIBLE_DEVICES' in os.environ:
+        Print('CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag')
+    else:
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
+
+    cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
+
+    data_list = get_datalist(cargs.data_list)
+    assert os.path.isfile(data_list), 'Data list not exists!'
+    files_list = get_items_from_file(data_list, format='json')
+    
+    if cargs.partial < 1:
+        Print('Use {} data'.format(int(len(files_list)*cargs.partial)), color='y')
+        files_list = files_list[:int(len(files_list)*cargs.partial)]
+    
+    if cargs.n_fold > 1: #! K-fold cross-validation
+        kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
+        for i, (train_index, test_index) in enumerate(kf.split(files_list)):
+            ith = i if cargs.ith_fold < 0 else cargs.ith_fold
+            if i < ith:
+                continue
+            Print(f'Processing {ith}/{cargs.n_fold} cross-validation', color='g')
+            files_train = list(np.array(files_list)[train_index])
+            files_valid = list(np.array(files_list)[test_index])
+
+            cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
+            train_core(cargs, files_train, files_valid)
+    else: #! Plain training
+        cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
+        files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+        train_core(cargs, files_train, files_valid)
+
 
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
-@click.option('--n-fold', type=int, default=0, help='K fold cross-validation')
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     if len(args.get('additional_args')) != 0: #parse additional args
@@ -116,14 +123,9 @@ def train_cfg(**args):
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id
     
-    if args['n_fold'] > 0:
-        for i in range(args['n_fold']):
-            configures['ith_fold'] = i
-            train(default_map=configures)
-    else:
-        train(default_map=configures)
-        #ctx.invoke(train, **configures) 
-
+    train(default_map=configures)
+    #ctx.invoke(train, **configures) 
+    
 
 @click.command('test-from-cfg')
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
