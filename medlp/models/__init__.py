@@ -14,7 +14,7 @@ from medlp.models.cnn.utils import print_network, output_onehot_transform, Polyn
 from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.layers.radam import RAdam
-from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
+#from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.utils import ENGINES, TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
@@ -171,10 +171,11 @@ def get_network(opts):
             dropout_dim=dim,
         )
     elif archi in RCNN_MODEL_TYPES:
-        config_file = get_rcnn_config(archi, opts.backbone)
-        assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
-        config_content = get_items_from_file(config_file, format='yaml')
-        model = GeneralizedRCNN(config_content)
+        pass
+        # config_file = get_rcnn_config(archi, opts.backbone)
+        # assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
+        # config_content = get_items_from_file(config_file, format='yaml')
+        # model = GeneralizedRCNN(config_content)
     else:
         raise ValueError(f'Model {archi} not available')  
 
