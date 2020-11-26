@@ -5,6 +5,7 @@ from torchvision.models.utils import load_state_dict_from_url
 import numpy as np
 
 from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
+from monai.networks.layers.prunable_conv import PrunableLinear
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -29,7 +30,11 @@ class VGG(nn.Module):
     def __init__(self, features, num_classes=1000, init_weights=True, **kwargs):
         super(VGG, self).__init__()
         dim = kwargs.get('dim', 2)
+        is_prunable = kwargs.get('is_prunable', False)
+
         pool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
+        fc_type: Callable = nn.Linear if not is_prunable else PrunableLinear
+
         self.features = features
         if dim == 2:
             output_size = (7,7)
@@ -41,13 +46,13 @@ class VGG(nn.Module):
         self.avgpool = pool_type(output_size)
         num_ = np.prod(output_size)
         self.classifier = nn.Sequential(
-            nn.Linear(512 * num_, 4096),
+            fc_type(512 * num_, 4096),
             nn.ReLU(True),
             nn.Dropout(),
-            nn.Linear(4096, 4096),
+            fc_type(4096, 4096),
             nn.ReLU(True),
             nn.Dropout(),
-            nn.Linear(4096, num_classes),
+            fc_type(4096, num_classes),
         )
         if init_weights:
             self._initialize_weights()

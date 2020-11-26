@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from monai.networks.layers.prunable_conv import PrunableWeights,PrunableConv3d,PrunableConv2d,PrunableDeconv3d, PrunableDeconv2d
+from monai.networks.layers.prunable_conv import PrunableWeights,PrunableConv3d,PrunableConv2d,PrunableDeconv3d, PrunableDeconv2d, PrunableLinear
 
 import os, copy, types, time, json
 import numpy as np
@@ -28,7 +28,7 @@ def snip_forward_deconv3d(self, x):
 def snip_forward_linear(self, x):
         return F.linear(x, self.weight * self.weight_mask, self.bias)
 
-def apply_prune_mask(net, keep_masks, verbose=False):
+def apply_prune_mask(net, keep_masks, device, verbose=False):
     # Before I can zip() layers and pruning masks I need to make sure they match
     # one-to-one by removing all the irelevant modules:
     prunable_layers = filter(
@@ -38,7 +38,7 @@ def apply_prune_mask(net, keep_masks, verbose=False):
     
     for layer, keep_mask in zip(prunable_layers, keep_masks):
         Print('Prune layer:', layer, '\tPruned unit size:', np.count_nonzero((keep_mask==0).cpu().numpy()), verbose=verbose, color='y')
-        layer.set_pruning_mask(keep_mask)
+        layer.set_pruning_mask(keep_mask.to(device))
 
     return net
 
@@ -155,7 +155,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
     # Let's create a fresh copy of the network so that we're not worried about
     # affecting the actual training-phase
-    net = copy.deepcopy(input_net)
+    net = copy.deepcopy(input_net).to(device)
 
     # Monkey-patch the Linear and Conv2d layer to learn the multiplicative mask
     # instead of the weights
@@ -179,8 +179,8 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
         if isinstance(layer, (PrunableDeconv3d, PrunableDeconv2d)):
             layer.forward = types.MethodType(snip_deconv_forward, layer)
 
-        # if isinstance(layer, nn.Linear):
-        #     layer.forward = types.MethodType(snip_forward_linear, layer)
+        if isinstance(layer, PrunableLinear):
+            layer.forward = types.MethodType(snip_forward_linear, layer)
 
     # Compute gradients (but don't apply them)
     net.zero_grad()
@@ -219,7 +219,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
     # print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks])))
     Print('Scores min:', torch.min(all_scores), 'Scores max:', torch.max(all_scores), 'Scores mean:', torch.mean(all_scores), color='y')
-    Print('Keep_masks sizes:', [np.count_nonzero(m.cpu().numpy()) for m in keep_masks], color='y')
+    Print('Keep_masks ratio:', [f'{np.count_nonzero(m.cpu().numpy())/m.cpu().numpy().size:0.2f}' for m in keep_masks], color='y')
     if output_dir and os.path.isdir(output_dir):
         np.save(os.path.join(output_dir, 'snip_w_scores_{}.npy'.format(time.strftime("%H%M"))), all_scores.cpu().numpy())
 

@@ -158,7 +158,8 @@ def get_network(opts):
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels,
-                      dim=dim)
+                      dim=dim,
+                      is_prunable=is_prunable)
     elif 'resnet' in archi:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
