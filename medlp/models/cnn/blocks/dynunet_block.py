@@ -44,6 +44,7 @@ class UnetResBlock(nn.Module):
         kernel_size: Union[Sequence[int], int],
         stride: Union[Sequence[int], int],
         norm_name: str,
+        is_prunable: bool = False
     ):
         super(UnetResBlock, self).__init__()
         self.conv1 = get_conv_layer(
@@ -53,6 +54,7 @@ class UnetResBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             conv_only=True,
+            is_prunable=is_prunable,
         )
         self.conv2 = get_conv_layer(
             spatial_dims,
@@ -61,6 +63,7 @@ class UnetResBlock(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             conv_only=True,
+            is_prunable=is_prunable,
         )
         self.conv3 = get_conv_layer(
             spatial_dims,
@@ -69,6 +72,7 @@ class UnetResBlock(nn.Module):
             kernel_size=1,
             stride=stride,
             conv_only=True,
+            is_prunable=is_prunable,
         )
         self.lrelu = get_acti_layer(("leakyrelu", {"inplace": True, "negative_slope": 0.01}))
         self.norm1 = get_norm_layer(spatial_dims, out_channels, norm_name)
@@ -119,6 +123,7 @@ class UnetBasicBlock(nn.Module):
         kernel_size: Union[Sequence[int], int],
         stride: Union[Sequence[int], int],
         norm_name: str,
+        is_prunable: bool = False,
     ):
         super(UnetBasicBlock, self).__init__()
         self.conv1 = get_conv_layer(
@@ -128,6 +133,7 @@ class UnetBasicBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             conv_only=True,
+            is_prunable=is_prunable,
         )
         self.conv2 = get_conv_layer(
             spatial_dims,
@@ -136,6 +142,7 @@ class UnetBasicBlock(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             conv_only=True,
+            is_prunable=is_prunable,
         )
         self.lrelu = get_acti_layer(("leakyrelu", {"inplace": True, "negative_slope": 0.01}))
         self.norm1 = get_norm_layer(spatial_dims, out_channels, norm_name)
@@ -178,6 +185,7 @@ class UnetUpBlock(nn.Module):
         stride: Union[Sequence[int], int],
         upsample_kernel_size: Union[Sequence[int], int],
         norm_name: str,
+        is_prunable: bool = False,
     ):
         super(UnetUpBlock, self).__init__()
         upsample_stride = upsample_kernel_size
@@ -189,6 +197,7 @@ class UnetUpBlock(nn.Module):
             stride=upsample_stride,
             conv_only=True,
             is_transposed=True,
+            is_prunable=is_prunable,
         )
         self.conv_block = UnetBasicBlock(
             spatial_dims,
@@ -197,6 +206,7 @@ class UnetUpBlock(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             norm_name=norm_name,
+            is_prunable=is_prunable,
         )
 
     def forward(self, inp, skip):
@@ -208,16 +218,30 @@ class UnetUpBlock(nn.Module):
 
 
 class UnetOutBlock(nn.Module):
-    def __init__(self, spatial_dims: int, in_channels: int, out_channels: int, **kwargs):
+    def __init__(
+        self, 
+        spatial_dims: int, 
+        in_channels: int, 
+        out_channels: int, 
+        **kwargs
+    ):
         super(UnetOutBlock, self).__init__()
         kernel_size = kwargs.get('kernel_size', 1)
         stride = kwargs.get('stride',1)
         bias = kwargs.get('bias',True)
         conv_only = kwargs.get('conv_only',True)
         activation = kwargs.get('activation', None)
+        is_prunable = kwargs.get('is_prunable', False)
 
         self.conv = get_conv_layer(
-            spatial_dims, in_channels, out_channels, kernel_size=kernel_size, stride=stride, bias=bias, conv_only=conv_only
+            spatial_dims, 
+            in_channels, 
+            out_channels, 
+            kernel_size=kernel_size, 
+            stride=stride, 
+            bias=bias, 
+            conv_only=conv_only,
+            is_prunable=is_prunable,
         )
         if activation is not None:
             act_name, act_args = split_args(activation)
@@ -258,6 +282,7 @@ def get_conv_layer(
     bias: bool = False,
     conv_only: bool = True,
     is_transposed: bool = False,
+    is_prunable: bool = False,
 ):
     padding = get_padding(kernel_size, stride)
     output_padding = None
@@ -274,6 +299,7 @@ def get_conv_layer(
         bias=bias,
         conv_only=conv_only,
         is_transposed=is_transposed,
+        is_prunable=is_prunable,
         padding=padding,
         output_padding=output_padding,
     )

@@ -145,7 +145,7 @@ def build_segmentation_engine(**kwargs):
         train_handlers=train_handlers,
         amp=opts.amp
     )
-    return trainer, net
+    return trainer
 
 
 @ENGINES.register('classification')
@@ -228,7 +228,7 @@ def build_classification_engine(**kwargs):
         amp=opts.amp
     )
 
-    return trainer, net
+    return trainer
 
 
 @ENGINES.register('selflearning')
@@ -311,7 +311,7 @@ def build_selflearning_engine(**kwargs):
         train_handlers=train_handlers,
         amp=opts.amp
     )
-    return trainer, net
+    return trainer
 
 
 @ENGINES.register('siamese')

@@ -65,10 +65,11 @@ class DynUNet(nn.Module):
         strides: Sequence[Union[Sequence[int], int]],
         upsample_kernel_size: Sequence[Union[Sequence[int], int]],
         norm_name: str = "instance",
-        deep_supervision: bool = True,
+        deep_supervision: bool = False,
         deep_supr_num: int = 1,
         res_block: bool = False,
-        last_activation: Optional[str] = None
+        last_activation: Optional[str] = None,
+        is_prunable: bool = False,
     ):
         super(DynUNet, self).__init__()
         self.spatial_dims = spatial_dims
@@ -79,6 +80,7 @@ class DynUNet(nn.Module):
         self.upsample_kernel_size = upsample_kernel_size
         self.norm_name = norm_name
         self.deep_supervision = deep_supervision
+        self.is_prunable = is_prunable
         self.conv_block = UnetResBlock if res_block else UnetBasicBlock
         self.filters = [min(2 ** (5 + i), 320 if spatial_dims == 3 else 512) for i in range(len(strides))]
         self.input_block = self.get_input_block()
@@ -86,7 +88,7 @@ class DynUNet(nn.Module):
         self.bottleneck = self.get_bottleneck()
         self.upsamples = self.get_upsamples()
         self.output_block = self.get_output_block(0, last_activation=last_activation)
-        self.deep_supervision_heads = self.get_deep_supervision_heads()
+        self.deep_supervision_heads = self.get_deep_supervision_heads() if deep_supervision else None
         self.deep_supr_num = deep_supr_num
         self.apply(self.initialize_weights)
         self.check_kernel_stride()
@@ -138,6 +140,7 @@ class DynUNet(nn.Module):
             self.kernel_size[0],
             self.strides[0],
             self.norm_name,
+            is_prunable=self.is_prunable,
         )
 
     def get_bottleneck(self):
@@ -148,15 +151,23 @@ class DynUNet(nn.Module):
             self.kernel_size[-1],
             self.strides[-1],
             self.norm_name,
+            is_prunable=self.is_prunable,
         )
 
     def get_output_block(self, idx: int, upsample: int = 0, last_activation: Optional[str] = None):
             if upsample > 1:
-                return nn.Sequential(UnetOutBlock(self.spatial_dims, self.filters[idx], self.out_channels), 
+                return nn.Sequential(UnetOutBlock(self.spatial_dims, 
+                                                  self.filters[idx], 
+                                                  self.out_channels, 
+                                                  is_prunable=self.is_prunable,), 
                                      nn.UpsamplingBilinear2d(scale_factor=upsample))
             else:
                 return UnetOutBlock(
-                    self.spatial_dims, self.filters[idx], self.out_channels, activation=last_activation
+                    self.spatial_dims, 
+                    self.filters[idx], 
+                    self.out_channels, 
+                    activation=last_activation, 
+                    is_prunable=self.is_prunable,
                 )
 
     def get_downsamples(self):
@@ -192,6 +203,7 @@ class DynUNet(nn.Module):
                     "stride": stride,
                     "norm_name": self.norm_name,
                     "upsample_kernel_size": up_kernel,
+                    "is_prunable": self.is_prunable,
                 }
                 layer = conv_block(**params)
                 layers.append(layer)
@@ -204,6 +216,7 @@ class DynUNet(nn.Module):
                     "kernel_size": kernel,
                     "stride": stride,
                     "norm_name": self.norm_name,
+                    "is_prunable": self.is_prunable,
                 }
                 layer = conv_block(**params)
                 layers.append(layer)

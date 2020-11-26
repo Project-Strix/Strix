@@ -86,6 +86,7 @@ def get_network(opts):
     image_size = get_attr_(opts, 'image_size', (512,512))
     layer_order = get_attr_(opts, 'layer_order', 'crb')
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
+    is_prunable = get_attr_(opts, 'snip', False)
 
     model = get_model_instance(archi, opts.tensor_dim)
     assert model is not None, f"Cannot get your network {archi} for {opts.tensor_dim}"
@@ -112,7 +113,8 @@ def get_network(opts):
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
             res_block=(archi=='res-unet'),
-            last_activation=last_act
+            last_activation=last_act,
+            is_prunable=is_prunable
         )
     elif archi == 'unetv2' or archi == 'res-unetv2':
         init_feat = get_attr_(opts, 'n_features', 64)
@@ -224,6 +226,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         loss = DeepSupervisionLoss(loss)
 
     net_ = get_network(opts)
+
     if len(opts.gpu_ids)>1: # and not opts.amp:
         net = torch.nn.DataParallel(net_.to(device))
     else:
@@ -280,7 +283,9 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         'model_dir': model_dir,
         'logger_name': f'{opts.tensor_dim}-Trainer'
     }
-    return ENGINES[framework_type](**params)
+    
+    engine = ENGINES[framework_type](**params)
+    return engine, net, loss
 
 from monai.transforms import *
 from monai.handlers import *
