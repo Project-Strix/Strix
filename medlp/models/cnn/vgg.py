@@ -61,11 +61,11 @@ class VGG(nn.Module):
 
     def _initialize_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, (nn.Conv3d, nn.Conv2d, nn.Conv1d)):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, (nn.BatchNorm3d, nn.BatchNorm2d, nn.BatchNorm1d)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
@@ -73,9 +73,15 @@ class VGG(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-def make_layers(cfg, dim, in_channels=3, batch_norm=False):
+def make_layers(
+    cfg, 
+    dim, 
+    in_channels=3, 
+    batch_norm=False,
+    is_prunable=False
+):
     layers = []
-    conv_type: Callable = Conv[Conv.CONV, dim]
+    conv_type: Callable = Conv[Conv.CONV, dim] if not is_prunable else Conv[Conv.PRUNABLE_CONV, dim]
     norm_type: Callable = Norm[Norm.BATCH, dim]
     pool_type: Callable = Pool[Pool.MAX, dim]
     input_channels = in_channels
@@ -107,12 +113,13 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
 
     in_channels = kwargs.get('in_channels', 3)
     dim = kwargs.get('dim', 2)
+    is_prunable = kwargs.get('is_prunable', False)
 
     if pretrained:
         num_classes_ = kwargs['num_classes']
         kwargs['num_classes'] = 1000
 
-    model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm), **kwargs)
+    model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable), **kwargs)
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
