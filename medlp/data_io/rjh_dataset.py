@@ -105,6 +105,63 @@ def get_rjh_tswi_seg_dataset(
 
     return dataset
 
+def get_rjh_swim_seg_dataset(
+    files_list,
+    phase,
+    spacing=None,
+    winlevel=None,
+    in_channels=1,
+    crop_size=(96,96,32),
+    preload=0,
+    augment_ratio=0.4,
+    orientation='RAI',
+    cache_dir='./',
+    verbose=False
+):
+    assert in_channels == 1, 'Currently only support single channel input'
+
+    # cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if is_avaible_size(crop_size) else None
+    cropper = [RandSpatialCropD(keys=['image','label'], roi_size=crop_size, random_size=False)] if is_avaible_size(crop_size) else []
+    if phase == 'train':
+        additional_transforms = [
+            RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
+            RandRotateD(keys=["image","label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='border'),
+            # Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(5,10),
+            #                magnitude_range=(50,150), mode=["bilinear","nearest"], padding_mode='zeros')
+        ]
+    elif phase == 'valid':
+        additional_transforms = []
+    elif phase == 'test':
+        cropper = None
+        additional_transforms = []
+    elif phase == 'test_wo_label':
+        return UnsupervisedSegmentationDataset3D(
+                    files_list,
+                    orienter=Orientationd(keys='image', axcodes=orientation),
+                    spacer=SpacingD(keys="image", pixdim=spacing),
+                    resizer=None,
+                    rescaler=ScaleIntensityRangePercentilesD(keys='image',lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
+                    cropper=None,
+                    additional_transforms=[],
+                    preload=0,
+                    cache_dir=cache_dir,
+                ).get_dataset()
+    else:
+        raise ValueError
+
+    dataset = SupervisedSegmentationDataset3D(
+        files_list,
+        orienter=Orientationd(keys=['image','label'], axcodes=orientation),
+        spacer=None,
+        resizer=None,
+        rescaler=ScaleIntensityRangePercentilesD(keys='image',lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
+        cropper=[CropForegroundD(keys=['image','label'],source_key='image',select_fn=lambda x: x > 0.45, margin=5),]+cropper,
+        additional_transforms=additional_transforms,
+        preload=preload,
+        cache_dir=cache_dir,
+    ).get_dataset()
+
+    return dataset
 
 def get_rjh_tswi_cls_dataset(
     files_list,
