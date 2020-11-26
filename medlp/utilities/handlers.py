@@ -97,7 +97,7 @@ class SNIP_prune_handler:
                  prune_percent,
                  data_loader,
                  device = 'cpu',
-                 save_dir: Optional[str] = None,
+                 verbose = False,
                  logger_name: Optional[str] = None
     ) -> None:
         self.net = net
@@ -105,14 +105,15 @@ class SNIP_prune_handler:
         self.prune_percent = prune_percent
         self.data_loader = data_loader
         self.device = device
+        self.verbose = verbose
         self.logger_name = logger_name
         self.logger = logging.getLogger(logger_name)
     
     def __call__(self, engine: Engine) -> None:
-        print('*'*20, 'snip', '*'*20)
+        self.logger.debug("-------------- In SNIP handler ---------------")
         keep_masks = SNIP(self.net, self.loss_fn, self.prune_percent, self.data_loader, self.device, None)
-        net_ = apply_prune_mask(self.net, keep_masks, True)
-        self.net.load_state_dict(net_.state_dict())
+        net_ = apply_prune_mask(self.net, keep_masks, self.verbose)
+        # self.net.load_state_dict(net_.state_dict())
 
 class TensorboardGraph:
     """

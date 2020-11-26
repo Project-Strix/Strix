@@ -102,8 +102,7 @@ def train(**args):
         Print('Begin SNIP pruning', color='g')
         device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
         trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
-                                  handler=SNIP_prune_handler(net, loss_fn, 0.3, train_loader, device=device, 
-                                                             save_dir=check_dir(cargs.experiment_path, 'snip')))
+                                  handler=SNIP_prune_handler(net, loss_fn, 0.3, train_loader, device=device, verbose=cargs.debug, logger_name=trainer.logger.name))
 
     trainer.run()
 

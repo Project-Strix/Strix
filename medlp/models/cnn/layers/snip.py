@@ -35,10 +35,9 @@ def apply_prune_mask(net, keep_masks, verbose=False):
         lambda layer: isinstance(layer, PrunableWeights),
         net.modules()
     )
-    if verbose:
-        [Print(i,'Prune layer:',l, color='y') for i, l in enumerate(prunable_layers)]
     
     for layer, keep_mask in zip(prunable_layers, keep_masks):
+        Print('Prune layer:', layer, '\tPruned unit size:', np.count_nonzero((keep_mask==0).cpu().numpy()), verbose=verbose, color='y')
         layer.set_pruning_mask(keep_mask)
 
     return net
@@ -220,6 +219,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
     # print(torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks])))
     Print('Scores min:', torch.min(all_scores), 'Scores max:', torch.max(all_scores), 'Scores mean:', torch.mean(all_scores), color='y')
+    Print('Keep_masks sizes:', [np.count_nonzero(m.cpu().numpy()) for m in keep_masks], color='y')
     if output_dir and os.path.isdir(output_dir):
         np.save(os.path.join(output_dir, 'snip_w_scores_{}.npy'.format(time.strftime("%H%M"))), all_scores.cpu().numpy())
 
@@ -323,4 +323,4 @@ def cSNIP(input_net, loss_fn, keep_ratio, train_dataloader, min_chs=3, use_cuda=
     remains = torch.sum(torch.cat([torch.flatten(x == 1) for x in keep_masks]))
     Print('Remain #{} channels'.format(remains), color='g')
     
-    return(keep_masks)
+    return keep_masks
