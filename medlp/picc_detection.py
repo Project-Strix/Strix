@@ -61,12 +61,15 @@ def train_core(cargs, files_train, files_valid):
                                   handler=TensorboardGraph(net, writer, lambda x:x['image']))
 
     if cargs.snip:
-        Print('Begin SNIP pruning', color='g')
-        snip_device = torch.device("cpu") #! TMP solutino to solve OOM issue
-        original_device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
-        trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
-                                  handler=SNIP_prune_handler(net, loss_fn, cargs.snip_percent, train_loader, device=original_device, 
-                                                             snip_device=snip_device, verbose=cargs.debug, logger_name=trainer.logger.name))
+        if cargs.snip_percent == 0.0 or cargs.snip_percent == 1.0:
+            Print('Invalid snip_percent. Skip SNIP!', color='y')
+        else:
+            Print('Begin SNIP pruning', color='g')
+            snip_device = torch.device("cuda") #torch.device("cpu") #! TMP solutino to solve OOM issue
+            original_device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
+            trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
+                                      handler=SNIP_prune_handler(net, loss_fn, cargs.snip_percent, train_loader, device=original_device, 
+                                                                snip_device=snip_device, verbose=cargs.debug, logger_name=trainer.logger.name))
 
     trainer.run()
 

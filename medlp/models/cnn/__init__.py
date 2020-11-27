@@ -162,8 +162,15 @@ def build_classification_engine(**kwargs):
     device = kwargs['device'] 
     model_dir = kwargs['model_dir'] 
     logger_name = kwargs.get('logger_name', None)
-
+    is_multilabel = opts.output_nc>1
     assert_network_type(opts.model_type, 'CNN')
+
+    if opts.criterion in ['BCE','WBCE']:
+        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32))
+        if opts.output_nc > 1:
+            key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
+    else:
+        prepare_batch_fn = lambda x : (x["image"], x["label"])
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
@@ -189,7 +196,7 @@ def build_classification_engine(**kwargs):
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_val_metric={"val_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=True)},
+        key_val_metric={"val_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=is_multilabel)},
         val_handlers=val_handlers,
         amp=opts.amp
     )
@@ -221,9 +228,10 @@ def build_classification_engine(**kwargs):
         optimizer=optim,
         loss_function=loss,
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(train_loader)),
+        prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_train_metric={"train_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=True)},
+        key_train_metric={"train_acc": Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=is_multilabel)},
         train_handlers=train_handlers,
         amp=opts.amp
     )

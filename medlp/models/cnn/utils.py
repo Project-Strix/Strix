@@ -51,6 +51,9 @@ class PolynomialLRDecay(_LRScheduler):
 
 def output_onehot_transform(output, n_classes=3):
     y_pred, y = output["pred"], output["label"]
+    if n_classes == 1:
+        #print(y_pred.type(torch.LongTensor).shape, y.type(torch.LongTensor).shape)
+        return y_pred, y
     onehot = torch.eye(n_classes)
     #print(onehot[y_pred.squeeze(1).type(torch.LongTensor)].shape, onehot[y.type(torch.LongTensor)].shape)
     return onehot[y_pred.squeeze(1).type(torch.LongTensor)], onehot[y.type(torch.LongTensor)]
