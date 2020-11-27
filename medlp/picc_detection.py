@@ -109,6 +109,8 @@ def train(**args):
             files_train = list(np.array(files_list)[train_index])
             files_valid = list(np.array(files_list)[test_index])
 
+            if '-th' in os.path.basename(cargs.experiment_path):
+                cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f'{i}-th')
             cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
             train_core(cargs, files_train, files_valid)
     else: #! Plain training

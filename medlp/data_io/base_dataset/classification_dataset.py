@@ -22,11 +22,12 @@ class BasicClassificationDataset(object):
         caster,
         to_tensor,
         additional_transforms,
+        is_supervised,
         verbose=False
     ):
         self.files_list = files_list
         self.verbose=verbose
-        self.input_data = self.get_input_data()
+        self.input_data = self.get_input_data(is_supervised)
         self.dataset = None
 
         self.transforms = ensure_list(loader)
@@ -52,31 +53,43 @@ class BasicClassificationDataset(object):
 
         self.transforms = Compose(self.transforms)
     
-    def get_input_data(self):
+    def get_input_data(self, is_supervised):
         '''
         check input file_list format and existence.
         '''
         input_data = []
         for f in self.files_list:
-            if isinstance(f, (list, tuple)): # Recognize f as ['image','label']
-                assert os.path.exists(f[0]), f'Image file not exists: {f[0]}'
-                assert os.path.exists(f[1]), f'Image file not exists: {f[1]}'
-                input_data.append({"image":f[0], "label":f[1]})
-            elif isinstance(f, dict):
-                assert 'image' in f, f"File {f} doesn't contain keyword 'image'"
-                assert os.path.exists(f['image']), f"File not exists: {f['image']}"
+            if is_supervised:
+                if isinstance(f, (list, tuple)): # Recognize f as ['image','label']
+                    assert os.path.exists(f[0]), f'Image file not exists: {f[0]}'
+                    assert os.path.exists(f[1]), f'Image file not exists: {f[1]}'
+                    input_data.append({"image":f[0], "label":f[1]})
+                elif isinstance(f, dict):
+                    assert 'image' in f, f"File {f} doesn't contain keyword 'image'"
+                    assert os.path.exists(f['image']), f"File not exists: {f['image']}"
 
-                input_dict = {"image": f["image"]}
-                if "label" in f:
-                    input_dict.update({"label": f["label"]})
-                if "mask" in f:
-                    input_dict.update({"mask": f["mask"]})
+                    input_dict = {"image": f["image"]}
+                    if "label" in f:
+                        input_dict.update({"label": f["label"]})
+                    if "mask" in f:
+                        input_dict.update({"mask": f["mask"]})
 
-                input_data.append(input_dict)
-                
+                    input_data.append(input_dict)      
+                else:
+                    raise ValueError(f'Not supported file_list format, Got {type(f)} in SupervisedDataset')
             else:
-                raise ValueError(f'Not supported file_list format, Got {type(f)}')
-            
+                if isinstance(f, str):
+                    assert os.path.exists(f), f'Image file not exists: {f}'
+                    input_data.append({"image":f})
+                elif isinstance(f, dict):
+                    assert 'image' in f, f"File {f} doesn't contain keyword 'image'"
+                    assert os.path.exists(f['image']), f"File not exists: {f['image']}"
+                    input_dict = {"image":f['image']}
+                    if "mask" in f:
+                        input_dict.update({"mask": f["mask"]})
+                    input_data.append(input_dict)
+                else:
+                    raise ValueError(f'Not supported file_list format, Got {type(f)} in UnsupervisedDataset')
         return input_data
 
     def get_dataset(self):
@@ -122,6 +135,7 @@ class SupervisedClassificationDataset2D(BasicClassificationDataset):
                          caster,
                          to_tensor,
                          additional_transforms,
+                         True,
                          verbose
                          )
 
@@ -169,6 +183,7 @@ class SupervisedClassificationDataset3D(BasicClassificationDataset):
                          caster,
                          to_tensor,
                          additional_transforms,
+                         True,
                          verbose
                          )
 
