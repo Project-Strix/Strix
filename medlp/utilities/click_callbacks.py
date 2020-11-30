@@ -181,7 +181,7 @@ def common_params(func):
     @click.option('--n-fold', type=int, default=0, help='K fold cross-validation')
     @click.option('--ith-fold', type=int, default=-1, help='i-th fold of cross-validation')
     @click.option('--seed', type=int, default=101, help='random seed')
-    @click.option('--verbose-log', is_flag=True, help='Output verbose log info')
+    @click.option('--compact-log', is_flag=True, help='Output compact log info')
     @click.option('--timestamp', type=str, default=time.strftime("%m%d_%H%M"), help='Timestamp')
     @wraps(func)
     def wrapper(*args, **kwargs):

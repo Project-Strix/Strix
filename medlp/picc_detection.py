@@ -45,7 +45,7 @@ def train_core(cargs, files_train, files_valid):
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     trainer.logger = setup_logger(f'{cargs.tensor_dim}-Trainer', level=logging_level)
-    if not cargs.verbose_log and not cargs.debug:
+    if cargs.compact_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
     
     trainer.add_event_handler(event_name=Events.EPOCH_STARTED, handler=lambda x: print('\n','-'*40))
@@ -114,7 +114,8 @@ def train(**args):
 
             if '-th' in os.path.basename(cargs.experiment_path):
                 cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f'{i}-th')
-            cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
+            else:
+                cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
             train_core(cargs, files_train, files_valid)
     else: #! Plain training
         cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
