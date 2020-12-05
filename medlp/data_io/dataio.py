@@ -8,7 +8,7 @@ from utils_cw import Print, load_h5, check_dir
 from medlp.data_io.picc_dataset import *
 from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
 from medlp.data_io.kits_dataset import get_kits_dataset
-from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_tswi_cls_dataset, get_rjh_swim_seg_dataset
+from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_tswi_cls_datasetV2, get_rjh_swim_seg_dataset, get_rjh_tswi_cls_dataset2D
 
 
 from monai.data import DataLoader
@@ -48,7 +48,7 @@ def get_datalist(dataset_name):
     elif dataset_name == 'rjh_swim':
         fname = "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json"
     elif dataset_name == 'rjh_tswi_cls':
-        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1124_1034-train.json"
+        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json"
     else:
         raise ValueError
     
@@ -197,16 +197,30 @@ def get_dataloader(args, files_list, phase='train'):
                                             )
     elif args.data_list == 'rjh_tswi_cls':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        dataset_ =  get_rjh_tswi_cls_dataset(files_list,
-                                             phase=phase,
-                                             spacing=(0.667,0.667,1.34),
-                                             in_channels=1,
-                                             preload=args.preload,
-                                             augment_ratio=args.augment_ratio,
-                                             orientation='RAI',
-                                             cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
-                                             verbose=False
-                                             )
+        if args.tensor_dim == '3D':
+            dataset_ =  get_rjh_tswi_cls_datasetV2(files_list,
+                                                   phase=phase,
+                                                   spacing=(0.666667,0.666667,1.34),
+                                                   in_channels=1,
+                                                   crop_size=args.crop_size,
+                                                   preload=args.preload,
+                                                   augment_ratio=args.augment_ratio,
+                                                   orientation='RAI',
+                                                   cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
+                                                   verbose=False
+                                                   )
+        elif args.tensor_dim == '2D':
+            dataset_ = get_rjh_tswi_cls_dataset2D(files_list,
+                                                  phase=phase,
+                                                  spacing=(0.666667,0.666667,1.34),
+                                                  in_channels=args.input_nc,
+                                                  crop_size=args.crop_size,
+                                                  preload=args.preload,
+                                                  augment_ratio=args.augment_ratio,
+                                                  orientation='RAI',
+                                                  cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
+                                                  verbose=False
+                                                  )
     else:
         raise ValueError(f'No {args.data_list} dataset')
 
