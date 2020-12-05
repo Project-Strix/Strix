@@ -8,7 +8,7 @@ FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','det
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']
 OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'radam']
 
-CNN_MODEL_TYPES = ['vgg9', 'vgg13', 'vgg16', 'resnet34', 'resnet50']
+CNN_MODEL_TYPES = ['vgg9', 'vgg13', 'vgg16', 'resnet18', 'resnet34', 'resnet50']
 FCN_MODEL_TYPES = ['unet', 'res-unet', 'unetv2', 'res-unetv2', 'scnn', 'highresnet', 'vnet']
 RCNN_MODEL_TYPES = ['mask_rcnn', 'faster_rcnn', 'fcos', 'retina']
 NETWORK_TYPES = {'CNN':CNN_MODEL_TYPES, 

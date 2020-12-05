@@ -19,6 +19,7 @@ import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
 from monai.handlers import CheckpointLoader
+from monai.engines import SupervisedEvaluator, EnsembleEvaluator
 
 def train_core(cargs, files_train, files_valid):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
@@ -142,8 +143,9 @@ def train_cfg(**args):
     
 
 @click.command('test-from-cfg')
-@click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.argument('config', nargs=1, type=click.Path(exists=True))
 @click.option('--test-files', type=str, default='', help='External files (.json) for testing')
+@click.option('--out-dir', type=str, default=None, help='Optional output dir to save results')
 @click.option('--with-label', is_flag=True, help='whether test data has label')
 @click.option('--save-image', is_flag=True, help='Save the tested image data')
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
@@ -163,25 +165,35 @@ def test_cfg(**args):
         test_fpath = args['test_files']
         test_files = get_items_from_file(args['test_files'], format='json')
     else:
-        assert os.path.isfile(os.path.join(exp_dir, 'test_files')), f'Test file does not exists in {exp_dir}!'
+        if not os.path.isfile(os.path.join(exp_dir, 'test_files')):
+            if configures.get('n_fold', 0) > 1:
+                raise ValueError(f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json).")
+            else:
+                raise ValueError(f'Test file does not exists in {exp_dir}!')
+
         test_fpath = os.path.join(exp_dir, 'test_files')
         test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
 
-    configures['model_path'] = clb.get_trained_models(exp_dir)
-    configures['experiment_path'] = check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
+    configures['model_path'] = clb.get_trained_models(exp_dir) if configures.get('n_fold',0) <= 1 else None 
     configures['preload'] = 0.0
     phase = 'test' if args['with_label'] else 'test_wo_label'
     configures['phase'] = phase
     configures['save_image'] = args['save_image']
+    configures['experiment_path'] = exp_dir
+    configures['out_dir'] = check_dir(args['out_dir']) if args['out_dir'] else check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
     
     Print(f'{len(test_files)} test files', color='g')
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
     engine = get_test_engine(sn(**configures), test_loader)
-    engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
+    engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO) #! not work
 
-    Print("Begin testing...", color='g')
-    shutil.copyfile(test_fpath, os.path.join(configures['experiment_path'], os.path.basename(test_fpath)))
+    if isinstance(engine, SupervisedEvaluator):
+        Print("Begin testing...", color='g')
+    elif isinstance(engine, EnsembleEvaluator):
+        Print("Begin ensemble testing...", color='g')
+ 
+    shutil.copyfile(test_fpath, os.path.join(configures['out_dir'], os.path.basename(test_fpath)))
     engine.run()
 
 

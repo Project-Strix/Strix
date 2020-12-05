@@ -76,7 +76,7 @@ def get_exp_name(ctx, param, value):
                 f"{ctx.params['optim']}-{ctx.params['lr_policy']}{partial_data}-{timestamp}"
 
     if ctx.params['n_fold'] > 0:
-        exp_name = exp_name + '-CV'
+        exp_name = exp_name + f"-CV{ctx.params['n_fold']}"
 
     #suffix = '-redo' if ctx.params.get('config') is not None else ''
         
@@ -141,7 +141,7 @@ def loss_params(ctx, param, value):
     return value
 
 def model_select(ctx, param, value):
-    if value in ['vgg13', 'vgg16', 'resnet34','resnet50']:
+    if value in ['vgg13', 'vgg16', 'resnet18', 'resnet34','resnet50']:
         ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
         if ctx.params['load_imagenet']:
             ctx.params['input_nc'] = 3
@@ -168,7 +168,7 @@ def common_params(func):
     @click.option('--smooth', type=float, default=0, help='Smooth rate, disable:0')
     @click.option('--input-nc', type=int, default=1, help='input data channels')
     @click.option('--output-nc', type=int, default=3, help='output channels (classes)')
-    @click.option('--split', type=float, default=0.1, help='Training/testing split ratio')
+    @click.option('--split', type=float, default=0.2, help='Training/testing split ratio')
     @click.option('-W', '--pretrained-model-path', type=str, default='', help='pretrained model path')
     @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/medlp_exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')

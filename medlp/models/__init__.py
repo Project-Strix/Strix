@@ -8,7 +8,7 @@ import torch
 from utils_cw.utils import get_items_from_file
 from medlp.models.cnn.unet3d import UNet3D
 from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn, vgg9_bn
-from medlp.models.cnn.resnet import resnet34, resnet50
+from medlp.models.cnn.resnet import resnet18, resnet34, resnet50
 from medlp.models.cnn.scnn import SCNN
 from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
 from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
@@ -16,7 +16,7 @@ from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.layers.radam import RAdam
 #from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES, TEST_ENGINES
+from medlp.utilities.utils import ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 
 from monai.networks.nets import UNet, HighResNet, VNet
@@ -34,6 +34,7 @@ def get_model_instance(archi, tensor_dim):
         'vgg9':{'3D': vgg9_bn, '2D': vgg9_bn},
         'vgg13':{'3D': vgg13_bn, '2D': vgg13_bn},
         'vgg16':{'3D': vgg16_bn, '2D': vgg16_bn},
+        'resnet18':{'3D': None, '2D': resnet18},
         'resnet34':{'3D': None, '2D': resnet34},
         'resnet50':{'3D': None, '2D': resnet50},
         'highresnet':{'3D':None, '2D': HighResNet},
@@ -306,4 +307,7 @@ def get_test_engine(opts, test_loader):
         'logger_name': f'{opts.tensor_dim}-Tester'
     }
 
-    return TEST_ENGINES[framework_type](**params)
+    if get_attr_(opts, 'n_fold', 0) > 1:
+        return ENSEMBLE_TEST_ENGINES[framework_type](**params)
+    else:
+        return TEST_ENGINES[framework_type](**params)
