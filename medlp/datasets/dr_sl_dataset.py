@@ -12,9 +12,16 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
+from medlp.data_io import SELFLEARNING_DATASETS
 
-def get_ObjCXR_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
-                       crop_size=None, augment_ratio=0.5, verbose=False):
+@SELFLEARNING_DATASETS.register('ObjCXR','2D')
+def get_ObjCXR_dataset(files_list, phase, opts):
+    in_channels=opts.get('input_nc', 1)
+    preload=opts.get('preload', 1.0)
+    image_size=opts.get('image_size', None)
+    crop_size=opts.get('crop_size', None)
+    augment_ratio=opts.get('augment_ratio', 0.5)
+
     input_data = []
     for img in files_list:
         input_data.append({"image":img, "label":img})
@@ -56,8 +63,14 @@ def get_ObjCXR_dataset(files_list, phase, in_channels=1, preload=1.0, image_size
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
-def get_NIHXray_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
-                        crop_size=None, augment_ratio=0.5, verbose=False):
+@SELFLEARNING_DATASETS.register('NIHXray','2D')
+def get_NIHXray_dataset(files_list, phase, opts):
+    in_channels=opts.get('input_nc', 1)
+    preload=opts.get('preload', 1.0)
+    image_size=opts.get('image_size', None)
+    crop_size=opts.get('crop_size', None)
+    augment_ratio=opts.get('augment_ratio', 0.5)
+
     input_data = []
     for img in files_list:
         input_data.append({"image":img, "label":img})    

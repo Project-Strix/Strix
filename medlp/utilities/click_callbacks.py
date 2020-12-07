@@ -154,11 +154,28 @@ def model_select(ctx, param, value):
 
     return value
 
+def data_select(ctx, param, value):
+    from medlp.data_io import (
+        CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS, SELFLEARNING_DATASETS, MULTITASK_DATASETS
+    )
+    data_dict = {
+        'segmentation':SEGMENTATION_DATASETS,
+        'classification':CLASSIFICATION_DATASETS,
+        'selflearning':SELFLEARNING_DATASETS,
+        'multitask':MULTITASK_DATASETS
+    }
+    datalist = list(data_dict[ctx.params['framework']][ctx.params['tensor_dim']].keys())
+    assert len(datalist) > 0, f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
+    ctx.params['data_list'] = click.prompt('Data list', type=click.Choice(datalist, show_index=True))
+    
+    return value
+
+
 
 def common_params(func):
     @click.option('--tensor-dim', prompt=True, type=click.Choice(['2D','3D'],show_index=True), default=0, help='2D or 3D')
-    @click.option('--data-list', prompt=True, type=click.Choice(DATASET_LIST,show_index=True), default=0, help='Data file list (json)')
     @click.option('--framework', prompt=True, type=click.Choice(FRAMEWORK_TYPES,show_index=True), default=0, help='Choose your framework type')
+    @click.option('--data-list', type=str, callback=data_select, default=None, help='Data file list (json)')
     @click.option('--preload', type=float, default=1.0, help='Ratio of preload data')
     @click.option('--n-epoch', prompt=True, show_default=True, type=int, default=1000, help='Epoch number')
     @click.option('--n-epoch-len', type=float, default=1.0, help='Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch')

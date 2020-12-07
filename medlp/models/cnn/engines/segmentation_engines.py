@@ -5,14 +5,8 @@ from functools import partial
 
 import torch
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import (
-    ENGINES, 
-    TEST_ENGINES, 
-    ENSEMBLE_TEST_ENGINES, 
-    assert_network_type, 
-    is_avaible_size, 
-    output_filename_check
-)
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.losses import DiceLoss
@@ -50,7 +44,7 @@ from monai.handlers import (
 )
 
 
-@ENGINES.register('segmentation')
+@TRAIN_ENGINES.register('segmentation')
 def build_segmentation_engine(**kwargs):
     opts = kwargs['opts'] 
     train_loader = kwargs['train_loader']  
@@ -86,15 +80,15 @@ def build_segmentation_engine(**kwargs):
     if opts.output_nc == 1:
         trainval_post_transforms = Compose(
             [
-                Activationsd(keys="pred", sigmoid=True),
-                AsDiscreted(keys="pred", threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys="pred", sigmoid=True),
+                AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         trainval_post_transforms = Compose(
             [
-                Activationsd(keys="pred", softmax=True),
-                AsDiscreted(keys="pred", to_onehot=True, argmax=True, n_classes=opts.output_nc),
+                ActivationsD(keys="pred", softmax=True),
+                AsDiscreteD(keys="pred", to_onehot=True, argmax=True, n_classes=opts.output_nc),
                 #KeepLargestConnectedComponentD(keys="pred", applied_labels=[1], independent=False),
             ]
         )

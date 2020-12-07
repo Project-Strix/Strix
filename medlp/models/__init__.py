@@ -14,9 +14,9 @@ from medlp.models.cnn.utils import print_network, output_onehot_transform, Polyn
 from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.layers.radam import RAdam
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 #from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 
 from monai.networks.nets import UNet, HighResNet, VNet
@@ -286,7 +286,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         'logger_name': f'{opts.tensor_dim}-Trainer'
     }
     
-    engine = ENGINES[framework_type](**params)
+    engine = TRAIN_ENGINES[framework_type](**params)
     return engine, net, loss
 
 from monai.transforms import *

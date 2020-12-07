@@ -125,7 +125,7 @@ def train(**args):
 
 
 @click.command('train-from-cfg', context_settings={'allow_extra_args':True, 'ignore_unknown_options':True})
-@click.option('--config', type=click.Path(exists=True), help='Config file to load')
+@click.argument('config', type=click.Path(exists=True))
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     if len(args.get('additional_args')) != 0: #parse additional args

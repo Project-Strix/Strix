@@ -1,10 +1,10 @@
 import os, sys, time, torch, random, tqdm, math
 import numpy as np
-from utils_cw import Print, load_h5
+from utils_cw import Print, load_h5, check_dir
 import nibabel as nib
 
 from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
-from medlp.data_io.base_dataset.selflearning_dataset import SelflearningDataset3D
+from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
 from medlp.data_io.base_dataset.classification_dataset import SupervisedClassificationDataset3D
 from medlp.utilities.utils import is_avaible_size
@@ -17,52 +17,24 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
-def get_rjh_tswi_sl_dataset(
-    files_list,
-    phase,
-    spacing=None,
-    winlevel=[-80,304],
-    in_channels=1,
-    image_size=None,
-    crop_size=None, 
-    preload=1.0, 
-    augment_ratio=0.4, 
-    downsample=1, 
-    orientation='LPI',
-    cache_dir='./',
-    verbose=False
-):
-    if phase == 'train' or phase == 'valid':
-        dataset = SelflearningDataset3D(
-            files_list,
-            repeater=None,
-            spacer=None,
-            rescaler=ScaleIntensityRanged(keys=["image","label"], a_min=0, a_max=255, b_min=0, b_max=1, clip=True),
-            resizer=None,
-            cropper=RandSpatialCropd(keys=["image", "label"], roi_size=(96,96,96), random_size=False),
-            
-        )
-    
-    return
 
 #win width: 1130.0, 19699.0
-def get_rjh_tswi_seg_dataset(
-    files_list,
-    phase,
-    spacing=(0.667,0.667,1.34),
-    winlevel=(1130.0, 19699.0),
-    in_channels=1,
-    crop_size=(96,96,64),
-    preload=0,
-    augment_ratio=0.4,
+@SEGMENTATION_DATASETS.register('rjh_tswi', '3D')
+def get_rjh_tswi_seg_dataset(files_list, phase, opts):
+    spacing=(0.667,0.667,1.34)
+    winlevel=(1130.0, 19699.0)
+    in_channels=opts.get('input_nc', 1), 
+    crop_size=opts.get('crop_size', (96,96,64)),
+    preload=opts.get('preload', 0),
+    augment_ratio=opts.get('augment_ratio',0.4),
     orientation='RAI',
-    cache_dir='./',
-    verbose=False
-):
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+
     assert in_channels == 1, 'Currently only support single channel input'
 
     cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if \
               is_avaible_size(crop_size) else None
+    
     if phase == 'train':
         additional_transforms = [
             #RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
@@ -105,19 +77,16 @@ def get_rjh_tswi_seg_dataset(
 
     return dataset
 
-def get_rjh_swim_seg_dataset(
-    files_list,
-    phase,
-    spacing=(0.666667,0.666667,2),
-    winlevel=None,
-    in_channels=1,
-    crop_size=(96,96,48),
-    preload=0,
-    augment_ratio=0.4,
+@SEGMENTATION_DATASETS.register('rjh_swim', '3D')
+def get_rjh_swim_seg_dataset(files_list, phase, opts):
+    spacing=(0.666667,0.666667,2)
+    in_channels=opts.get('input_nc', 1), 
+    crop_size=opts.get('crop_size', (96,96,48)),
+    preload=opts.get('preload', 0),
+    augment_ratio=opts.get('augment_ratio',0.4),
     orientation='RAI',
-    cache_dir='./',
-    verbose=False
-):
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+
     assert in_channels == 1, 'Currently only support single channel input'
 
     cropper = [RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size)] if is_avaible_size(crop_size) else []
@@ -163,19 +132,16 @@ def get_rjh_swim_seg_dataset(
 
     return dataset
 
-def get_rjh_tswi_cls_dataset(
-    files_list,
-    phase,
-    spacing=(0.667,0.667,1.34),
-    winlevel=None,
-    in_channels=1,
-    crop_size=(32,32,16),
-    preload=0,
-    augment_ratio=0.4,
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D')
+def get_rjh_tswi_cls_dataset(files_list, phase, opts):
+    spacing=(0.666667,0.666667,1.34),
+    in_channels=opts.get('input_nc', 1),
+    crop_size=opts.get('crop_size', (32,32,16)),
+    preload=opts.get('preload', 0),
+    augment_ratio=opts.get('augment_ratio', 0.4),
     orientation='RAI',
-    cache_dir='./',
-    verbose=False
-):
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+
     assert in_channels == 1, 'Currently only support single channel input'
     if phase == 'train':
         additional_transforms = [
@@ -209,3 +175,10 @@ def get_rjh_tswi_cls_dataset(
     ).get_dataset()
 
     return dataset
+
+
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D')
+def get_rjh_dataset2(**kwargs):
+    print(kwargs)
+
+    

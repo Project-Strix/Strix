@@ -5,14 +5,8 @@ from functools import partial
 
 import torch
 from medlp.utilities.handlers import NNIReporterHandler
-from medlp.utilities.utils import (
-    ENGINES, 
-    TEST_ENGINES, 
-    ENSEMBLE_TEST_ENGINES, 
-    assert_network_type, 
-    is_avaible_size, 
-    output_filename_check
-)
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
@@ -50,7 +44,7 @@ from monai.handlers import (
 )
 
 
-@ENGINES.register('classification')
+@TRAIN_ENGINES.register('classification')
 def build_classification_engine(**kwargs):
     opts = kwargs['opts'] 
     train_loader = kwargs['train_loader']  

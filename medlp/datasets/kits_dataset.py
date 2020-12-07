@@ -13,6 +13,8 @@ from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fa
 from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
+from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
+
 def get_kits_dataset(files_list,
                      phase,
                      spacing=[],

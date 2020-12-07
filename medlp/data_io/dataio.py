@@ -5,11 +5,16 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5, check_dir
 
-from medlp.data_io.picc_dataset import *
-from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
-from medlp.data_io.kits_dataset import get_kits_dataset
-from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_tswi_cls_datasetV2, get_rjh_swim_seg_dataset, get_rjh_tswi_cls_dataset2D
-
+from medlp.data_io import (
+    CLASSIFICATION_DATASETS, 
+    SEGMENTATION_DATASETS, 
+    SELFLEARNING_DATASETS,
+    MULTITASK_DATASETS
+)
+# from medlp.data_io.picc_dataset import *
+# from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
+# from medlp.data_io.kits_dataset import get_kits_dataset
+# from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_swim_seg_dataset
 
 from monai.data import DataLoader
 from monai.transforms import (
@@ -79,7 +84,7 @@ def get_default_setting(phase, **kwargs):
     
     return {'batch_size':batch_size, 'shuffle':shuffle, 'drop_last':drop_last, 'num_workers':num_workers, 'pin_memory':pin_memory}
     
-def get_dataloader(args, files_list, phase='train'):
+def get_dataloader_old(args, files_list, phase='train'):
     if args.data_list == 'rib':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
         dataset_ = RIB_seg_dataset(files_list,
@@ -198,31 +203,31 @@ def get_dataloader(args, files_list, phase='train'):
     elif args.data_list == 'rjh_tswi_cls':
         params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
         if args.tensor_dim == '3D':
-            dataset_ =  get_rjh_tswi_cls_datasetV2(files_list,
-                                                   phase=phase,
-                                                   spacing=(0.666667,0.666667,1.34),
-                                                   in_channels=1,
-                                                   crop_size=args.crop_size,
-                                                   preload=args.preload,
-                                                   augment_ratio=args.augment_ratio,
-                                                   orientation='RAI',
-                                                   cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
-                                                   verbose=False
-                                                   )
+            pass
         elif args.tensor_dim == '2D':
-            dataset_ = get_rjh_tswi_cls_dataset2D(files_list,
-                                                  phase=phase,
-                                                  spacing=(0.666667,0.666667,1.34),
-                                                  in_channels=args.input_nc,
-                                                  crop_size=args.crop_size,
-                                                  preload=args.preload,
-                                                  augment_ratio=args.augment_ratio,
-                                                  orientation='RAI',
-                                                  cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'),
-                                                  verbose=False
-                                                  )
+            pass
     else:
         raise ValueError(f'No {args.data_list} dataset')
 
     loader = DataLoader(dataset_, **params)
     return loader
+
+def get_dataloader(args, files_list, phase='train'):
+    params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
+    data_dict = {
+        'segmentation':SEGMENTATION_DATASETS,
+        'classification':CLASSIFICATION_DATASETS,
+        'selflearning':SELFLEARNING_DATASETS,
+        'multitask':MULTITASK_DATASETS
+    }
+    arguments = {
+        'files_list':files_list,
+        'phase': phase,
+        'opts': vars(args)
+    }
+
+    dataset_ = data_dict[args.framework][args.tensor_dim][args.data_list](**arguments)
+    
+    loader = DataLoader(dataset_, **params)
+    return loader
+

@@ -1,10 +1,9 @@
-
 # All enum variables
-DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi', 'rjh_swim', 'rjh_tswi_cls']
+#DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi', 'rjh_swim', 'rjh_tswi_cls']
 NORM_TYPES = ['batch','instance','group']
 LOSSES = ['CE', 'WCE', 'BCE', 'WBCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'poly', 'step', 'SGDR', 'plateau']
-FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection']
+FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection','multitask']
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']
 OPTIM_TYPES = ['sgd', 'adam', 'adamw', 'radam']
 
@@ -16,3 +15,4 @@ NETWORK_TYPES = {'CNN':CNN_MODEL_TYPES,
                  'RCNN':RCNN_MODEL_TYPES}
 RCNN_BACKBONE = ["R-50-C4","R-50-C5","R-101-C4","R-101-C5",
                  "R-50-FPN","R-101-FPN","R-152-FPN"]
+

@@ -15,19 +15,19 @@ from monai.transforms.utils import generate_pos_neg_label_crop_centers
 from monai.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
+from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset2D as SegmentationDataset2D
 from medlp.utilities.utils import is_avaible_size
 
-def PICC_dcm_seg_dataset(
-    files_list, 
-    phase, 
-    spacing=(0.3,0.3), 
-    in_channels=1, 
-    image_size=(1024,1024),
-    crop_size=None, 
-    preload=1.0, 
-    augment_ratio=0.4
-):
+@SEGMENTATION_DATASETS.register('picc_dcm', '2D')
+def PICC_dcm_seg_dataset(files_list, phase, opts):
+    spacing=opts.get('spacing', (0.3,0.3))
+    in_channels=opts.get('input_nc', 1)
+    image_size=opts.get('image_size', (1024,1024))
+    crop_size=opts.get('crop_size', None)
+    preload=opts.get('preload', 1.0), 
+    augment_ratio=opts.get('augment_ratio', 0.5)
+
     assert in_channels == 1, 'Currently only support single channel input'
     
     if phase == 'train':
@@ -56,17 +56,16 @@ def PICC_dcm_seg_dataset(
 
     return dataset
 
-def PICC_nii_seg_dataset(
-    files_list, 
-    phase, 
-    spacing=(0.3,0.3), 
-    winlevel=(421,2515), 
-    in_channels=1, 
-    image_size=(1024,1024),
-    crop_size=None, 
-    preload=1.0, 
-    augment_ratio=0.4
-):
+@SEGMENTATION_DATASETS.register('picc_nii', '2D')
+def PICC_nii_seg_dataset(files_list, phase, opts):
+    spacing=opts.get('spacing', (0.3,0.3)) 
+    winlevel=opts.get('winlevel', (421,2515))
+    in_channels=opts.get('input_nc', 1)
+    image_size=opts.get('image_size', (1024,1024))
+    crop_size=opts.get('crop_size', None)
+    preload=opts.get('preload', 1.0) 
+    augment_ratio=opts.get('augment_ratio', 0.4)
+
     assert in_channels == 1, 'Currently only support single channel input'
     
     if phase == 'train':
@@ -159,10 +158,15 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
     dataset_ = CacheDataset(files_list, transform=transforms, cache_rate=preload)
     return dataset_
 
-
-def RIB_seg_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
-                    crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
-
+@SEGMENTATION_DATASETS.register('rib_nii', '2D')
+def RIB_seg_dataset(files_list, phase, opts):
+    in_channels=opts.get('input_nc', 1)
+    preload=opts.get('preload', 1.0)
+    image_size=opts.get('image_size', None)
+    crop_size=opts.get('crop_size', None)
+    augment_ratio=opts.get('augment_ratio', 0.4)
+    downsample=opts.get('downsample', 1)
+    
     input_data = []
     try:
         no_label = False
@@ -283,8 +287,3 @@ class DetDateSet(Dataset):
 
     def get_img_info(self, idx):
         return None
-
-
-def PICC_det_dataset(files_list, phase, in_channels=1, preload=1.0, image_size=None, 
-                     crop_size=None, augment_ratio=0.4, downsample=1, verbose=False):
-    pass
