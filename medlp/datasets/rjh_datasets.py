@@ -82,12 +82,12 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
     spacing=(0.666667,0.666667,2)
-    in_channels=opts.get('input_nc', 1), 
-    crop_size=opts.get('crop_size', (96,96,48)),
-    preload=opts.get('preload', 0),
-    augment_ratio=opts.get('augment_ratio',0.4),
-    orientation='RAI',
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+    in_channels=opts.get('input_nc', 1)
+    crop_size=opts.get('crop_size', (96,96,48))
+    preload=opts.get('preload', 0)
+    augment_ratio=opts.get('augment_ratio',0.4)
+    orientation='RAI'
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
 
     assert in_channels == 1, 'Currently only support single channel input'
 
@@ -181,6 +181,7 @@ def get_rjh_tswi_cls_dataset(files_list, phase, opts):
 
 
 @CLASSIFICATION_DATASETS.register('rjh_tswi', '2D', None)
-def get_rjh_dataset2(**kwargs):
-    print(kwargs)
+@CLASSIFICATION_DATASETS.register('rjh_tswi_2', '2D', None)
+def get_rjh_dataset2(files_list, phase, opts):
+    raise NotImplementedError
 

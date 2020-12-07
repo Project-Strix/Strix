@@ -5,18 +5,7 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5, check_dir
 
-from medlp.data_io import (
-    CLASSIFICATION_DATASETS, 
-    SEGMENTATION_DATASETS, 
-    SELFLEARNING_DATASETS,
-    MULTITASK_DATASETS,
-    DATASET_MAPPING
-)
-# from medlp.data_io.picc_dataset import *
-# from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
-# from medlp.data_io.kits_dataset import get_kits_dataset
-# from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset, get_rjh_swim_seg_dataset
-
+from medlp.data_io import DATASET_MAPPING
 from monai.data import DataLoader
 from monai.transforms import (
         Compose,
@@ -69,7 +58,7 @@ def get_default_setting(phase, **kwargs):
 
 
 def get_dataloader(args, files_list, phase='train'):
-    params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
+    params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1) #! How to customize?
     arguments = {
         'files_list':files_list,
         'phase': phase,

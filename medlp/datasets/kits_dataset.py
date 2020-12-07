@@ -24,10 +24,8 @@ def get_kits_dataset(files_list, phase, opts):
     crop_size=opts.get('crop_size', None)
     preload=opts.get('preload', 1.0)
     augment_ratio=opts.get('augment_ratio', 0.4)
-    downsample=opts.get('downsample', 1)
     orientation=opts.get('orientation', 'LPI')
     cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
-    verbose=False
     
     data_reader = LoadNiftid(keys=["image","label"], dtype=np.float32)
 

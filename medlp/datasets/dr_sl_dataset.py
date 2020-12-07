@@ -110,5 +110,3 @@ def get_NIHXray_dataset(files_list, phase, opts):
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
-    
-    
