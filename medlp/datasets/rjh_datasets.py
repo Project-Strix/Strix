@@ -19,16 +19,17 @@ from monai.transforms import *
 
 
 #win width: 1130.0, 19699.0
-@SEGMENTATION_DATASETS.register('rjh_tswi', '3D')
+@SEGMENTATION_DATASETS.register('rjh_tswi', '3D', 
+    "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json")
 def get_rjh_tswi_seg_dataset(files_list, phase, opts):
     spacing=(0.667,0.667,1.34)
     winlevel=(1130.0, 19699.0)
-    in_channels=opts.get('input_nc', 1), 
-    crop_size=opts.get('crop_size', (96,96,64)),
-    preload=opts.get('preload', 0),
-    augment_ratio=opts.get('augment_ratio',0.4),
-    orientation='RAI',
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+    in_channels=opts.get('input_nc', 1)
+    crop_size=opts.get('crop_size', (96,96,64))
+    preload=opts.get('preload', 0)
+    augment_ratio=opts.get('augment_ratio',0.4)
+    orientation='RAI'
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
 
     assert in_channels == 1, 'Currently only support single channel input'
 
@@ -77,7 +78,8 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-@SEGMENTATION_DATASETS.register('rjh_swim', '3D')
+@SEGMENTATION_DATASETS.register('rjh_swim', '3D', 
+    "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
     spacing=(0.666667,0.666667,2)
     in_channels=opts.get('input_nc', 1), 
@@ -132,7 +134,8 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D')
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D', 
+    "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
 def get_rjh_tswi_cls_dataset(files_list, phase, opts):
     spacing=(0.666667,0.666667,1.34),
     in_channels=opts.get('input_nc', 1),
@@ -177,8 +180,7 @@ def get_rjh_tswi_cls_dataset(files_list, phase, opts):
     return dataset
 
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D')
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D', None)
 def get_rjh_dataset2(**kwargs):
     print(kwargs)
 
-    

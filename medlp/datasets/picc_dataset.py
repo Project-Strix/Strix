@@ -19,7 +19,7 @@ from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset2D as SegmentationDataset2D
 from medlp.utilities.utils import is_avaible_size
 
-@SEGMENTATION_DATASETS.register('picc_dcm', '2D')
+@SEGMENTATION_DATASETS.register('picc_dcm', '2D', "/homes/clwang/Data/picc/picc_dcm_nii.json")
 def PICC_dcm_seg_dataset(files_list, phase, opts):
     spacing=opts.get('spacing', (0.3,0.3))
     in_channels=opts.get('input_nc', 1)
@@ -56,7 +56,7 @@ def PICC_dcm_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-@SEGMENTATION_DATASETS.register('picc_nii', '2D')
+@SEGMENTATION_DATASETS.register('picc_nii', '2D', "/homes/clwang/Data/picc/picc_seg_nii.json")
 def PICC_nii_seg_dataset(files_list, phase, opts):
     spacing=opts.get('spacing', (0.3,0.3)) 
     winlevel=opts.get('winlevel', (421,2515))
@@ -158,7 +158,7 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
     dataset_ = CacheDataset(files_list, transform=transforms, cache_rate=preload)
     return dataset_
 
-@SEGMENTATION_DATASETS.register('rib_nii', '2D')
+@SEGMENTATION_DATASETS.register('rib_nii', '2D', "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json")
 def RIB_seg_dataset(files_list, phase, opts):
     in_channels=opts.get('input_nc', 1)
     preload=opts.get('preload', 1.0)

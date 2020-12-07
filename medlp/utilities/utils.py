@@ -67,6 +67,10 @@ def _register_generic_dim(module_dict, module_name, dim, module):
     assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
     module_dict[dim].update({module_name:module})
 
+def _register_generic_data(module_dict, module_name, dim, fpath, module):
+    assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
+    module_dict[dim].update({module_name:module, module_name+"_fpath":fpath})
+
 def is_avaible_size(value):
     if isinstance(value, (list, tuple)):
         if np.all( np.greater(value, 0) ):
@@ -157,6 +161,24 @@ class DimRegistry(dict):
             return fn 
         return register_fn
     
+
+class DatasetRegistry(DimRegistry):
+    def __init__(self, *args, **kwargs):
+        super(DatasetRegistry, self).__init__(*args, **kwargs)
+    
+    def register(self, module_name, dim, fpath, module=None):
+        assert dim in ['2D', '3D', '2', '3', 2, 3], "Only support 2D&3D dataset now"
+        dim = self.dim_mapping[dim]
+        # used as function call
+        if module is not None:
+            _register_generic_data(self, module_name, dim, fpath, module)
+            return
+
+        # used as decorator
+        def register_fn(fn):
+            _register_generic_data(self, module_name, dim, fpath, fn)
+            return fn 
+        return register_fn
 
 
 

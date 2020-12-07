@@ -9,7 +9,8 @@ from medlp.data_io import (
     CLASSIFICATION_DATASETS, 
     SEGMENTATION_DATASETS, 
     SELFLEARNING_DATASETS,
-    MULTITASK_DATASETS
+    MULTITASK_DATASETS,
+    DATASET_MAPPING
 )
 # from medlp.data_io.picc_dataset import *
 # from medlp.data_io.dr_sl_dataset import get_ObjCXR_dataset, get_NIHXray_dataset
@@ -34,26 +35,8 @@ def get_datalist(dataset_name):
             fname = r"\\mega\clwang\Data\picc\prepared_h5\data_list.json"
         elif os.name == 'posix':
             fname = "/homes/clwang/Data/picc/prepared_h5/data_list_linux.json"
-    elif dataset_name == 'picc_nii':
-        fname = "/homes/clwang/Data/picc/picc_seg_nii.json"
-    elif dataset_name == 'picc_dcm':
-        fname = "/homes/clwang/Data/picc/picc_dcm_nii.json"
-    elif dataset_name == 'Obj_CXR':
-        fname = "/homes/clwang/Data/object-CXR/train_data_list.json"
-    elif dataset_name == 'NIH_CXR':
-        fname = "/homes/clwang/Data/NIH-CXR_TRAIN_VAL_LIST.json"
-    elif dataset_name == 'rib':
-        fname = "/homes/clwang/Data/picc/prepared_rib_h5/nii_files.json"
-    elif dataset_name == 'kits':
-        fname = '/MRIData/kits19/data/train_data_list.json'
     elif dataset_name == 'jsph_rcc':
         fname = "/homes/clwang/Data/jsph_rcc/kidney_rcc/Train/data_list.json"
-    elif dataset_name == 'rjh_tswi':
-        fname = "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json"
-    elif dataset_name == 'rjh_swim':
-        fname = "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json"
-    elif dataset_name == 'rjh_tswi_cls':
-        fname = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json"
     else:
         raise ValueError
     
@@ -83,150 +66,17 @@ def get_default_setting(phase, **kwargs):
         raise ValueError(f"phase must be in 'train,valid,test', but got {phase}") 
     
     return {'batch_size':batch_size, 'shuffle':shuffle, 'drop_last':drop_last, 'num_workers':num_workers, 'pin_memory':pin_memory}
-    
-def get_dataloader_old(args, files_list, phase='train'):
-    if args.data_list == 'rib':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
-        dataset_ = RIB_seg_dataset(files_list,
-                                   phase=phase,
-                                   in_channels=args.input_nc,
-                                   preload=args.preload,
-                                   image_size=args.image_size,
-                                   crop_size=args.crop_size,
-                                   augment_ratio=args.augment_ratio,
-                                   downsample=args.downsample,
-                                   verbose=args.debug
-                                   )
-    elif args.data_list == 'picc_h5':
-        params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = PICC_seg_dataset(files_list,
-                                    phase=phase,
-                                    spacing=args.spacing,
-                                    in_channels=args.input_nc,
-                                    image_size=args.image_size,
-                                    crop_size=args.crop_size,
-                                    preload=args.preload,
-                                    augment_ratio=args.augment_ratio,
-                                    downsample=args.downsample,
-                                    verbose=args.debug
-                                    )
-    elif args.data_list == 'picc_nii':
-        params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = PICC_nii_seg_dataset(files_list,
-                                        phase=phase,
-                                        spacing=args.spacing,
-                                        in_channels=args.input_nc,
-                                        image_size=args.image_size,
-                                        crop_size=args.crop_size,
-                                        preload=args.preload,
-                                        augment_ratio=args.augment_ratio
-                                        )
-    elif args.data_list == 'picc_dcm':
-        params = get_default_setting(phase, train_n_batch=args.n_batch)
-        dataset_ = PICC_dcm_seg_dataset(files_list,
-                                        phase=phase,
-                                        spacing=args.spacing,
-                                        in_channels=args.input_nc,
-                                        image_size=args.image_size,
-                                        crop_size=args.crop_size,
-                                        preload=args.preload,
-                                        augment_ratio=args.augment_ratio
-                                        )
-    elif args.data_list == 'Obj_CXR':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
-        dataset_ = get_ObjCXR_dataset(files_list, 
-                                      phase=phase, 
-                                      in_channels=args.input_nc, 
-                                      preload=args.preload, 
-                                      image_size=args.image_size,
-                                      crop_size=args.crop_size, 
-                                      augment_ratio=args.augment_ratio, 
-                                      verbose=args.debug
-                                      )
-    elif args.data_list == 'NIH_CXR':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=10)
-        dataset_ = get_NIHXray_dataset(files_list,
-                                       phase=phase,
-                                       in_channels=args.input_nc,
-                                       preload=args.preload,
-                                       image_size=args.image_size,
-                                       crop_size=args.crop_size,
-                                       augment_ratio=args.augment_ratio,
-                                       verbose=args.debug
-                                       )
-    elif args.data_list == 'kits':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        dataset_  = get_kits_dataset(files_list, 
-                                     phase=phase,
-                                     spacing=args.spacing,
-                                     winlevel=[-80,304],
-                                     in_channels=args.input_nc,
-                                     crop_size=args.crop_size,
-                                     preload=args.preload,
-                                     augment_ratio=args.augment_ratio,
-                                     cache_dir=check_dir(args.experiment_path,'caches'),
-                                     verbose=args.debug
-                                     )
-    elif args.data_list == 'jsph_rcc':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        dataset_  = get_kits_dataset(files_list, 
-                                     phase=phase,
-                                     spacing=args.spacing,
-                                     winlevel=[-80,304],
-                                     in_channels=args.input_nc,
-                                     crop_size=args.crop_size,
-                                     preload=args.preload,
-                                     augment_ratio=args.augment_ratio,
-                                     cache_dir=check_dir(args.experiment_path,'caches'),
-                                     verbose=args.debug
-                                     )
-    elif args.data_list == 'rjh_tswi':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        dataset_ = get_rjh_tswi_seg_dataset(files_list,
-                                            phase=phase,
-                                            crop_size=args.crop_size,
-                                            preload=args.preload,
-                                            augment_ratio=args.augment_ratio,
-                                            cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'), #! share same caches for large 3D dataset
-                                            verbose=args.debug
-                                            )
-    elif args.data_list == 'rjh_swim':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        dataset_ = get_rjh_swim_seg_dataset(files_list,
-                                            phase=phase,
-                                            crop_size=args.crop_size,
-                                            preload=args.preload,
-                                            augment_ratio=args.augment_ratio,
-                                            cache_dir=check_dir(os.path.dirname(args.experiment_path),'caches'), #! share same caches for large 3D dataset
-                                            verbose=args.debug
-                                            )
-    elif args.data_list == 'rjh_tswi_cls':
-        params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch, valid_n_workers=5)
-        if args.tensor_dim == '3D':
-            pass
-        elif args.tensor_dim == '2D':
-            pass
-    else:
-        raise ValueError(f'No {args.data_list} dataset')
 
-    loader = DataLoader(dataset_, **params)
-    return loader
 
 def get_dataloader(args, files_list, phase='train'):
     params = get_default_setting(phase, train_n_batch=args.n_batch, valid_n_batch=1)
-    data_dict = {
-        'segmentation':SEGMENTATION_DATASETS,
-        'classification':CLASSIFICATION_DATASETS,
-        'selflearning':SELFLEARNING_DATASETS,
-        'multitask':MULTITASK_DATASETS
-    }
     arguments = {
         'files_list':files_list,
         'phase': phase,
         'opts': vars(args)
     }
 
-    dataset_ = data_dict[args.framework][args.tensor_dim][args.data_list](**arguments)
+    dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list](**arguments)
     
     loader = DataLoader(dataset_, **params)
     return loader

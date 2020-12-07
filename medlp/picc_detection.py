@@ -7,7 +7,8 @@ from types import SimpleNamespace as sn
 import nibabel as nib
 
 from medlp.models import get_engine, get_test_engine
-from medlp.data_io.dataio import get_dataloader, get_datalist
+from medlp.data_io import DATASET_MAPPING
+from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import TensorboardGraph, SNIP_prune_handler
 import medlp.utilities.click_callbacks as clb
 from medlp.utilities import enum
@@ -75,7 +76,7 @@ def train_core(cargs, files_train, files_valid):
     trainer.run()
 
 @click.command('train', context_settings={'allow_extra_args':True})
-@click.option('--config', type=str, help="tmp var for train_from_cfg")
+@click.option('--config', type=click.Path(exists=True))
 @click.option('--debug', is_flag=True)
 @clb.latent_auxilary_params
 @clb.common_params
@@ -95,7 +96,7 @@ def train(**args):
 
     cargs.gpu_ids = list(range(len(list(map(int,cargs.gpus.split(','))))))
 
-    data_list = get_datalist(cargs.data_list)
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list+'_fpath']
     assert os.path.isfile(data_list), 'Data list not exists!'
     files_list = get_items_from_file(data_list, format='json')
     
@@ -137,6 +138,7 @@ def train_cfg(**args):
     configures['smi'] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
     configures['gpus'] = gpu_id
+    configures['config'] = args['config']
     
     train(default_map=configures)
     #ctx.invoke(train, **configures) 

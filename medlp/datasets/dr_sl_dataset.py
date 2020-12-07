@@ -14,7 +14,7 @@ from monai.transforms import *
 
 from medlp.data_io import SELFLEARNING_DATASETS
 
-@SELFLEARNING_DATASETS.register('ObjCXR','2D')
+@SELFLEARNING_DATASETS.register('ObjCXR','2D',"/homes/clwang/Data/object-CXR/train_data_list.json")
 def get_ObjCXR_dataset(files_list, phase, opts):
     in_channels=opts.get('input_nc', 1)
     preload=opts.get('preload', 1.0)
@@ -63,7 +63,7 @@ def get_ObjCXR_dataset(files_list, phase, opts):
     dataset_ = CacheDataset(input_data, transform=transforms, cache_rate=preload)
     return dataset_
 
-@SELFLEARNING_DATASETS.register('NIHXray','2D')
+@SELFLEARNING_DATASETS.register('NIHXray','2D',"/homes/clwang/Data/NIH-CXR_TRAIN_VAL_LIST.json")
 def get_NIHXray_dataset(files_list, phase, opts):
     in_channels=opts.get('input_nc', 1)
     preload=opts.get('preload', 1.0)

@@ -1,6 +1,6 @@
 import os, sys, time, torch, random, tqdm
 import numpy as np
-from utils_cw import Print, load_h5
+from utils_cw import Print, load_h5, check_dir
 import nibabel as nib
 
 from scipy.ndimage.morphology import binary_dilation
@@ -15,21 +15,20 @@ from monai.transforms import *
 
 from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 
-def get_kits_dataset(files_list,
-                     phase,
-                     spacing=[],
-                     winlevel=[-80,304],
-                     in_channels=1,
-                     image_size=None,
-                     crop_size=None, 
-                     preload=1.0, 
-                     augment_ratio=0.4, 
-                     downsample=1, 
-                     orientation='LPI',
-                     cache_dir='./',
-                     verbose=False
-                    ):
-    #data_reader = LoadHdf5d(keys=["image","label"], h5_keys=["data","label"], dtype=[np.float32, np.int64])
+@SEGMENTATION_DATASETS.register('kits','3D','/MRIData/kits19/data/train_data_list.json')
+def get_kits_dataset(files_list, phase, opts):
+    spacing=opts.get('spacing', [])
+    winlevel=opts.get('winlevel', [-80,304])
+    in_channels=opts.get('input_nc', 1)
+    image_size=opts.get('image_size', None)
+    crop_size=opts.get('crop_size', None)
+    preload=opts.get('preload', 1.0)
+    augment_ratio=opts.get('augment_ratio', 0.4)
+    downsample=opts.get('downsample', 1)
+    orientation=opts.get('orientation', 'LPI')
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
+    verbose=False
+    
     data_reader = LoadNiftid(keys=["image","label"], dtype=np.float32)
 
     if spacing:

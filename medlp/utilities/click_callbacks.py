@@ -107,7 +107,7 @@ def split_input_str_(value):
 
 def _prompt(prompt_str, data_type, default_value, value_proc=None):
     return click.prompt('\tInput {}'.format(prompt_str),\
-                            type=data_type, default=default_value, value_proc=value_proc)
+                        type=data_type, default=default_value, value_proc=value_proc)
 
 def lr_schedule_params(ctx, param, value):
     if ctx.params.get('lr_policy_params', None) is not None: #loaded config from specified file
@@ -155,21 +155,16 @@ def model_select(ctx, param, value):
     return value
 
 def data_select(ctx, param, value):
-    from medlp.data_io import (
-        CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS, SELFLEARNING_DATASETS, MULTITASK_DATASETS
-    )
-    data_dict = {
-        'segmentation':SEGMENTATION_DATASETS,
-        'classification':CLASSIFICATION_DATASETS,
-        'selflearning':SELFLEARNING_DATASETS,
-        'multitask':MULTITASK_DATASETS
-    }
-    datalist = list(data_dict[ctx.params['framework']][ctx.params['tensor_dim']].keys())
-    assert len(datalist) > 0, f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
-    ctx.params['data_list'] = click.prompt('Data list', type=click.Choice(datalist, show_index=True))
-    
-    return value
+    from medlp.data_io import DATASET_MAPPING
 
+    datalist = list(DATASET_MAPPING[ctx.params['framework']][ctx.params['tensor_dim']].keys())
+    datalist = list(filter( lambda x : 'fpath' not in x, datalist )) #! Not good
+    assert len(datalist) > 0, f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
+
+    if value is not None and value in datalist:
+        return value
+    else:
+        return click.prompt('Data list', type=click.Choice(datalist, show_index=True))
 
 
 def common_params(func):
