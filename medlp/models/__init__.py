@@ -6,15 +6,16 @@ import numpy as np
 
 import torch
 from utils_cw.utils import get_items_from_file
-from medlp.models.cnn.unet3d import UNet3D
-from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn, vgg9_bn
-from medlp.models.cnn.resnet import resnet18, resnet34, resnet50
-from medlp.models.cnn.scnn import SCNN
+# from medlp.models.cnn.unet3d import UNet3D
+# from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn, vgg9_bn
+# from medlp.models.cnn.resnet import resnet18, resnet34, resnet50
+# from medlp.models.cnn.scnn import SCNN
+# from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
 from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
-from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from medlp.models.cnn import ARCHI_MAPPING
 #from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
@@ -71,11 +72,10 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
 
 def get_network(opts):
-    assert hasattr(opts,'model_type') and hasattr(opts,'input_nc') and \
+    assert hasattr(opts,'model_name') and hasattr(opts,'input_nc') and \
            hasattr(opts, 'tensor_dim') and hasattr(opts,'output_nc')
 
-    archi = opts.model_type
-    framework_type = opts.framework
+    model_name = opts.model_name
     in_channels, out_channels = opts.input_nc, opts.output_nc
     is_deconv = get_attr_(opts, 'is_deconv', False)
     f_maps = get_attr_(opts, 'n_features', 64)
@@ -89,15 +89,14 @@ def get_network(opts):
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
 
-    model = get_model_instance(archi, opts.tensor_dim)
-    assert model is not None, f"Cannot get your network {archi} for {opts.tensor_dim}"
+    model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
 
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
                  np.any(np.less_equal(crop_size,0)) else crop_size
 
-    if archi == 'unet' or archi == 'res-unet':
-        last_act = 'sigmoid' if framework_type == 'selflearning' else None
+    if model_name == 'unet' or model_name == 'res-unet':
+        last_act = 'sigmoid' if opts.framework == 'selflearning' else None
         n_depth = 5 if n_depth == -1 else n_depth
         kernel_size = (3,)+(3,)*n_depth
         strides = (1,)+(2,)*n_depth
@@ -113,11 +112,11 @@ def get_network(opts):
             upsample_kernel_size=upsample_kernel_size,
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
-            res_block=(archi=='res-unet'),
+            res_block=(model_name=='res-unet'),
             last_activation=last_act,
             is_prunable=is_prunable
         )
-    elif archi == 'unetv2' or archi == 'res-unetv2':
+    elif model_name == 'unetv2' or model_name == 'res-unetv2':
         init_feat = get_attr_(opts, 'n_features', 64)
         n_depth = 5 if n_depth == -1 else n_depth
         strides = (2,)*(n_depth-1)
@@ -132,12 +131,12 @@ def get_network(opts):
             strides=strides,
             kernel_size = 3,
             up_kernel_size = 3,
-            num_res_units = 2 if archi=='res-unet' else 0,
+            num_res_units = 2 if model_name=='res-unet' else 0,
             act='prelu',
             norm=layer_norm,
             dropout=0,
         )
-    elif archi == 'highresnet':
+    elif model_name == 'highresnet':
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -146,7 +145,7 @@ def get_network(opts):
             acti_type=Activation.RELU,
             dropout_prob=0.5,
         )
-    elif archi == 'scnn':
+    elif model_name == 'scnn':
         model = model(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -155,17 +154,17 @@ def get_network(opts):
             is_deconv=is_deconv,
             use_dilated_conv=True,
             pretrained=load_imagenet)
-    elif 'vgg' in archi:
+    elif 'vgg' in model_name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels,
                       dim=dim,
                       is_prunable=is_prunable)
-    elif 'resnet' in archi:
+    elif 'resnet' in model_name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
-    elif archi == 'vnet':
+    elif model_name == 'vnet':
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -174,21 +173,21 @@ def get_network(opts):
             dropout_prob=0.5,
             dropout_dim=dim,
         )
-    elif archi in RCNN_MODEL_TYPES:
+    elif model_name in RCNN_MODEL_TYPES:
         pass
-        # config_file = get_rcnn_config(archi, opts.backbone)
+        # config_file = get_rcnn_config(model_name, opts.backbone)
         # assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
         # config_content = get_items_from_file(config_file, format='yaml')
         # model = GeneralizedRCNN(config_content)
     else:
-        raise ValueError(f'Model {archi} not available')  
+        raise ValueError(f'Model {model_name} not available')  
 
     return model
 
 
 def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     # Print the model type
-    print('\nInitialising model {}'.format(opts.model_type))
+    print('\nInitialising model {}'.format(opts.model_name))
     weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
     valid_interval = get_attr_(opts, 'valid_interval', 5)
 

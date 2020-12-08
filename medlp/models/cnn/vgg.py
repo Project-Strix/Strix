@@ -4,6 +4,7 @@ from typing import Callable
 from torchvision.models.utils import load_state_dict_from_url
 import numpy as np
 
+from medlp.models.cnn import CLASSIFICATION_ARCHI
 from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
 from monai.networks.layers.prunable_conv import PrunableLinear
 
@@ -144,6 +145,7 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
 
     return model
 
+
 def vgg9(pretrained=False, progress=True, **kwargs):
     r"""VGG 9-layer model (configuration "S") for small size dataset
     Args:
@@ -152,6 +154,7 @@ def vgg9(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg11', 'S', False, pretrained, progress, **kwargs)
 
+@CLASSIFICATION_ARCHI.register('3D','vgg9_bn')
 def vgg9_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 9-layer model (configuration "S") with batch normalization for small size dataset
     Args:
@@ -159,6 +162,7 @@ def vgg9_bn(pretrained=False, progress=True, **kwargs):
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vgg('vgg11', 'S', True, pretrained, progress, **kwargs)
+
 
 def vgg11(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") from
@@ -171,6 +175,7 @@ def vgg11(pretrained=False, progress=True, **kwargs):
     return _vgg('vgg11', 'A', False, pretrained, progress, **kwargs)
 
 
+@CLASSIFICATION_ARCHI.register('2D','vgg11_bn')
 def vgg11_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_
@@ -192,7 +197,7 @@ def vgg13(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg13', 'B', False, pretrained, progress, **kwargs)
 
-
+@CLASSIFICATION_ARCHI.register('2D','vgg13_bn')
 def vgg13_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 13-layer model (configuration "B") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_

@@ -45,7 +45,7 @@ def get_trained_models(exp_folder):
     return str(files[selected])
 
 def get_exp_name(ctx, param, value):
-    model_name = ctx.params['model_type']
+    model_name = ctx.params['model_name']
     datalist_name = str(ctx.params['data_list'])
     partial_data = '-partial' if 'partial' in ctx.params and ctx.params['partial'] < 1 else ''
     
@@ -141,16 +141,27 @@ def loss_params(ctx, param, value):
     return value
 
 def model_select(ctx, param, value):
-    if value in ['vgg13', 'vgg16', 'resnet18', 'resnet34','resnet50']:
-        ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
-        if ctx.params['load_imagenet']:
-            ctx.params['input_nc'] = 3
-    elif value == 'unet':
-        ctx.params['deep_supervision'] = click.confirm("Whether use deep supervision?", default=False, abort=False, show_default=True)
-        if ctx.params['deep_supervision']:
-            ctx.params['deep_supr_num'] = click.prompt("Num of deep supervision?", default=1, type=int, show_default=True)
+    from medlp.models.cnn import ARCHI_MAPPING
+
+    archilist = list(ARCHI_MAPPING[ctx.params['framework']][ctx.params['tensor_dim']].keys())
+    assert len(archilist) > 0, f"No architecture available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
+
+    if value is not None and value in archilist:
+        return value
     else:
-        pass
+        return click.prompt('Model list', type=click.Choice(archilist, show_index=True))
+    
+    #! How to handle?
+    # if value in ['vgg13', 'vgg16', 'resnet18', 'resnet34','resnet50']:
+    #     ctx.params['load_imagenet'] = click.confirm("Whether load pretrained ImageNet model?", default=False, abort=False, show_default=True)
+    #     if ctx.params['load_imagenet']:
+    #         ctx.params['input_nc'] = 3
+    # elif value == 'unet':
+    #     ctx.params['deep_supervision'] = click.confirm("Whether use deep supervision?", default=False, abort=False, show_default=True)
+    #     if ctx.params['deep_supervision']:
+    #         ctx.params['deep_supr_num'] = click.prompt("Num of deep supervision?", default=1, type=int, show_default=True)
+    # else:
+    #     pass
 
     return value
 
@@ -212,7 +223,7 @@ def solver_params(func):
     return wrapper
 
 def network_params(func):
-    @click.option('--model-type', prompt=True, type=click.Choice(FCN_MODEL_TYPES+CNN_MODEL_TYPES,show_index=True), callback=model_select, default=1, help='CNN Model type')
+    @click.option('--model-name', type=str, callback=model_select, default=None, help='Select deeplearning model')
     @click.option('-L', '--criterion', prompt=True, type=click.Choice(LOSSES,show_index=True), callback=loss_params, default=0, help='loss criterion type')
     @click.option('--image-size', prompt=True, type=DynamicTuple(int), default=(0,0), help='Input Image size')
     @click.option('--crop-size', prompt=True, type=DynamicTuple(int), default=(0,0), help='Crop patch size')

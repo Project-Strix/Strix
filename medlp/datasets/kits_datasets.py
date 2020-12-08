@@ -15,7 +15,7 @@ from monai.transforms import *
 
 from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 
-@SEGMENTATION_DATASETS.register('kits','3D','/MRIData/kits19/data/train_data_list.json')
+@SEGMENTATION_DATASETS.register('3D','kits','/MRIData/kits19/data/train_data_list.json')
 def get_kits_dataset(files_list, phase, opts):
     spacing=opts.get('spacing', [])
     winlevel=opts.get('winlevel', [-80,304])

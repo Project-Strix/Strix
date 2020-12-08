@@ -5,7 +5,7 @@
     
     from medlp.data_io import CLASSIFICATION_DATASETS
 
-    @CLASSIFICATION_DATASETS.register('my_dataset', '2D', '\homes\my_dataset_fname.json')
+    @CLASSIFICATION_DATASETS.register('2D', 'my_dataset', '\homes\my_dataset_fname.json')
     def get_my_dataset(files_list, phase, opts):
         # Get parameters you need for creating your dataset
         preload=opts.get('preload', 1.0)
@@ -32,8 +32,8 @@ In the given example, `my_dataset` has been registered to a `2D classification` 
 
 ### If you want reuse your dataset function for multiple dataset. You can add multiple decorators like:
 
-    @CLASSIFICATION_DATASETS.register('my_dataset', '2D', '\homes\my_dataset_fname.json')
-    @CLASSIFICATION_DATASETS.register('my_dataset_2', '2D', '\homes\my_dataset_fname_2.json')
+    @CLASSIFICATION_DATASETS.register('2D', 'my_dataset', '\homes\my_dataset_fname.json')
+    @CLASSIFICATION_DATASETS.register('2D', 'my_dataset_2', '\homes\my_dataset_fname_2.json')
     def get_my_dataset(files_list, phase, opts):
         pass
 

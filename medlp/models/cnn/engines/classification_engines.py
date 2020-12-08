@@ -59,7 +59,7 @@ def build_classification_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
-    assert_network_type(opts.model_type, 'CNN')
+    assert_network_type(opts.model_name, 'CNN')
 
     if opts.criterion in ['BCE','WBCE']:
         prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32))
@@ -160,7 +160,7 @@ def build_classification_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
 
-    assert_network_type(opts.model_type, 'CNN')
+    assert_network_type(opts.model_name, 'CNN')
 
     post_transform = Compose([
         ActivationsD(keys="pred", sigmoid=True),
@@ -249,7 +249,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc>1
 
-    assert_network_type(opts.model_type, 'CNN')
+    assert_network_type(opts.model_name, 'CNN')
 
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
     cv_folders = filter(lambda x : x.is_dir() , cv_folders)

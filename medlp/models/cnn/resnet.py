@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Callable
 from torchvision.models.utils import load_state_dict_from_url
+from medlp.models.cnn import CLASSIFICATION_ARCHI
 from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -258,7 +259,8 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
 
     return model
 
-
+@CLASSIFICATION_ARCHI.register('2D','resnet18')
+@CLASSIFICATION_ARCHI.register('3D','resnet18')
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -270,7 +272,8 @@ def resnet18(pretrained=False, progress=True, **kwargs):
     return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
                    **kwargs)
 
-
+@CLASSIFICATION_ARCHI.register('2D','resnet34')
+@CLASSIFICATION_ARCHI.register('3D','resnet34')
 def resnet34(pretrained=False, progress=True, **kwargs):
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -282,7 +285,8 @@ def resnet34(pretrained=False, progress=True, **kwargs):
     return _resnet('resnet34', BasicBlock, [3, 4, 6, 3], pretrained, progress,
                    **kwargs)
 
-
+@CLASSIFICATION_ARCHI.register('2D','resnet50')
+@CLASSIFICATION_ARCHI.register('3D','resnet50')
 def resnet50(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_

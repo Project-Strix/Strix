@@ -59,7 +59,7 @@ def build_segmentation_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
-    assert_network_type(opts.model_type, 'FCN')
+    assert_network_type(opts.model_name, 'FCN')
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
@@ -176,7 +176,7 @@ def build_segmentation_test_engine(**kwargs):
     else:
         print('---Use simple infer!---')
 
-    assert_network_type(opts.model_type, 'FCN')
+    assert_network_type(opts.model_name, 'FCN')
 
     if opts.output_nc == 1:
         post_transforms = Compose(

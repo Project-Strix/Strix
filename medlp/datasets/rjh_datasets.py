@@ -8,13 +8,7 @@ from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
 from medlp.data_io.base_dataset.classification_dataset import SupervisedClassificationDataset3D
 from medlp.utilities.utils import is_avaible_size
-from medlp.utilities.transforms import (LabelMorphologyD, 
-                                        DataLabellingD, 
-                                        RandMarginalCropByMaskD, 
-                                        RandMarginalCrop2DByMaskD, 
-                                        RandLabelToMaskD, 
-                                        MaskIntensityExD
-                                        )
+from medlp.utilities.transforms import LabelMorphologyD, DataLabellingD, RandLabelToMaskD, MaskIntensityExD
 
 import monai
 from monai.config import IndexSelection, KeysCollection
@@ -25,7 +19,7 @@ from monai.transforms import *
 
 
 #win width: 1130.0, 19699.0
-@SEGMENTATION_DATASETS.register('rjh_tswi', '3D', 
+@SEGMENTATION_DATASETS.register('3D','rjh_tswi', 
     "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json")
 def get_rjh_tswi_seg_dataset(files_list, phase, opts):
     spacing=(0.667,0.667,1.34)
@@ -85,7 +79,7 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
     return dataset
 
 
-@SEGMENTATION_DATASETS.register('rjh_swim', '3D', 
+@SEGMENTATION_DATASETS.register('3D','rjh_swim', 
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
     spacing=(0.666667,0.666667,2)
@@ -142,7 +136,7 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
     return dataset
 
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D', 
+@CLASSIFICATION_DATASETS.register('3D','rjh_tswi', 
     "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
 def get_rjh_tswi_cls_datasetV2(files_list, phase, opts):
     spacing=opts.get('spacing', (0.66667,0.66667,1.34))
@@ -207,7 +201,7 @@ def get_rjh_tswi_cls_datasetV2(files_list, phase, opts):
     return dataset
 
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D', 
+@CLASSIFICATION_DATASETS.register('2D','rjh_tswi', 
     "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
 def get_rjh_tswi_cls_dataset2D(files_list, phase, opts):
     spacing=opts.get('spacing', (0.667,0.667,1.34))

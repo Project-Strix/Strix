@@ -14,9 +14,13 @@ from typing import List, Optional, Sequence, Union
 
 import torch.nn as nn
 
+from medlp.models.cnn import SEGMENTATION_ARCHI, SELFLEARNING_ARCHI
 from medlp.models.cnn.blocks.dynunet_block import *
 
-
+@SEGMENTATION_ARCHI.register('2D','unet')
+@SEGMENTATION_ARCHI.register('3D','unet')
+@SELFLEARNING_ARCHI.register('2D','unet')
+@SELFLEARNING_ARCHI.register('3D','unet')
 class DynUNet(nn.Module):
     """
     This reimplementation of a dynamic UNet (DynUNet) is based on:

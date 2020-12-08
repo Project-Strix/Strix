@@ -114,19 +114,6 @@ def initialize_weights(net, init_type='normal', gain=0.02):
     print('initialize network with %s' % init_type)
     net.apply(init_func)
 
-def import_module(name, path):
-    """
-    correct way of importing a module dynamically in python 3.
-    :param name: name given to module instance.
-    :param path: path to module.
-    :return: module: returned module instance.
-    """
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 
 ############################################################
 #  Bounding Boxes

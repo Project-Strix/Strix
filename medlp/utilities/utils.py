@@ -56,20 +56,21 @@ def get_network_type(name):
         if name in v:
             return k
 
-def assert_network_type(model_type, target_type):
-    assert get_network_type(model_type) == target_type, f"Only accept {target_type} arch: {NETWORK_TYPES[target_type]}"
+def assert_network_type(model_name, target_type):
+    assert get_network_type(model_name) == target_type, f"Only accept {target_type} arch: {NETWORK_TYPES[target_type]}"
 
 def _register_generic(module_dict, module_name, module):
     assert module_name not in module_dict
     module_dict[module_name] = module
 
-def _register_generic_dim(module_dict, module_name, dim, module):
+def _register_generic_dim(module_dict, dim, module_name, module):
     assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
     module_dict[dim].update({module_name:module})
 
-def _register_generic_data(module_dict, module_name, dim, fpath, module):
+def _register_generic_data(module_dict, dim, module_name, fpath, module):
     assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
     module_dict[dim].update({module_name:module, module_name+"_fpath":fpath})
+
 
 def is_avaible_size(value):
     if isinstance(value, (list, tuple)):
@@ -147,17 +148,17 @@ class DimRegistry(dict):
         self['2D'] = {}
         self['3D'] = {}
 
-    def register(self, module_name, dim, module=None):
+    def register(self, dim, module_name, module=None):
         assert dim in ['2D', '3D', '2', '3', 2, 3], "Only support 2D&3D dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
-            _register_generic_dim(self, module_name, dim, module)
+            _register_generic_dim(self, dim, module_name, module)
             return
 
         # used as decorator
         def register_fn(fn):
-            _register_generic_dim(self, module_name, dim, fn)
+            _register_generic_dim(self, dim, module_name, fn)
             return fn 
         return register_fn
     
@@ -166,19 +167,18 @@ class DatasetRegistry(DimRegistry):
     def __init__(self, *args, **kwargs):
         super(DatasetRegistry, self).__init__(*args, **kwargs)
     
-    def register(self, module_name, dim, fpath, module=None):
+    def register(self, dim, module_name, fpath, module=None):
         assert dim in ['2D', '3D', '2', '3', 2, 3], "Only support 2D&3D dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
-            _register_generic_data(self, module_name, dim, fpath, module)
+            _register_generic_data(self, dim, module_name, fpath, module)
             return
 
         # used as decorator
         def register_fn(fn):
-            _register_generic_data(self, module_name, dim, fpath, fn)
+            _register_generic_data(self, dim, module_name, fpath, fn)
             return fn 
         return register_fn
-
 
 

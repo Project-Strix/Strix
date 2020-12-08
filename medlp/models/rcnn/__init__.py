@@ -33,7 +33,7 @@
 #     model_dir = kwargs['model_dir']
 #     logger_name = kwargs.get('logger_name', None)
 
-#     assert_network_type(opts.model_type, 'RCNN')
+#     assert_network_type(opts.model_name, 'RCNN')
     
 #     prepare_batch_fn = lambda x : (x["image"], x["target"])
 #     key_metric_transform_fn = lambda x : (x["pred"], x["target"])
