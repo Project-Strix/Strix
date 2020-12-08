@@ -8,7 +8,13 @@ from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
 from medlp.data_io.base_dataset.classification_dataset import SupervisedClassificationDataset3D
 from medlp.utilities.utils import is_avaible_size
-from medlp.utilities.transforms import LabelMorphologyD, DataLabellingD, MarginalCropByMaskD
+from medlp.utilities.transforms import (LabelMorphologyD, 
+                                        DataLabellingD, 
+                                        RandMarginalCropByMaskD, 
+                                        RandMarginalCrop2DByMaskD, 
+                                        RandLabelToMaskD, 
+                                        MaskIntensityExD
+                                        )
 
 import monai
 from monai.config import IndexSelection, KeysCollection
@@ -134,16 +140,15 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D', 
-    "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
+
 def get_rjh_tswi_cls_dataset(files_list, phase, opts):
-    spacing=(0.666667,0.666667,1.34),
-    in_channels=opts.get('input_nc', 1),
-    crop_size=opts.get('crop_size', (32,32,16)),
-    preload=opts.get('preload', 0),
-    augment_ratio=opts.get('augment_ratio', 0.4),
-    orientation='RAI',
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches'),
+    spacing=(0.666667,0.666667,1.34)
+    in_channels=opts.get('input_nc', 1)
+    crop_size=opts.get('crop_size', (32,32,16))
+    preload=opts.get('preload', 0)
+    augment_ratio=opts.get('augment_ratio', 0.4)
+    orientation='RAI'
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
 
     assert in_channels == 1, 'Currently only support single channel input'
     if phase == 'train':
@@ -166,10 +171,75 @@ def get_rjh_tswi_cls_dataset(files_list, phase, opts):
         loader = LoadNiftid(keys=["image","mask"], dtype=np.float32),
         channeler = AsChannelFirstD(keys=["image", "mask"]),
         orienter=Orientationd(keys=['image','mask'], axcodes=orientation),
-        spacer=None, #SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
+        spacer=SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
         resizer=None,
-        rescaler=None,
-        cropper=[MarginalCropByMaskD(keys='image',mask_key='mask',label_key='label',margin_size=(5,5,2)), Resized(keys=["image","mask"], spatial_size=crop_size)],
+        rescaler=NormalizeIntensityD(keys='image'),
+        cropper=[RandMarginalCropByMaskD(keys='image',mask_key='mask',label_key='label',margin_size=(4,4,2),divide_by_k=2), 
+                 Resized(keys=["image","mask"], spatial_size=crop_size)],
+        additional_transforms=additional_transforms,
+        caster=CastToTyped(keys="image", dtype=np.float32),
+        to_tensor=ToTensord(keys=["image"]),
+        preload=preload,
+        cache_dir=cache_dir,
+    ).get_dataset()
+
+    return dataset
+
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '3D', 
+    "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
+def get_rjh_tswi_cls_datasetV2(files_list, phase, opts):
+    spacing=opts.get('spacing', (0.66667,0.66667,1.34))
+    in_channels=opts.get('input_nc', 1)
+    crop_size=opts.get('crop_size', (32,32,16))
+    preload=opts.get('preload', 0)
+    augment_ratio=opts.get('augment_ratio', 0.4)
+    orientation=opts.get('orientation','RAI')
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
+
+    assert in_channels == 1, 'Currently only support single channel input'
+
+    cropper = [
+        RandLabelToMaskD(keys="mask", select_labels=[1,2], cls_label_key='label'),
+        CropForegroundD(keys=["image","mask"], source_key="mask", margin=(5,5,2)),
+        ResizeWithPadOrCropD(keys=["image","mask"], spatial_size=crop_size),
+        Rand3DElasticD(keys="mask", prob=augment_ratio, sigma_range=(6,8), 
+                       magnitude_range=(50,80), mode="nearest", padding_mode='zeros'),
+        MaskIntensityExD(keys="image", mask_key="mask"),
+        ]
+
+    if phase == 'train':
+        additional_transforms = [
+            #RandFlipD(keys=["image","mask"], prob=augment_ratio, spatial_axis=[2]),
+            RandRotate90D(keys=["image","mask"], prob=augment_ratio, max_k=3),
+        ]
+    elif phase == 'valid':
+        additional_transforms = []
+    elif phase == 'test':
+        additional_transforms = []
+        cropper = [
+            RandLabelToMaskD(keys="mask", select_labels=[1,2], cls_label_key='label', select_msk_label=2), 
+            CropForegroundD(keys=["image","mask"], source_key="mask", margin=(5,5,2)),
+            ResizeWithPadOrCropD(keys=["image","mask"], spatial_size=crop_size),
+            MaskIntensityExD(keys="image", mask_key="mask"),
+        ]
+    elif phase == 'test_wo_label':
+        raise NotImplementedError
+
+
+    dataset = SupervisedClassificationDataset3D(
+        files_list,
+        loader = LoadNiftid(keys=["image","mask"], dtype=np.float32),
+        channeler = AddChanneld(keys=["image","mask"]),
+        orienter=Orientationd(keys=['image','mask'], axcodes=orientation),
+        spacer=SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
+        resizer=None,
+        rescaler=[
+            NormalizeIntensityD(keys='image'),
+            #ScaleIntensityRangePercentilesD(keys='image',lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
+            LabelMorphologyD(keys='mask',mode='closing', radius=2,binary=False),
+            LabelMorphologyD(keys='mask',mode='dilation',radius=1,binary=False),
+            ],
+        cropper=cropper,
         additional_transforms=additional_transforms,
         caster=CastToTyped(keys="image", dtype=np.float32),
         to_tensor=ToTensord(keys=["image"]),
@@ -180,8 +250,59 @@ def get_rjh_tswi_cls_dataset(files_list, phase, opts):
     return dataset
 
 
-@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D', None)
-@CLASSIFICATION_DATASETS.register('rjh_tswi_2', '2D', None)
-def get_rjh_dataset2(files_list, phase, opts):
-    raise NotImplementedError
+@CLASSIFICATION_DATASETS.register('rjh_tswi', '2D', 
+    "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
+def get_rjh_tswi_cls_dataset2D(files_list, phase, opts):
+    spacing=opts.get('spacing', (0.667,0.667,1.34))
+    in_channels=opts.get('input_nc', 1)
+    image_size=opts.get('image_size', (96,96))
+    crop_size=opts.get('crop_size', (48,48))
+    preload=opts.get('preload', 0)
+    augment_ratio=opts.get('augment_ratio', 0.4)
+    orientation=opts.get('orientation', 'RAI')
+    cache_dir=check_dir(opts.get('experiment_path'),'caches')
+
+    assert in_channels in [1,3], 'Currently only support 1&3 channel input'
+
+    neighbor_slice = (in_channels-1)//2
+    cropper = [RandMarginalCrop2DByMaskD(keys='image',mask_key='mask',label_key='label',crop_size=crop_size,neighbor_slices=neighbor_slice,keep_largest=True),
+               SqueezeDimD(keys=['image','mask']), 
+               AsChannelFirstD(keys=['image','mask'])]
+    if is_avaible_size(image_size):
+        cropper += [ResizeWithPadOrCropD(keys=['image','mask'],spatial_size=image_size)]
+
+    if phase == 'train':
+        additional_transforms = [
+            RandFlipD(keys=["image","mask"], prob=augment_ratio, spatial_axis=0),
+            RandRotateD(keys=["image","mask"], range_x=math.pi/40, range_y=math.pi/40, prob=augment_ratio, padding_mode='reflection'),
+        ]
+    elif phase == 'valid':
+        additional_transforms = []
+    elif phase == 'test':
+        additional_transforms = []
+        cropper = [RandMarginalCrop2DByMaskD(keys='image', mask_key='mask',label_key='label',crop_size=crop_size,neighbor_slices=neighbor_slice,keep_largest=True,select_msk=1),
+                   SqueezeDimD(keys=['image','mask']), 
+                   AsChannelFirstD(keys=['image','mask'])]
+        if is_avaible_size(image_size):
+            cropper += [ResizeWithPadOrCropD(keys=['image','mask'],spatial_size=image_size)]
+    elif phase == 'test_wo_label':
+        raise NotImplementedError
+
+    dataset = SupervisedClassificationDataset3D(
+        files_list,
+        loader = LoadNiftid(keys=["image","mask"], dtype=np.float32),
+        channeler = [AddChanneld(keys="image"), AsChannelFirstD(keys="mask")],
+        orienter=Orientationd(keys=['image','mask'], axcodes=orientation),
+        spacer=SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
+        resizer=None,
+        rescaler=NormalizeIntensityD(keys='image'),
+        cropper=cropper, 
+        additional_transforms=additional_transforms,
+        caster=CastToTyped(keys=["image","mask"], dtype=[np.float32,np.int16]),
+        to_tensor=ToTensord(keys=["image"]),
+        preload=preload,
+        cache_dir=cache_dir,
+    ).get_dataset()
+
+    return dataset
 
