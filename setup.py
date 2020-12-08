@@ -61,13 +61,10 @@ setup(name='medlp',
             "numpy",
             "scikit-learn",
             "nibabel",
-            "nni",
-            "utils_cw"
-            "monai"
-      ],
-      dependency_links=[
-          "git+git@https://github.com/ChenglongWang/py_utils_cw.git@0.5.1"
-          "git+git@https://github.com/ChenglongWang/MONAI.git#egg=monai"
+            #"nni",
+            "pytorch-ignite==0.4.2",
+            "monai @ git+https://gitlab.com/ChingRyu/MONAI@master#egg=monai",
+            "utils_cw @ git+https://github.com/ChenglongWang/py_utils_cw@master#egg=utils_cw",
       ],
       ext_modules=get_extensions(),
       cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},

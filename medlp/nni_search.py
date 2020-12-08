@@ -12,9 +12,12 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from ignite.engine import Events
 from monai.handlers import CheckpointLoader
+from monai.utils import optional_import, min_version
 
-import nni
-from nni.utils import merge_parameter
+#Need NII package
+nii, has_nii = optional_import("nii", "1.8", min_version)
+if has_nii:
+    from nni.utils import merge_parameter
 
 
 @click.command('train-nii')
