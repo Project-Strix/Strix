@@ -8,6 +8,7 @@ from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
+from medlp.utilities.handlers import TensorBoardImageHandlerEx
 
 from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai.engines import multi_gpu_supervised_trainer
@@ -30,7 +31,6 @@ from monai.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
-    MyTensorBoardImageHandler,
     ValidationHandler,
     LrScheduleHandler,
     LrScheduleTensorboardHandler,
@@ -78,7 +78,7 @@ def build_classification_engine(**kwargs):
             key_metric_n_saved=4,
             key_metric_save_after_epoch=100
         ),
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x : (None, None),
             output_transform=lambda x: x["image"],
@@ -124,7 +124,7 @@ def build_classification_engine(**kwargs):
         StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
         CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=None), #! 5
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x : (None, None),
             output_transform=lambda x: x["image"],

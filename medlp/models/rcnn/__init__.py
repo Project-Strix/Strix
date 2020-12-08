@@ -6,7 +6,7 @@
 #     StatsHandler,
 #     TensorBoardStatsHandler,
 #     TensorBoardImageHandler,
-#     MyTensorBoardImageHandler,
+#     TensorBoardImageHandlerEx,
 #     ValidationHandler,
 #     LrScheduleHandler,
 #     LrScheduleTensorboardHandler,
@@ -44,7 +44,7 @@
 #         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"], name=logger_name),
 #         CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
 #         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
-#         # MyTensorBoardImageHandler(
+#         # TensorBoardImageHandlerEx(
 #         #     summary_writer=writer, 
 #         #     batch_transform=lambda x: (x["image"], x["label"]), 
 #         #     output_transform=lambda x: x["pred"],

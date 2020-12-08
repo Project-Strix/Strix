@@ -4,7 +4,7 @@ import numpy as np
 from functools import partial
 
 import torch
-from medlp.utilities.handlers import NNIReporterHandler
+from medlp.utilities.handlers import NNIReporterHandler, TensorBoardImageHandlerEx
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
@@ -18,7 +18,6 @@ from monai.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
-    MyTensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
     CheckpointSaver
@@ -45,7 +44,7 @@ def build_selflearning_engine(**kwargs):
     val_handlers = [
         StatsHandler(output_transform=lambda x: None),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_loss"),
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
@@ -84,7 +83,7 @@ def build_selflearning_engine(**kwargs):
         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
         CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,

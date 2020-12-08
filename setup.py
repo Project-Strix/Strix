@@ -62,7 +62,12 @@ setup(name='medlp',
             "scikit-learn",
             "nibabel",
             "nni",
-            #"monai @ git+https://github.com/ChenglongWang/MONAI.git"
+            "utils_cw"
+            "monai"
+      ],
+      dependency_links=[
+          "git+git@https://github.com/ChenglongWang/py_utils_cw.git@0.5.1"
+          "git+git@https://github.com/ChenglongWang/MONAI.git#egg=monai"
       ],
       ext_modules=get_extensions(),
       cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},

@@ -8,6 +8,7 @@ from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
+from medlp.utilities.handlers import TensorBoardImageHandlerEx
 
 from monai.losses import DiceLoss
 from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
@@ -30,7 +31,6 @@ from monai.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
-    MyTensorBoardImageHandler,
     ValidationHandler,
     LrScheduleHandler,
     LrScheduleTensorboardHandler,
@@ -64,7 +64,7 @@ def build_segmentation_engine(**kwargs):
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
@@ -132,7 +132,7 @@ def build_segmentation_engine(**kwargs):
         StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"], name=logger_name),
         CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
-        MyTensorBoardImageHandler(
+        TensorBoardImageHandlerEx(
             summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,

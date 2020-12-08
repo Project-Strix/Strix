@@ -1,6 +1,6 @@
 # Datasets for MeDLP 
 
-### Here is a simple example for creating a dataset for MeDLP.
+### Here is a simple example for creating a custom dataset for MeDLP.
 
     
     from medlp.data_io import CLASSIFICATION_DATASETS
@@ -36,3 +36,6 @@ In the given example, `my_dataset` has been registered to a `2D classification` 
     @CLASSIFICATION_DATASETS.register('my_dataset_2', '2D', '\homes\my_dataset_fname_2.json')
     def get_my_dataset(files_list, phase, opts):
         pass
+
+
+### Notice that ONLY registered dataset can used in MeDLP. If you want remove one dataset, you can simply remove its decorator instead.

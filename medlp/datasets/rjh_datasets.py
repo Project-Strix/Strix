@@ -84,6 +84,7 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
 
     return dataset
 
+
 @SEGMENTATION_DATASETS.register('rjh_swim', '3D', 
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
@@ -140,50 +141,6 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-
-def get_rjh_tswi_cls_dataset(files_list, phase, opts):
-    spacing=(0.666667,0.666667,1.34)
-    in_channels=opts.get('input_nc', 1)
-    crop_size=opts.get('crop_size', (32,32,16))
-    preload=opts.get('preload', 0)
-    augment_ratio=opts.get('augment_ratio', 0.4)
-    orientation='RAI'
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
-
-    assert in_channels == 1, 'Currently only support single channel input'
-    if phase == 'train':
-        additional_transforms = [
-            RandFlipD(keys=["image","mask"], prob=augment_ratio, spatial_axis=[2]),
-            RandRotateD(keys=["image","mask"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='reflection'),
-            # Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(5,10),
-            #                magnitude_range=(50,150), mode=["bilinear","nearest"], padding_mode='zeros')
-        ]
-    elif phase == 'valid':
-        additional_transforms = []
-    elif phase == 'test':
-        additional_transforms = []
-    elif phase == 'test_wo_label':
-        raise NotImplementedError
-
-
-    dataset = SupervisedClassificationDataset3D(
-        files_list,
-        loader = LoadNiftid(keys=["image","mask"], dtype=np.float32),
-        channeler = AsChannelFirstD(keys=["image", "mask"]),
-        orienter=Orientationd(keys=['image','mask'], axcodes=orientation),
-        spacer=SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
-        resizer=None,
-        rescaler=NormalizeIntensityD(keys='image'),
-        cropper=[RandMarginalCropByMaskD(keys='image',mask_key='mask',label_key='label',margin_size=(4,4,2),divide_by_k=2), 
-                 Resized(keys=["image","mask"], spatial_size=crop_size)],
-        additional_transforms=additional_transforms,
-        caster=CastToTyped(keys="image", dtype=np.float32),
-        to_tensor=ToTensord(keys=["image"]),
-        preload=preload,
-        cache_dir=cache_dir,
-    ).get_dataset()
-
-    return dataset
 
 @CLASSIFICATION_DATASETS.register('rjh_tswi', '3D', 
     "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1130_1537-train.json")
