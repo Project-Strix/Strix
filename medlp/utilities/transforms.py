@@ -264,6 +264,23 @@ class ClaheD(MapTransform):
         return d
 
 
+class LabelToSeparateMask(Transform):
+    """
+    Different from monai's LabelToMask which transfrom select_labels to one non-zero mask.
+    LabelToSeparateMask transform each label to individual mask.
+    """
+    def __init__(  # pytype: disable=annotation-type-mismatch
+        self,
+        select_labels: Union[Sequence[int], int]
+    ) -> None:  # pytype: disable=annotation-type-mismatch
+        self.select_labels = ensure_tuple(select_labels)
+
+    def __call__(
+        self, img: np.ndarray, merge_channels: bool = False
+    ) -> np.ndarray:
+        raise NotImplementedError
+
+
 class RandLabelToMask(Randomizable, Transform):
     """
     Convert labels to mask for other tasks. A typical usage is to convert segmentation labels
