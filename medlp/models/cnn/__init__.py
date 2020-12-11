@@ -12,8 +12,8 @@ ARCHI_MAPPING = {
     'multitask':MULTITASK_ARCHI
     }
 
-from medlp.models.cnn.dynunet import DynUNet
-from medlp.models.cnn.resnet import *
-from medlp.models.cnn.scnn import SCNN
-from medlp.models.cnn.vgg import *
+from medlp.models.cnn.nets.dynunet import DynUNet
+from medlp.models.cnn.nets.resnet import *
+from medlp.models.cnn.nets.scnn import SCNN
+from medlp.models.cnn.nets.vgg import *
 
