@@ -39,8 +39,6 @@ def build_selflearning_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
-    assert_network_type(opts.model_name, 'FCN')
-
     val_handlers = [
         StatsHandler(output_transform=lambda x: None),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_loss"),

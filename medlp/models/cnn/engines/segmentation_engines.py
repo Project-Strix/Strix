@@ -59,8 +59,6 @@ def build_segmentation_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
-    assert_network_type(opts.model_name, 'FCN')
-
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
@@ -69,7 +67,8 @@ def build_segmentation_engine(**kwargs):
             batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,
-            prefix_name='Val'
+            prefix_name='Val',
+            overlap=False
         ),
         CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3)
     ]
@@ -136,7 +135,8 @@ def build_segmentation_engine(**kwargs):
             summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,
-            prefix_name='train'
+            prefix_name='train',
+            overlap=False
         ),
     ]
 

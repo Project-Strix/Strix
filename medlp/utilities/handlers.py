@@ -10,6 +10,7 @@ from monai.visualize import plot_2d_or_3d_image
 
 import torch
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
+from medlp.utilities.utils import add_3D_overlay_to_summary
 
 Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
 Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")
@@ -135,7 +136,8 @@ class TensorBoardImageHandlerEx(TensorBoardImageHandler):
         index: int = 0,
         max_channels: int = 1,
         max_frames: int = 64,
-        prefix_name: str = ''):
+        prefix_name: str = '',
+        overlap=False):
         super().__init__(
             summary_writer=summary_writer,
             log_dir=log_dir,
@@ -149,6 +151,7 @@ class TensorBoardImageHandlerEx(TensorBoardImageHandler):
             max_frames=max_frames
         )
         self.prefix_name = prefix_name
+        self.overlap = overlap
     
     def __call__(self, engine: Engine):
         step = self.global_iter_transform(engine.state.epoch if self.epoch_level else engine.state.iteration)
@@ -168,9 +171,12 @@ class TensorBoardImageHandlerEx(TensorBoardImageHandler):
         if show_labels is not None:
             if not isinstance(show_labels, np.ndarray):
                 raise ValueError("batch_transform(engine.state.batch)[1] must be an ndarray or tensor.")
-            plot_2d_or_3d_image(
-                show_labels, step, self._writer, self.index, self.max_channels, self.max_frames, self.prefix_name+"/input_1"
-            )
+            if self.overlap:
+                add_3D_overlay_to_summary(self._writer, show_labels[0], show_images[0], name=self.prefix_name+"/input_1_overlay")
+            else:
+                plot_2d_or_3d_image(
+                    show_labels, step, self._writer, self.index, self.max_channels, self.max_frames, self.prefix_name+"/input_1"
+                )
 
         show_outputs = self.output_transform(engine.state.output)
         if torch.is_tensor(show_outputs):
@@ -178,9 +184,12 @@ class TensorBoardImageHandlerEx(TensorBoardImageHandler):
         if show_outputs is not None:
             if not isinstance(show_outputs, np.ndarray):
                 raise ValueError("output_transform(engine.state.output) must be an ndarray or tensor.")
-            plot_2d_or_3d_image(
-                show_outputs, step, self._writer, self.index, self.max_channels, self.max_frames, self.prefix_name+"/output"
-            )
+            if self.overlap:
+                add_3D_overlay_to_summary(self._writer, show_outputs[0], show_images[0], name=self.prefix_name+"/output_overlap")
+            else:
+                plot_2d_or_3d_image(
+                    show_outputs, step, self._writer, self.index, self.max_channels, self.max_frames, self.prefix_name+"/output"
+                )
 
         self._writer.flush()
 

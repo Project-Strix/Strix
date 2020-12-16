@@ -191,7 +191,7 @@ def common_params(func):
     @click.option('--smooth', type=float, default=0, help='Smooth rate, disable:0')
     @click.option('--input-nc', type=int, default=1, help='input data channels')
     @click.option('--output-nc', type=int, default=3, help='output channels (classes)')
-    @click.option('--split', type=float, default=0.2, help='Training/testing split ratio')
+    @click.option('--split', type=float, default=0.1, help='Training/testing split ratio')
     @click.option('-W', '--pretrained-model-path', type=str, default='', help='pretrained model path')
     @click.option('--out-dir', type=str, prompt=True, show_default=True, default='/homes/clwang/Data/medlp_exp')
     @click.option('--augment-ratio', type=float, default=0.3, help='Data aug ratio.')
