@@ -21,6 +21,10 @@ from medlp.models.cnn.blocks.dynunet_block import *
 @SEGMENTATION_ARCHI.register('3D','unet')
 @SELFLEARNING_ARCHI.register('2D','unet')
 @SELFLEARNING_ARCHI.register('3D','unet')
+@SEGMENTATION_ARCHI.register('2D','res-unet')
+@SEGMENTATION_ARCHI.register('3D','res-unet')
+@SELFLEARNING_ARCHI.register('2D','res-unet')
+@SELFLEARNING_ARCHI.register('3D','res-unet')
 class DynUNet(nn.Module):
     """
     This reimplementation of a dynamic UNet (DynUNet) is based on:
