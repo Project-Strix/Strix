@@ -121,39 +121,6 @@ class SNIP_prune_handler:
         net_ = apply_prune_mask(self.net, keep_masks, self.device, self.verbose)
         # self.net.load_state_dict(net_.state_dict())
 
-
-class TensorboardGraph:
-    """
-    TensorboardGraph for visualize network architecture using tensorboard
-    """
-    def __init__(self,
-                 net,
-                 writer,
-                 output_transform: Callable = lambda x: x,
-                 logger_name: Optional[str] = None
-    ) -> None:
-        self.net = net
-        self.writer = writer
-        self.output_transform = output_transform
-        self.logger_name = logger_name
-        self.logger = logging.getLogger(logger_name)
-    
-    def attach(self, engine: Engine) -> None:
-        if self.logger_name is None:
-            self.logger = engine.logger
-        
-        engine.add_event_handler(Events.STARTED, self)
-
-    def __call__(self, engine: Engine) -> None:
-        inputs = self.output_transform(engine.state.output)
-        if inputs is not None:
-            try:
-                self.writer.add_graph(self.net, inputs[0:1,...], False)
-            except Exception as e:
-                self.logger.error(f'Error occurred when adding graph to tensorboard: {e}')
-        else:
-            self.logger.warn('No inputs are found! Skip adding graph!')
-
 class TorchVisualizer:
     """
     TorchVisualizer for visualize network architecture using PyTorchViz.

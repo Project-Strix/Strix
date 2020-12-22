@@ -9,7 +9,7 @@ import nibabel as nib
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.handlers import TensorboardGraph, SNIP_prune_handler
+from medlp.utilities.handlers import SNIP_prune_handler
 import medlp.utilities.click_callbacks as clb
 from medlp.utilities import enum
 
@@ -19,7 +19,7 @@ from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2,
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import CheckpointLoader
+from monai_ex.handlers import CheckpointLoader, TensorboardGraphHandler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 def train_core(cargs, files_train, files_valid):
@@ -60,7 +60,7 @@ def train_core(cargs, files_train, files_valid):
     if cargs.visualize:
         Print('Visualize the architecture to tensorboard', color='g')
         trainer.add_event_handler(event_name=Events.ITERATION_COMPLETED(once=1),
-                                  handler=TensorboardGraph(net, writer, lambda x:x['image']))
+                                  handler=TensorboardGraphHandler(net, writer, lambda x:x['image']))
 
     if cargs.snip:
         if cargs.snip_percent == 0.0 or cargs.snip_percent == 1.0:
