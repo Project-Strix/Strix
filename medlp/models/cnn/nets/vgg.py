@@ -5,8 +5,7 @@ from torchvision.models.utils import load_state_dict_from_url
 import numpy as np
 
 from medlp.models.cnn import CLASSIFICATION_ARCHI
-from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
-from monai.networks.layers.prunable_conv import PrunableLinear
+from monai_ex.networks.layers import Conv, Dropout, Norm, Pool, PrunableLinear
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',

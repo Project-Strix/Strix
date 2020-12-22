@@ -4,11 +4,9 @@ import random
 import torch
 import numpy as np
 
-from monai.config import IndexSelection, KeysCollection
-from monai.transforms.compose import Transform, MapTransform, Randomizable
-from monai.utils import ensure_tuple_rep, ensure_tuple, fall_back_tuple
-from monai.transforms.utils import map_binary_to_indices, generate_pos_neg_label_crop_centers
-from monai.transforms import SpatialCrop, MaskIntensity
+from monai_ex.config import KeysCollection
+from monai_ex.transforms import Transform, MapTransform, Randomizable, SpatialCrop
+from monai_ex.utils import ensure_tuple_rep, ensure_tuple
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
 from medlp.utilities.utils import is_avaible_size, bbox_2D, bbox_3D
@@ -70,109 +68,6 @@ class CoordToBoxListd(MapTransform):
         
         for key in self.keys:
             d[key] = self.converter(d[key], label=label_data, shape=self.image_shape, box_radius=self.radius)
-        return d
-
-
-class LabelMorphology(Transform):
-    def __init__(self, 
-                 mode: str,
-                 radius: int,
-                 binary: bool):
-        """
-        Args:
-            mode: morphology mode, e.g. 'closing', 'dilation', 'erosion', 'opening'
-            radius: radius of morphology operation.
-            binary: whether using binary morphology (for binary data)
-
-        """
-        self.mode = mode
-        self.radius = radius
-        self.binary = binary
-        assert self.mode in ['closing', 'dilation', 'erosion', 'opening'], \
-            f"Mode must be one of 'closing', 'dilation', 'erosion', 'opening', but got {self.mode}"
-
-    def __call__(self, 
-                 img: np.ndarray, 
-                 mode: Optional[str]=None,
-                 radius: Optional[int]=None,
-                 binary: Optional[bool]=None) -> np.ndarray:
-        """
-        Apply the transform to `img`.
-
-        """
-        self.mode = self.mode if mode is None else mode
-        self.radius = self.radius if radius is None else radius
-        self.binary = self.binary if binary is None else binary
-
-        input_ndim = img.squeeze().ndim # spatial ndim
-        if input_ndim == 2:
-            structure = ndi.generate_binary_structure(2, 1)
-        elif input_ndim == 3:
-            structure = ndi.generate_binary_structure(3, 1)
-        else:
-            raise ValueError('Currently only support 2D&3D data')
-        
-        channel_dim = None
-        if input_ndim != img.ndim:
-            channel_dim = img.shape.index(1)
-            img = img.squeeze()
-
-        if self.mode == 'closing':
-            if self.binary:
-                img = ndi.binary_closing(img, structure=structure, iterations=self.radius)
-            else:
-                for _ in range(self.radius):
-                    img = ndi.grey_closing(img, footprint=structure)        
-        elif self.mode == 'dilation':
-            if self.binary:
-                img = ndi.binary_dilation(img, structure=structure, iterations=self.radius)
-            else:
-                for _ in range(self.radius):
-                    img = ndi.grey_dilation(img, footprint=structure)
-        elif self.mode == 'erosion':
-            if self.binary:
-                img = ndi.binary_erosion(img, structure=structure, iterations=self.radius)
-            else:
-                for _ in range(self.radius):
-                    img = ndi.grey_erosion(img, footprint=structure)
-        elif self.mode == 'opening':
-            if self.binary:
-                img = ndi.binary_opening(img, structure=structure, iterations=self.radius)
-            else:
-                for _ in range(self.radius):
-                    img = ndi.grey_opening(img, footprint=structure)
-        else:
-            raise ValueError(f'Unexpected keyword {self.mode}')
-        
-        if channel_dim is not None:
-            return np.expand_dims(img, axis=channel_dim)
-        else:
-            return img
-
-class LabelMorphologyD(MapTransform):
-    """
-    Dictionary-based wrapper of :py:class:`DataMorphology`.
-    """
-
-    def __init__(
-        self,
-        keys: KeysCollection,
-        mode: str,
-        radius: int,
-        binary: bool,
-    ) -> None:
-        super().__init__(keys)
-        self.mode = ensure_tuple_rep(mode, len(self.keys))
-        self.radius = ensure_tuple_rep(radius, len(self.keys))
-        self.binary = ensure_tuple_rep(binary, len(self.keys))
-        self.converter = LabelMorphology('dilation', 0, True)
-
-    def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
-        d = dict(data)
-        for idx, key in enumerate(self.keys):
-            if self.radius[idx] <= 0:
-                continue
-            d[key] = self.converter(d[key], mode=self.mode[idx], radius=self.radius[idx], binary=self.binary[idx])
         return d
 
 
@@ -386,31 +281,5 @@ class RandLabelToMaskD(Randomizable, MapTransform):
         for key in self.keys:
             d[key] = self.converter(d[key], select_label=self.select_label)
 
-        return d
-
-class MaskIntensityExD(MapTransform):
-    """
-    Dictionary-based wrapper of :py:class:`monai.transforms.MaskIntensity`.
-
-    Args:
-        keys: keys of the corresponding items to be transformed.
-            See also: :py:class:`monai.transforms.compose.MapTransform`
-        mask_data: if mask data is single channel, apply to evey channel
-            of input image. if multiple channels, the channel number must
-            match input data. mask_data will be converted to `bool` values
-            by `mask_data > 0` before applying transform to input image.
-
-    """
-
-    def __init__(self, keys: KeysCollection, mask_key: KeysCollection) -> None:
-        super().__init__(keys)
-        self.mask_key = mask_key
-        self.converter = MaskIntensity(mask_data=None)
-
-    def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
-        d = dict(data)
-        mask_data = d[self.mask_key]
-        for key in self.keys:
-            d[key] = self.converter(d[key], mask_data=mask_data)
         return d
 

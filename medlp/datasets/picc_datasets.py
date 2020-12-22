@@ -7,12 +7,9 @@ import nibabel as nib
 from scipy.ndimage.morphology import binary_dilation
 from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
 
-import monai
-from monai.config import IndexSelection, KeysCollection
-from monai.data import CacheDataset, Dataset
-from monai.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
-from monai.transforms.utils import generate_pos_neg_label_crop_centers
-from monai.transforms import *
+from monai_ex.data import CacheDataset, Dataset
+from monai_ex.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
+from monai_ex.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
 from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
@@ -43,7 +40,7 @@ def PICC_dcm_seg_dataset(files_list, phase, opts):
     ignore_dcm_keys = ['0040|0244','0040|0245','0040|0253','0040|0254','0032|1060']
     dataset = SegmentationDataset2D(
         files_list,
-        loader=[LoadImageD(keys='image', drop_meta_keys=ignore_dcm_keys), LoadNiftiD(keys='label')],
+        loader=[LoadImageExD(keys='image', drop_meta_keys=ignore_dcm_keys), LoadNiftiD(keys='label')],
         channeler=TransposeD(keys='label'), #to match the axes of itk and numpy
         orienter=None,
         spacer=SpacingD(keys=["image","label"], pixdim=spacing),

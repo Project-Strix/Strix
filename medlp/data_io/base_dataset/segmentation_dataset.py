@@ -3,10 +3,9 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional, Sequence
 from utils_cw import Print
 
-from monai.data import CacheDataset, PersistentDataset
-from monai.transforms import *
-from monai.transforms.compose import MapTransform
-from monai.utils import ensure_list
+from monai_ex.data import CacheDataset, PersistentDataset
+from monai_ex.transforms import *
+from monai_ex.utils import ensure_list
 
 class BasicSegmentationDataset(object):
     def __init__(
@@ -90,7 +89,7 @@ class SupervisedSegmentationDataset2D(BasicSegmentationDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadPNGd(keys=["image","label"], grayscale=True),
+        loader: MapTransform = LoadPNGExd(keys=["image","label"], grayscale=True),
         channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
         orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
         spacer: Optional[MapTransform] = Spacingd(keys=["image","label"], pixdim=(0.1,0.1)),
@@ -136,7 +135,7 @@ class UnsupervisedSegmentationDataset2D(BasicSegmentationDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadPNGd(keys=["image"], grayscale=True),
+        loader: MapTransform = LoadPNGExd(keys=["image"], grayscale=True),
         channeler: Optional[MapTransform] = AddChanneld(keys=["image"]),
         orienter: Optional[MapTransform] = Orientationd(keys=['image'], axcodes='LPI'),
         spacer: Optional[MapTransform] = Spacingd(keys=["image"], pixdim=(0.1,0.1)),

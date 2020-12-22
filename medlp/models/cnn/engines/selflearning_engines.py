@@ -4,22 +4,23 @@ import numpy as np
 from functools import partial
 
 import torch
-from medlp.utilities.handlers import NNIReporterHandler, TensorBoardImageHandlerEx
+from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
-from medlp.models.cnn.utils import output_onehot_transform
+from medlp.models.cnn.nets.utils import output_onehot_transform
 
-from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import multi_gpu_supervised_trainer
+from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
 from ignite.metrics import MeanSquaredError
 
-from monai.handlers import (
+from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
+    TensorBoardImageHandlerEx,
     CheckpointSaver
 )
 

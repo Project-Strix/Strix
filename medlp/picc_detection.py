@@ -19,8 +19,8 @@ from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2,
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai.handlers import CheckpointLoader
-from monai.engines import SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.handlers import CheckpointLoader
+from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 def train_core(cargs, files_train, files_valid):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')

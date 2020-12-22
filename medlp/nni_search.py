@@ -11,8 +11,8 @@ import medlp.utilities.click_callbacks as clb
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from ignite.engine import Events
-from monai.handlers import CheckpointLoader
-from monai.utils import optional_import, min_version
+from monai_ex.handlers import CheckpointLoader
+from monai_ex.utils import optional_import, min_version
 
 #Need NII package
 nii, has_nii = optional_import("nii", "1.8", min_version)
