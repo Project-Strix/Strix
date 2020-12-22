@@ -3,6 +3,8 @@ from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Seque
 import random
 import torch
 import numpy as np
+from scipy import ndimage as ndi
+from skimage import exposure
 
 from monai_ex.config import KeysCollection
 from monai_ex.transforms import Transform, MapTransform, Randomizable, SpatialCrop
@@ -11,8 +13,6 @@ from monai_ex.utils import ensure_tuple_rep, ensure_tuple
 from medlp.models.rcnn.structures.bounding_box import BoxList
 from medlp.utilities.utils import is_avaible_size, bbox_2D, bbox_3D
 from utils_cw import get_connected_comp
-from scipy import ndimage as ndi
-from skimage import exposure
 
 class CoordToBoxList(Transform):
     """
