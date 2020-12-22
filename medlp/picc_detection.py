@@ -67,7 +67,7 @@ def train_core(cargs, files_train, files_valid):
             Print('Invalid snip_percent. Skip SNIP!', color='y')
         else:
             Print('Begin SNIP pruning', color='g')
-            snip_device = torch.device("cuda") #torch.device("cpu") #! TMP solutino to solve OOM issue
+            snip_device = torch.device("cuda") #torch.device("cpu") #! TMP solution to solve OOM issue
             original_device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
             trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
                                       handler=SNIP_prune_handler(net, loss_fn, cargs.snip_percent, train_loader, device=original_device, 

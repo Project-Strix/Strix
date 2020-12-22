@@ -29,7 +29,7 @@ def bbox_2D(img):
 
 
 def create_rgb_summary(label):
-    num_colors = label.shape[3]
+    num_colors = label.shape[1]
 
     cm = pylab.get_cmap('gist_rainbow')
 
@@ -48,8 +48,6 @@ def add_3D_overlay_to_summary(
     mask: Union[torch.Tensor, np.ndarray],
     writer,
     index: int = 0,
-    # binary_volume, 
-    # volume_overlay, 
     tag: str = 'output',
     centers=None
 ):
@@ -58,7 +56,7 @@ def add_3D_overlay_to_summary(
     # binary_volume = np.squeeze(binary_volume)
     # volume_overlay = np.squeeze(volume_overlay)
 
-    if len(mask_.shape) > 3:
+    if mask_.shape[1] > 1:
         # there are channels
         mask_ = create_rgb_summary(mask_)
         data_ = data_[..., np.newaxis]

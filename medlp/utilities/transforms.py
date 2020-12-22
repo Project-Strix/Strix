@@ -284,3 +284,25 @@ class RandLabelToMaskD(Randomizable, MapTransform):
 
         return d
 
+# class RandSelectSlice(Randomizable):
+#     def __init__(self, dim: int) -> None:
+#         super().__init__()
+#         self.dim = dim
+
+#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
+#         d = dict(data)
+#         mask_data = d[self.mask_key]
+#         for key in self.keys:
+#             d[key] = self.converter(d[key], mask_data=mask_data)
+#         return d
+
+# class RandSelectSliceD(Randomizable, MapTransform):
+#     def __init__(self, keys: KeysCollection, dim: int) -> None:
+#         super().__init__(keys)
+#         self.converter = RandSelectSlice(dim=dim)
+
+#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
+#         d = dict(data)
+#         for key in self.keys:
+#             d[key] = self.converter(d[key], mask_data=mask_data)
+#         return d

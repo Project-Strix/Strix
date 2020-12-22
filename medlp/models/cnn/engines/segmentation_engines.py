@@ -15,7 +15,10 @@ from monai_ex.engines import multi_gpu_supervised_trainer
 from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
 from monai_ex.networks import predict_segmentation, one_hot
 from monai_ex.utils import Activation, ChannelMatching, Normalisation
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
 from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
+
 from monai_ex.transforms import (
     Compose, 
     ActivationsD, 
@@ -25,7 +28,6 @@ from monai_ex.transforms import (
     VoteEnsembleD,
     SqueezeDimD
 )
-
 from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
@@ -40,6 +42,7 @@ from monai_ex.handlers import (
     MeanDice,
     MetricLogger,
     ROCAUC,
+    stopping_fn_from_metric,
 )
 
 
@@ -58,9 +61,10 @@ def build_segmentation_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
+    val_metric = 'val_mean_dice'
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
+        TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
         TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x: (x["image"], x["label"]), 
@@ -73,7 +77,7 @@ def build_segmentation_engine(**kwargs):
     ]
     # If in nni search mode
     if opts.nni: 
-        val_handlers += [NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch, logger_name=logger_name)]
+        val_handlers += [NNIReporterHandler(metric_name=val_metric, max_epochs=opts.n_epoch, logger_name=logger_name)]
     
     if opts.output_nc == 1:
         trainval_post_transforms = Compose(
@@ -113,14 +117,14 @@ def build_segmentation_engine(**kwargs):
         inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
         post_transform=trainval_post_transforms,
         key_val_metric={
-            "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
+            val_metric: MeanDice(include_background=False, output_transform=key_metric_transform_fn)
         },
         val_handlers=val_handlers,
         amp=opts.amp
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x : evaluator.state.metrics["val_mean_dice"]
+        lr_step_transform = lambda x : evaluator.state.metrics[val_metric]
     else:
         lr_step_transform = lambda x: ()
 
@@ -156,6 +160,14 @@ def build_segmentation_engine(**kwargs):
         train_handlers=train_handlers,
         amp=opts.amp
     )
+    
+    if opts.early_stop > 0:
+        early_stopper = EarlyStopping(
+            patience=opts.early_stop, 
+            score_function=stopping_fn_from_metric(val_metric), 
+            trainer=trainer
+        )
+        evaluator.add_event_handler(event_name=Events.EPOCH_COMPLETED, handler=early_stopper)
     return trainer
 
 
@@ -253,3 +265,7 @@ def build_segmentation_test_engine(**kwargs):
 
     return evaluator
 
+
+@ENSEMBLE_TEST_ENGINES.register('segmentation')
+def build_segmentation_ensemble_test_engine(**kwargs):
+    raise NotImplementedError

@@ -172,6 +172,7 @@ def common_params(func):
     @optionex('-V', '--visualize', is_flag=True, help='Visualize the network architecture')
     @optionex('--valid-interval', type=int, default=4, help='Interval of validation during training')
     @optionex('--save-epoch-freq', type=int, default=5, help='Save model freq')
+    @optionex('--early-stop', type=int, default=200, help='Patience of early stopping. default: 200epochs')
     @optionex('--amp', is_flag=True, help='Flag of using amp. Need pytorch1.6')
     @optionex('--nni', is_flag=True, help='Flag of using nni-search, you dont need to modify this.')
     @optionex('--n-fold', type=int, default=0, help='K fold cross-validation')
