@@ -9,6 +9,7 @@ from monai_ex.visualize import plot_2d_or_3d_image
 
 import torch
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
+from medlp.utilities.utils import add_3D_overlay_to_summary
 
 Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
 Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")

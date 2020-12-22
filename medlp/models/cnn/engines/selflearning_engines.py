@@ -7,7 +7,7 @@ import torch
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
-from medlp.models.cnn.nets.utils import output_onehot_transform
+from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.engines import multi_gpu_supervised_trainer
@@ -39,8 +39,6 @@ def build_selflearning_engine(**kwargs):
     device = kwargs['device'] 
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
-
-    assert_network_type(opts.model_name, 'FCN')
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None),

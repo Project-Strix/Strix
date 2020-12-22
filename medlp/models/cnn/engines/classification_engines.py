@@ -7,7 +7,7 @@ import torch
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
-from medlp.models.cnn.nets.utils import output_onehot_transform
+from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.engines import multi_gpu_supervised_trainer
@@ -58,7 +58,6 @@ def build_classification_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
-    assert_network_type(opts.model_name, 'CNN')
 
     if opts.criterion in ['BCE','WBCE']:
         prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32))
@@ -122,7 +121,7 @@ def build_classification_engine(**kwargs):
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
-        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=None), #! 5
+        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5), #!n_saved=None
         TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x : (None, None),

@@ -119,6 +119,8 @@ def train(**args):
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
             train_core(cargs, files_train, files_valid)
+            Print('Cleaning CUDA cache...', color='g')
+            torch.cuda.empty_cache()
     else: #! Plain training
         cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
         files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
