@@ -54,7 +54,7 @@ def build_selflearning_engine(**kwargs):
                         key_metric_name='val_mse',key_metric_mode='min',key_metric_n_saved=2)
     ]
 
-    prepare_batch_fn = lambda x : (x["image"], x["label"])
+    prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
 
     evaluator = SupervisedEvaluator(

@@ -60,11 +60,11 @@ def build_classification_engine(**kwargs):
     is_multilabel = opts.output_nc>1
 
     if opts.criterion in ['BCE','WBCE']:
-        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
     else:
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),

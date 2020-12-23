@@ -70,8 +70,7 @@ def build_segmentation_engine(**kwargs):
             batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,
-            prefix_name='Val',
-            overlap=False
+            prefix_name='Val'
         ),
         CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True, key_metric_n_saved=3)
     ]
@@ -96,15 +95,15 @@ def build_segmentation_engine(**kwargs):
         )
 
     if opts.criterion in ['CE','WCE']:
-        prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].squeeze(dim=1).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"].unsqueeze(dim=1),num_classes=opts.output_nc))
     elif opts.criterion in ['BCE','WBCE']:
-        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"], dtype=torch.float32))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"], dtype=torch.float32).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
     else:
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
 
@@ -138,8 +137,7 @@ def build_segmentation_engine(**kwargs):
             summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
             output_transform=lambda x: x["pred"],
             max_channels=opts.output_nc,
-            prefix_name='train',
-            overlap=False
+            prefix_name='train'
         ),
     ]
 
@@ -238,11 +236,11 @@ def build_segmentation_test_engine(**kwargs):
     #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
 
     if opts.phase == 'test_wo_label':
-        prepare_batch_fn = lambda x : (x["image"], None)
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), None)
         key_metric_transform_fn = lambda x : (x["pred"], None)
         key_val_metric = None
     elif opts.phase == 'test':
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
         key_metric_transform_fn = lambda x : (x["pred"], x["label"])  
         key_val_metric = {
             "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
