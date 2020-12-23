@@ -2,8 +2,8 @@ import os
 import nibabel as nib
 import numpy as np
 from utils_cw import get_items_from_file
-from monai.transforms import *
-from monai.data import DataLoader
+from monai_ex.transforms import *
+from monai_ex.data import DataLoader
 from medlp.data_io.segmentation_dataset import SegmentationDataset2D
 import torchvision
 import matplotlib.pyplot as plt

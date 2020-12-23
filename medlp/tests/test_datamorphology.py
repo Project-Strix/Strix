@@ -1,6 +1,6 @@
 import os
 from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset
-from medlp.utilities.transforms import LabelMorphology
+from monai_ex.transforms import LabelMorphology
 
 from utils_cw import get_items_from_file
 import nibabel as nib

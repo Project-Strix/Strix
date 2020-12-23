@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from monai.networks.layers.prunable_conv import PrunableWeights,PrunableConv3d,PrunableConv2d,PrunableDeconv3d, PrunableDeconv2d, PrunableLinear
+from monai_ex.networks.layers.prunable_conv import PrunableWeights,PrunableConv3d,PrunableConv2d,PrunableDeconv3d, PrunableDeconv2d, PrunableLinear
 
 import os, copy, types, time, json
 import numpy as np

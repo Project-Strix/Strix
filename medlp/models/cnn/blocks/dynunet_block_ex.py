@@ -4,8 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from monai_ex.networks.blocks.convolutions import ConvolutionEx as Convolution
-from monai_ex.networks.layers import Act, Norm, Dropout, Norm, split_args
+from monai.networks.blocks.convolutions import Convolution
+from monai.networks.layers.factories import Act, Norm, Dropout, Norm, split_args
 
 
 class UnetResBlock(nn.Module):
@@ -32,6 +32,7 @@ class UnetResBlock(nn.Module):
         out_channels: int,
         kernel_size: Union[Sequence[int], int],
         stride: Union[Sequence[int], int],
+        num_groups: int,
         norm_name: str,
         is_prunable: bool = False
     ):
@@ -43,6 +44,7 @@ class UnetResBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             conv_only=True,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         self.conv2 = get_conv_layer(
@@ -52,6 +54,7 @@ class UnetResBlock(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             conv_only=True,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         self.conv3 = get_conv_layer(
@@ -61,6 +64,7 @@ class UnetResBlock(nn.Module):
             kernel_size=1,
             stride=stride,
             conv_only=True,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         self.lrelu = get_acti_layer(("leakyrelu", {"inplace": True, "negative_slope": 0.01}))
@@ -111,6 +115,7 @@ class UnetBasicBlock(nn.Module):
         out_channels: int,
         kernel_size: Union[Sequence[int], int],
         stride: Union[Sequence[int], int],
+        num_groups: int,
         norm_name: str,
         is_prunable: bool = False,
     ):
@@ -122,6 +127,7 @@ class UnetBasicBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             conv_only=True,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         self.conv2 = get_conv_layer(
@@ -131,6 +137,7 @@ class UnetBasicBlock(nn.Module):
             kernel_size=kernel_size,
             stride=1,
             conv_only=True,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         self.lrelu = get_acti_layer(("leakyrelu", {"inplace": True, "negative_slope": 0.01}))
@@ -172,10 +179,12 @@ class UnetUpBlock(nn.Module):
         out_channels: int,
         kernel_size: Union[Sequence[int], int],
         stride: Union[Sequence[int], int],
+        num_groups: int,
         upsample_kernel_size: Union[Sequence[int], int],
         norm_name: str,
         is_prunable: bool = False,
     ):
+        self.num_groups = num_groups
         super(UnetUpBlock, self).__init__()
         upsample_stride = upsample_kernel_size
         self.transp_conv = get_conv_layer(
@@ -185,6 +194,7 @@ class UnetUpBlock(nn.Module):
             kernel_size=upsample_kernel_size,
             stride=upsample_stride,
             conv_only=True,
+            num_groups=num_groups,
             is_transposed=True,
             is_prunable=is_prunable,
         )
@@ -194,14 +204,24 @@ class UnetUpBlock(nn.Module):
             out_channels,
             kernel_size=kernel_size,
             stride=1,
+            num_groups=num_groups,
             norm_name=norm_name,
             is_prunable=is_prunable,
         )
+    
+    def groupwise_concate(self, f1, f2):
+        output      = torch.cat((f1.unsqueeze(2), f2.unsqueeze(2)), dim = 2)
+        output      = output.reshape([f1.shape[0],-1]+f1.shape[2:])
+        return output 
 
     def forward(self, inp, skip):
         # number of channels for skip should equals to out_channels
         out = self.transp_conv(inp)
-        out = torch.cat((out, skip), dim=1)
+        if self.num_groups == 1:
+            out = torch.cat((out, skip), dim=1)
+        else: #num_groups > 1
+            out = self.groupwise_concate(out, skip)
+
         out = self.conv_block(out)
         return out
 
@@ -211,7 +231,8 @@ class UnetOutBlock(nn.Module):
         self, 
         spatial_dims: int, 
         in_channels: int, 
-        out_channels: int, 
+        out_channels: int,
+        num_groups: int,
         **kwargs
     ):
         super(UnetOutBlock, self).__init__()
@@ -230,6 +251,7 @@ class UnetOutBlock(nn.Module):
             stride=stride, 
             bias=bias, 
             conv_only=conv_only,
+            num_groups=num_groups,
             is_prunable=is_prunable,
         )
         if activation is not None:
@@ -271,6 +293,7 @@ def get_conv_layer(
     bias: bool = False,
     conv_only: bool = True,
     is_transposed: bool = False,
+    num_groups: int= 1,
     is_prunable: bool = False,
 ):
     padding = get_padding(kernel_size, stride)
@@ -285,6 +308,7 @@ def get_conv_layer(
         kernel_size=kernel_size,
         act=act,
         norm=norm,
+        groups=num_groups,
         bias=bias,
         conv_only=conv_only,
         is_transposed=is_transposed,

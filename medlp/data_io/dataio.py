@@ -6,8 +6,8 @@ from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5, check_dir
 
 from medlp.data_io import DATASET_MAPPING
-from monai.data import DataLoader
-from monai.transforms import (
+from monai_ex.data import DataLoader
+from monai_ex.transforms import (
         Compose,
         LoadHdf5d,
         LoadNumpyd,

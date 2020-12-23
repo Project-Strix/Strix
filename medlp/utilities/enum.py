@@ -1,7 +1,7 @@
 # All enum variables
 #DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi', 'rjh_swim', 'rjh_tswi_cls']
 NORM_TYPES = ['batch','instance','group']
-LOSSES = ['CE', 'WCE', 'BCE', 'WBCE', 'MSE', 'DCE', 'CE-DCE', 'WCE-DCE']
+LOSSES = ['CE', 'WCE', 'BCE', 'WBCE', 'MSE', 'DCE', 'GDL', 'CE-DCE', 'WCE-DCE']
 LR_SCHEDULE = ['const', 'poly', 'step', 'SGDR', 'plateau']
 FRAMEWORK_TYPES = ['segmentation','classification','siamese','selflearning','detection','multitask']
 LAYER_ORDERS = ['crb','cbr', 'cgr','cbe', 'abn']

@@ -4,22 +4,23 @@ import numpy as np
 from functools import partial
 
 import torch
-from medlp.utilities.handlers import NNIReporterHandler, TensorBoardImageHandlerEx
+from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
 
-from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import multi_gpu_supervised_trainer
+from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
 from ignite.metrics import MeanSquaredError
 
-from monai.handlers import (
+from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
+    TensorBoardImageHandlerEx,
     CheckpointSaver
 )
 
@@ -39,8 +40,6 @@ def build_selflearning_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
-    assert_network_type(opts.model_name, 'FCN')
-
     val_handlers = [
         StatsHandler(output_transform=lambda x: None),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_loss"),
@@ -55,7 +54,7 @@ def build_selflearning_engine(**kwargs):
                         key_metric_name='val_mse',key_metric_mode='min',key_metric_n_saved=2)
     ]
 
-    prepare_batch_fn = lambda x : (x["image"], x["label"])
+    prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
 
     evaluator = SupervisedEvaluator(

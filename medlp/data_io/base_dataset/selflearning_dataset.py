@@ -3,10 +3,9 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional, Sequence
 from utils_cw import Print
 
-from monai.data import CacheDataset, PersistentDataset
-from monai.transforms import *
-from monai.transforms.compose import MapTransform
-from monai.utils import ensure_list
+from monai_ex.data import CacheDataset, PersistentDataset
+from monai_ex.transforms import *
+from monai_ex.utils import ensure_list
 
 class BasicSelflearningDataset(object):
     def __init__(
@@ -70,7 +69,7 @@ class SelflearningDataset2D(BasicSelflearningDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadPNGd(keys=["image","label"], grayscale=True),
+        loader: MapTransform = LoadPNGExd(keys=["image","label"], grayscale=True),
         channeler: Optional[MapTransform] = AddChanneld(keys=["image", "label"]),
         orienter: Optional[MapTransform] = Orientationd(keys=['image','label'], axcodes='LPI'),
         repeater: Optional[MapTransform] = RepeatChanneld(keys="image", repeats=3),

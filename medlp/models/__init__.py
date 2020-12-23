@@ -6,13 +6,8 @@ import numpy as np
 
 import torch
 from utils_cw.utils import get_items_from_file
-# from medlp.models.cnn.unet3d import UNet3D
-# from medlp.models.cnn.vgg import vgg13_bn, vgg16_bn, vgg9_bn
-# from medlp.models.cnn.resnet import resnet18, resnet34, resnet50
-# from medlp.models.cnn.scnn import SCNN
-# from medlp.models.cnn.dynunet import DynUNet
 from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
-from medlp.models.cnn.losses import DeepSupervisionLoss, CEDiceLoss
+from medlp.models.cnn.losses.losses import DeepSupervisionLoss, CEDiceLoss
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.models.cnn import ARCHI_MAPPING
@@ -20,27 +15,27 @@ from medlp.models.cnn import ARCHI_MAPPING
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 
-from monai.networks.nets import UNet, HighResNet, VNet
-from monai.losses import DiceLoss
-from monai.utils import Activation, ChannelMatching, Normalisation
+from monai_ex.networks.nets import UNet, HighResNet, VNet
+from monai_ex.losses import DiceLoss, GeneralizedDiceLoss
+from monai_ex.utils import Activation, ChannelMatching, Normalisation
 
 
-def get_model_instance(archi, tensor_dim):
-    return {
-        'unet':{'3D': DynUNet, '2D': DynUNet},
-        'res-unet':{'3D': DynUNet, '2D': DynUNet},
-        'unetv2':{'3D': UNet, '2D': UNet},
-        'res-unetv2':{'3D': UNet, '2D': UNet},
-        'scnn':{'3D': None, '2D': SCNN},
-        'vgg9':{'3D': vgg9_bn, '2D': vgg9_bn},
-        'vgg13':{'3D': vgg13_bn, '2D': vgg13_bn},
-        'vgg16':{'3D': vgg16_bn, '2D': vgg16_bn},
-        'resnet18':{'3D': None, '2D': resnet18},
-        'resnet34':{'3D': None, '2D': resnet34},
-        'resnet50':{'3D': None, '2D': resnet50},
-        'highresnet':{'3D':None, '2D': HighResNet},
-        'vnet':{'3D': VNet, '2D': VNet},
-    }[archi][tensor_dim]
+# def get_model_instance(archi, tensor_dim):
+#     return {
+#         'unet':{'3D': DynUNet, '2D': DynUNet},
+#         'res-unet':{'3D': DynUNet, '2D': DynUNet},
+#         'unetv2':{'3D': UNet, '2D': UNet},
+#         'res-unetv2':{'3D': UNet, '2D': UNet},
+#         'scnn':{'3D': None, '2D': SCNN},
+#         'vgg9':{'3D': vgg9_bn, '2D': vgg9_bn},
+#         'vgg13':{'3D': vgg13_bn, '2D': vgg13_bn},
+#         'vgg16':{'3D': vgg16_bn, '2D': vgg16_bn},
+#         'resnet18':{'3D': None, '2D': resnet18},
+#         'resnet34':{'3D': None, '2D': resnet34},
+#         'resnet50':{'3D': None, '2D': resnet50},
+#         'highresnet':{'3D':None, '2D': HighResNet},
+#         'vnet':{'3D': VNet, '2D': VNet},
+#     }[archi][tensor_dim]
 
 def get_rcnn_config(archi, backbone):
     folder = Path(__file__).parent.parent.joinpath('misc/config')
@@ -101,7 +96,7 @@ def get_network(opts):
         kernel_size = (3,)+(3,)*n_depth
         strides = (1,)+(2,)*n_depth
         upsample_kernel_size=(1,)+(2,)*n_depth
-
+        
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -213,6 +208,11 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
             loss = DiceLoss(include_background=False, to_onehot_y=False, sigmoid=True)
         else:
             loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
+    elif opts.criterion == 'GDL':
+        if opts.output_nc == 1:
+            loss = GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True)
+        else:
+            loss = GeneralizedDiceLoss(include_background=False, to_onehot_y=True, softmax=True)
     elif opts.criterion == 'CE-DCE':
         loss = CEDiceLoss(torch.nn.CrossEntropyLoss(), 
                           DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
@@ -288,9 +288,9 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     engine = TRAIN_ENGINES[framework_type](**params)
     return engine, net, loss
 
-from monai.transforms import *
-from monai.handlers import *
-from monai.engines import SupervisedEvaluator
+from monai_ex.transforms import *
+from monai_ex.handlers import *
+from monai_ex.engines import SupervisedEvaluator
 def get_test_engine(opts, test_loader):
 
     framework_type = opts.framework

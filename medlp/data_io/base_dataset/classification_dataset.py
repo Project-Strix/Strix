@@ -3,10 +3,9 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional, Sequence
 from utils_cw import Print
 
-from monai.data import CacheDataset, PersistentDataset
-from monai.transforms import *
-from monai.transforms.compose import MapTransform
-from monai.utils import ensure_list
+from monai_ex.data import CacheDataset, PersistentDataset
+from monai_ex.transforms import *
+from monai_ex.utils import ensure_list
 
 class BasicClassificationDataset(object):
     def __init__(
@@ -100,7 +99,7 @@ class SupervisedClassificationDataset2D(BasicClassificationDataset):
     def __init__(
         self, 
         files_list,
-        loader: MapTransform = LoadPNGD(keys="image", grayscale=True),
+        loader: MapTransform = LoadPNGExD(keys="image", grayscale=True),
         channeler: Optional[MapTransform] = AddChannelD(keys="image"),
         orienter: Optional[MapTransform] = OrientationD(keys='image', axcodes='LPI'),
         spacer: Optional[MapTransform] = SpacingD(keys="image", pixdim=(0.1,0.1)),

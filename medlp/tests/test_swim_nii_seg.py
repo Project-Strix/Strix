@@ -2,7 +2,7 @@ import os
 from medlp.data_io.rjh_dataset import get_rjh_swim_seg_dataset
 #from medlp.data_io.base_dataset.segmentation_dataset import SegmentationDataset3D
 from medlp.utilities.transforms import LabelMorphologyD
-from monai.transforms import *
+from monai_ex.transforms import *
 
 from utils_cw import get_items_from_file
 import nibabel as nib

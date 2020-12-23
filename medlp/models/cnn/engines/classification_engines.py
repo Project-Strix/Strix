@@ -8,15 +8,14 @@ from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
-from medlp.utilities.handlers import TensorBoardImageHandlerEx
 
-from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from monai.networks import predict_segmentation, one_hot
-from monai.utils import Activation, Normalisation
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import multi_gpu_supervised_trainer
+from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
+from monai_ex.networks import predict_segmentation, one_hot
+from monai_ex.utils import Activation, Normalisation
 from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
-from monai.transforms import (
+from monai_ex.transforms import (
     Compose, 
     ActivationsD, 
     AsDiscreteD, 
@@ -27,10 +26,10 @@ from monai.transforms import (
 )
 
 
-from monai.handlers import (
+from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
-    TensorBoardImageHandler,
+    TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleHandler,
     LrScheduleTensorboardHandler,
@@ -59,14 +58,13 @@ def build_classification_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
-    assert_network_type(opts.model_name, 'CNN')
 
     if opts.criterion in ['BCE','WBCE']:
-        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
     else:
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
@@ -123,7 +121,7 @@ def build_classification_engine(**kwargs):
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
-        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=None), #! 5
+        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5), #!n_saved=None
         TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x : (None, None),

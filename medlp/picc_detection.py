@@ -9,7 +9,7 @@ import nibabel as nib
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.handlers import TensorboardGraph, SNIP_prune_handler
+from medlp.utilities.handlers import SNIP_prune_handler
 import medlp.utilities.click_callbacks as clb
 from medlp.utilities import enum
 
@@ -19,8 +19,8 @@ from utils_cw import Print, print_smi, confirmation, check_dir, recursive_glob2,
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai.handlers import CheckpointLoader
-from monai.engines import SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.handlers import CheckpointLoader, TensorboardGraphHandler
+from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 def train_core(cargs, files_train, files_valid):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
@@ -60,14 +60,14 @@ def train_core(cargs, files_train, files_valid):
     if cargs.visualize:
         Print('Visualize the architecture to tensorboard', color='g')
         trainer.add_event_handler(event_name=Events.ITERATION_COMPLETED(once=1),
-                                  handler=TensorboardGraph(net, writer, lambda x:x['image']))
+                                  handler=TensorboardGraphHandler(net, writer, lambda x:x['image']))
 
     if cargs.snip:
         if cargs.snip_percent == 0.0 or cargs.snip_percent == 1.0:
             Print('Invalid snip_percent. Skip SNIP!', color='y')
         else:
             Print('Begin SNIP pruning', color='g')
-            snip_device = torch.device("cuda") #torch.device("cpu") #! TMP solutino to solve OOM issue
+            snip_device = torch.device("cuda") #torch.device("cpu") #! TMP solution to solve OOM issue
             original_device = torch.device("cuda") if cargs.gpus != '-1' else torch.device("cpu")
             trainer.add_event_handler(event_name=Events.ITERATION_STARTED(once=1),
                                       handler=SNIP_prune_handler(net, loss_fn, cargs.snip_percent, train_loader, device=original_device, 
@@ -119,6 +119,8 @@ def train(**args):
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f'{i}-th')
             train_core(cargs, files_train, files_valid)
+            Print('Cleaning CUDA cache...', color='g')
+            torch.cuda.empty_cache()
     else: #! Plain training
         cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
         files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)

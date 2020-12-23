@@ -3,8 +3,8 @@ from medlp.data_io.rjh_dataset import get_rjh_tswi_cls_datasetV2, get_rjh_tswi_c
 #from medlp.data_io.base_dataset.segmentation_dataset import SegmentationDataset3D
 from medlp.utilities.transforms import LabelMorphologyD
 from medlp.utilities.utils import bbox_3D
-from monai.transforms import *
-from monai.data import DataLoader
+from monai_ex.transforms import *
+from monai_ex.data import DataLoader
 
 from utils_cw import get_items_from_file, get_connected_comp
 import nibabel as nib

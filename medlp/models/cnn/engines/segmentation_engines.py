@@ -8,16 +8,18 @@ from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
-from medlp.utilities.handlers import TensorBoardImageHandlerEx
 
-from monai.losses import DiceLoss
-from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from monai.networks import predict_segmentation, one_hot
-from monai.utils import Activation, ChannelMatching, Normalisation
+from monai_ex.losses import DiceLoss
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import multi_gpu_supervised_trainer
+from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
+from monai_ex.networks import predict_segmentation, one_hot
+from monai_ex.utils import Activation, ChannelMatching, Normalisation
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
 from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
-from monai.transforms import (
+
+from monai_ex.transforms import (
     Compose, 
     ActivationsD, 
     AsDiscreteD, 
@@ -26,11 +28,10 @@ from monai.transforms import (
     VoteEnsembleD,
     SqueezeDimD
 )
-
-from monai.handlers import (
+from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
-    TensorBoardImageHandler,
+    TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleHandler,
     LrScheduleTensorboardHandler,
@@ -41,6 +42,7 @@ from monai.handlers import (
     MeanDice,
     MetricLogger,
     ROCAUC,
+    stopping_fn_from_metric,
 )
 
 
@@ -59,11 +61,10 @@ def build_segmentation_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
 
-    assert_network_type(opts.model_name, 'FCN')
-
+    val_metric = 'val_mean_dice'
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_mean_dice"),
+        TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
         TensorBoardImageHandlerEx(
             summary_writer=writer, 
             batch_transform=lambda x: (x["image"], x["label"]), 
@@ -75,7 +76,7 @@ def build_segmentation_engine(**kwargs):
     ]
     # If in nni search mode
     if opts.nni: 
-        val_handlers += [NNIReporterHandler(metric_name='val_mean_dice', max_epochs=opts.n_epoch, logger_name=logger_name)]
+        val_handlers += [NNIReporterHandler(metric_name=val_metric, max_epochs=opts.n_epoch, logger_name=logger_name)]
     
     if opts.output_nc == 1:
         trainval_post_transforms = Compose(
@@ -94,15 +95,15 @@ def build_segmentation_engine(**kwargs):
         )
 
     if opts.criterion in ['CE','WCE']:
-        prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].squeeze(dim=1).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"].unsqueeze(dim=1),num_classes=opts.output_nc))
     elif opts.criterion in ['BCE','WBCE']:
-        prepare_batch_fn = lambda x : (x["image"], torch.as_tensor(x["label"], dtype=torch.float32))
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"], dtype=torch.float32).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
     else:
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
 
@@ -115,14 +116,14 @@ def build_segmentation_engine(**kwargs):
         inferer=SimpleInferer(), #SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
         post_transform=trainval_post_transforms,
         key_val_metric={
-            "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
+            val_metric: MeanDice(include_background=False, output_transform=key_metric_transform_fn)
         },
         val_handlers=val_handlers,
         amp=opts.amp
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x : evaluator.state.metrics["val_mean_dice"]
+        lr_step_transform = lambda x : evaluator.state.metrics[val_metric]
     else:
         lr_step_transform = lambda x: ()
 
@@ -157,6 +158,14 @@ def build_segmentation_engine(**kwargs):
         train_handlers=train_handlers,
         amp=opts.amp
     )
+    
+    if opts.early_stop > 0:
+        early_stopper = EarlyStopping(
+            patience=opts.early_stop, 
+            score_function=stopping_fn_from_metric(val_metric), 
+            trainer=trainer
+        )
+        evaluator.add_event_handler(event_name=Events.EPOCH_COMPLETED, handler=early_stopper)
     return trainer
 
 
@@ -227,11 +236,11 @@ def build_segmentation_test_engine(**kwargs):
     #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
 
     if opts.phase == 'test_wo_label':
-        prepare_batch_fn = lambda x : (x["image"], None)
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), None)
         key_metric_transform_fn = lambda x : (x["pred"], None)
         key_val_metric = None
     elif opts.phase == 'test':
-        prepare_batch_fn = lambda x : (x["image"], x["label"])
+        prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
         key_metric_transform_fn = lambda x : (x["pred"], x["label"])  
         key_val_metric = {
             "val_mean_dice": MeanDice(include_background=False, output_transform=key_metric_transform_fn)
@@ -254,3 +263,7 @@ def build_segmentation_test_engine(**kwargs):
 
     return evaluator
 
+
+@ENSEMBLE_TEST_ENGINES.register('segmentation')
+def build_segmentation_ensemble_test_engine(**kwargs):
+    raise NotImplementedError
