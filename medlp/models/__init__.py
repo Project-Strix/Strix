@@ -20,23 +20,6 @@ from monai_ex.losses import DiceLoss, GeneralizedDiceLoss
 from monai_ex.utils import Activation, ChannelMatching, Normalisation
 
 
-# def get_model_instance(archi, tensor_dim):
-#     return {
-#         'unet':{'3D': DynUNet, '2D': DynUNet},
-#         'res-unet':{'3D': DynUNet, '2D': DynUNet},
-#         'unetv2':{'3D': UNet, '2D': UNet},
-#         'res-unetv2':{'3D': UNet, '2D': UNet},
-#         'scnn':{'3D': None, '2D': SCNN},
-#         'vgg9':{'3D': vgg9_bn, '2D': vgg9_bn},
-#         'vgg13':{'3D': vgg13_bn, '2D': vgg13_bn},
-#         'vgg16':{'3D': vgg16_bn, '2D': vgg16_bn},
-#         'resnet18':{'3D': None, '2D': resnet18},
-#         'resnet34':{'3D': None, '2D': resnet34},
-#         'resnet50':{'3D': None, '2D': resnet50},
-#         'highresnet':{'3D':None, '2D': HighResNet},
-#         'vnet':{'3D': VNet, '2D': VNet},
-#     }[archi][tensor_dim]
-
 def get_rcnn_config(archi, backbone):
     folder = Path(__file__).parent.parent.joinpath('misc/config')
     return {

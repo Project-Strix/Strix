@@ -4,7 +4,7 @@ from typing import Sequence, Union
 import os, math, random, copy, pylab, torch
 from pathlib import Path
 import socket
-from medlp.utilities.enum import NETWORK_TYPES
+from medlp.utilities.enum import NETWORK_TYPES, DIMS
 import numpy as np
 
 
@@ -243,7 +243,7 @@ class DimRegistry(dict):
         self['3D'] = {}
 
     def register(self, dim, module_name, module=None):
-        assert dim in ['2D', '3D', '2', '3', 2, 3], "Only support 2D&3D dataset now"
+        assert dim in DIMS, "Only support 2D&3D dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
@@ -262,7 +262,7 @@ class DatasetRegistry(DimRegistry):
         super(DatasetRegistry, self).__init__(*args, **kwargs)
     
     def register(self, dim, module_name, fpath, module=None):
-        assert dim in ['2D', '3D', '2', '3', 2, 3], "Only support 2D&3D dataset now"
+        assert dim in DIMS, "Only support 2D&3D dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:

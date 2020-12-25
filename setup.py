@@ -48,7 +48,7 @@ def get_extensions():
 
 setup(name='medlp',
       packages=find_namespace_packages(include=["medlp", "medlp.*"]),
-      version='0.0.2',
+      version='0.0.3',
       description='Medical Deep Learning Platform',
       author='Chenglong Wang',
       author_email='clwang@phy.ecnu.edu.cn',

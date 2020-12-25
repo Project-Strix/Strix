@@ -5,7 +5,8 @@ import numpy as np
 from skimage.exposure import rescale_intensity
 from utils_cw import Print, load_h5, check_dir
 
-from medlp.data_io import DATASET_MAPPING
+from torch.utils.data import DataLoader as _TorchDataLoader
+from medlp.utilities.utils import DatasetRegistry
 from monai_ex.data import DataLoader
 from monai_ex.transforms import (
         Compose,
@@ -17,6 +18,18 @@ from monai_ex.transforms import (
         Lambdad,
         ToTensord
     )
+
+CLASSIFICATION_DATASETS = DatasetRegistry()
+SEGMENTATION_DATASETS = DatasetRegistry()
+SELFLEARNING_DATASETS = DatasetRegistry()
+MULTITASK_DATASETS = DatasetRegistry()
+
+DATASET_MAPPING = {
+        'segmentation':SEGMENTATION_DATASETS,
+        'classification':CLASSIFICATION_DATASETS,
+        'selflearning':SELFLEARNING_DATASETS,
+        'multitask':MULTITASK_DATASETS
+    }
 
 def get_datalist(dataset_name):
     if dataset_name == 'picc_h5':
@@ -66,7 +79,8 @@ def get_dataloader(args, files_list, phase='train'):
     }
 
     dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list](**arguments)
-    
-    loader = DataLoader(dataset_, **params)
-    return loader
+    if isinstance(dataset_, _TorchDataLoader):
+        return dataset_
+    else:
+        return DataLoader(dataset_, **params)
 
