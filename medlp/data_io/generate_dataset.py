@@ -3,7 +3,6 @@ from types import SimpleNamespace as sn
 from monai_ex.transforms import *
 from monai_ex.data import *
 from monai_ex.utils import ensure_tuple
-from utils_cw import get_items_from_file
 import medlp.utilities.oyaml as yaml
 from medlp.utilities.enum import DIMS, FRAMEWORK_TYPES, PHASES
 from medlp.data_io.dataio import DATASET_MAPPING

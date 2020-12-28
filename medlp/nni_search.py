@@ -20,7 +20,7 @@ if has_nii:
     from nni.utils import merge_parameter
 
 
-@click.command('train-nii')
+@click.command('train-nni')
 @click.option('--config', type=click.Path(exists=True), help='Config file to load')
 def train_nni(**kwargs):
     logger = logging.getLogger('nni_search')
@@ -46,7 +46,7 @@ def train_nni(**kwargs):
 
         data_list = get_datalist(cargs.data_list)
         assert os.path.isfile(data_list), 'Data list not exists!'
-        files_list = get_items_from_file(data_list, format='json')
+        files_list = get_items_from_file(data_list, format='auto')
         if cargs.partial < 1:
             logger.info(f'Use {int(len(files_list)*cargs.partial)} data')
             files_list = files_list[:int(len(files_list)*cargs.partial)]
@@ -90,7 +90,7 @@ def train_nni(**kwargs):
 @click.option('--experiment-path', type=str, callback=clb.get_nni_exp_name, default='nni-search')
 def nni_search(**args):
     cargs = sn(**args)
-    configures = get_items_from_file(args['param_list'], format='json')
+    configures = get_items_from_file(args['param_list'], format='auto')
     configures['out_dir'] = cargs.out_dir
     configures['gpus'] = cargs.gpus
     configures['nni'] = True
@@ -99,9 +99,9 @@ def nni_search(**args):
 
     if not os.path.isfile(cargs.nni_config):
         nni_config_path = Path(__file__).parent.joinpath('misc/nni_template_config.yml')
-        nni_config = get_items_from_file(nni_config_path, format='yaml')
+        nni_config = get_items_from_file(nni_config_path, format='auto')
     else:
-        nni_config = get_items_from_file(cargs.nni_config, format='yaml')
+        nni_config = get_items_from_file(cargs.nni_config, format='auto')
 
     main_file = Path(__file__).parent.joinpath('main.py')
     paramlist_file = os.path.join(cargs.experiment_path, 'param.list')

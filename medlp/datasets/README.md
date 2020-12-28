@@ -1,6 +1,6 @@
 # Datasets for MeDLP 
 
-### Here is a simple example for creating a custom dataset for MeDLP.
+## Here is a simple example for creating a custom dataset for MeDLP using python script.
 
     
     from medlp.data_io import CLASSIFICATION_DATASETS

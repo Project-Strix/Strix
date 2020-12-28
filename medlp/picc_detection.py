@@ -1,4 +1,4 @@
-import os, sys, shutil, json, logging, warnings, time, random, torch
+import os, sys, shutil, yaml, logging, warnings, time, random, torch
 import numpy as np
 from functools import partial
 from torch import from_numpy, reshape, cuda, cat
@@ -25,10 +25,10 @@ from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 def train_core(cargs, files_train, files_valid):
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
     # Save param and datalist
-    with open(os.path.join(cargs.experiment_path, 'train_files'), 'w') as f:
-        json.dump(files_train, f, indent=2)
-    with open(os.path.join(cargs.experiment_path, 'test_files'), 'w') as f:
-        json.dump(files_valid, f, indent=2)
+    with open(os.path.join(cargs.experiment_path, 'train_files.yml'), 'w') as f:
+        yaml.dump(files_train, f)
+    with open(os.path.join(cargs.experiment_path, 'test_files.yml'), 'w') as f:
+        yaml.dump(files_valid, f)
 
     train_loader = get_dataloader(cargs, files_train, phase='train')
     valid_loader = get_dataloader(cargs, files_valid, phase='valid')
@@ -98,7 +98,7 @@ def train(**args):
 
     data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list+'_fpath']
     assert os.path.isfile(data_list), 'Data list not exists!'
-    files_list = get_items_from_file(data_list, format='json')
+    files_list = get_items_from_file(data_list, format='auto')
     
     if cargs.partial < 1:
         Print('Use {} data'.format(int(len(files_list)*cargs.partial)), color='y')
@@ -167,7 +167,7 @@ def test_cfg(**args):
     exp_dir = configures.get('experiment_path', os.path.dirname(args['config']))
     if os.path.isfile(args['test_files']):
         test_fpath = args['test_files']
-        test_files = get_items_from_file(args['test_files'], format='json')
+        test_files = get_items_from_file(args['test_files'], format='auto')
     else:
         if not os.path.isfile(os.path.join(exp_dir, 'test_files')):
             if configures.get('n_fold', 0) > 1:
@@ -176,7 +176,7 @@ def test_cfg(**args):
                 raise ValueError(f'Test file does not exists in {exp_dir}!')
 
         test_fpath = os.path.join(exp_dir, 'test_files')
-        test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='json')
+        test_files = get_items_from_file(os.path.join(exp_dir, 'test_files'), format='auto')
 
     configures['model_path'] = clb.get_trained_models(exp_dir) if configures.get('n_fold',0) <= 1 else None 
     configures['preload'] = 0.0
