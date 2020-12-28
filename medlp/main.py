@@ -20,10 +20,10 @@ def main():
 if __name__ == '__main__':
     assert sys.version_info >= (3, 6), "Python ver. >=3.6 is required!"
 
-    from medlp.picc_detection import train
-    from medlp.picc_detection import train_cfg
-    from medlp.picc_detection import test_cfg
-    from medlp.picc_detection import unlink_dirs
+    from medlp.main_entry import train
+    from medlp.main_entry import train_cfg
+    from medlp.main_entry import test_cfg
+    from medlp.main_entry import unlink_dirs
     from nni_search import nni_search
     from nni_search import train_nni
     main.add_command(train)

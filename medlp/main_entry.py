@@ -22,7 +22,16 @@ from ignite.utils import setup_logger
 from monai_ex.handlers import CheckpointLoader, TensorboardGraphHandler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
+
+
 def train_core(cargs, files_train, files_valid):
+    """Main train function.
+
+    Args:
+        cargs (SimpleNamespace): All arguments from cmd line.
+        files_train (list): Train file list.
+        files_valid (list): Valid file list.
+    """
     Print(f'Get {len(files_train)} training data, {len(files_valid)} validation data', color='g')
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, 'train_files.yml'), 'w') as f:
@@ -87,6 +96,8 @@ def train_core(cargs, files_train, files_valid):
 @click.option('--experiment-path', type=str, callback=clb.get_exp_name, default='')
 @click.option('--confirm', callback=partial(confirmation, output_dir_ctx='experiment_path',save_code=True,exist_ok=False))
 def train(**args):
+    """Entry of train command.
+    """
     cargs = sn(**args)
     
     if 'CUDA_VISIBLE_DEVICES' in os.environ:
@@ -131,6 +142,8 @@ def train(**args):
 @click.argument('config', type=click.Path(exists=True))
 @click.argument('additional_args', nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
+    """Entry of train-from-cfg command
+    """
     if len(args.get('additional_args')) != 0: #parse additional args
         Print('*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n', color='y')
 
@@ -155,6 +168,12 @@ def train_cfg(**args):
 @click.option('--smi', default=True, callback=print_smi, help='Print GPU usage')
 @click.option('--gpus', prompt='Choose GPUs[eg: 0]', type=str, help='The ID of active GPU')
 def test_cfg(**args):
+    """Entry of test-from-cfg command.
+
+    Raises:
+        ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
+        ValueError: Test file not exist error.
+    """
     logging.basicConfig(stream=sys.stderr, level=logging.INFO)
     
     configures = get_items_from_file(args['config'], format='json')
@@ -205,6 +224,12 @@ def test_cfg(**args):
 @click.option('--root-dir', type=click.Path(exists=True), help='Root dir contains symbolic dirs')
 @click.option('-a', '--all-dir', is_flag=True, help='Unlink all dirs including both avalible and unavailable dirs')
 def unlink_dirs(root_dir, all_dir):
+    """Utility for unlink invalid symbolic tensorboard dir.
+
+    Args:
+        root_dir (str): Root dir contains symbolic dirs.
+        all_dir (bool): whether unlink both invalid and valid sym dirs.
+    """
     for d in os.listdir(root_dir):
         d = os.path.join(root_dir, d)
         if os.path.islink(d):

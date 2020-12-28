@@ -7,15 +7,14 @@ import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
-from medlp.utilities.handlers import TensorBoardImageHandlerEx
 
-from monai.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai.engines import multi_gpu_supervised_trainer
-from monai.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from monai.networks import predict_segmentation, one_hot
-from monai.utils import Activation, Normalisation
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import multi_gpu_supervised_trainer
+from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
+from monai_ex.networks import predict_segmentation, one_hot
+from monai_ex.utils import Activation, Normalisation
 from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
-from monai.transforms import (
+from monai_ex.transforms import (
     Compose, 
     ActivationsD, 
     AsDiscreteD, 
@@ -25,10 +24,11 @@ from monai.transforms import (
     SqueezeDimD
 )
 
-from monai.handlers import (
+from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
     TensorBoardImageHandler,
+    TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleHandler,
     LrScheduleTensorboardHandler,

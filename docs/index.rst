@@ -3,8 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to MeDLP's documentation!
+Welcome to MeDLP!
 =================================
+*Medical Deep Learning Platform*
+
+MeDLP is a `PyTorch <https://pytorch.org/>`_-based open-source platform for deep-learning in medical tasks.
+
+MeDLP is developed based on `PyTorch <https://pytorch.org/>`_, `Ignite <https://pytorch.org/ignite/>`_ and `MONAI <https://monai.io/>`_.
+
+
 
 .. toctree::
    :maxdepth: 2

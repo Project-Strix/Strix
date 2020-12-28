@@ -164,6 +164,22 @@ def get_network(opts):
 
 
 def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
+    """Generate engines for specified config.
+
+    Args:
+        opts (SimpleNamespace): All arguments from cmd line.
+        train_loader (DataLoader): Pytorch dataload for training dataset.
+        test_loader (DataLoader): Pytorch dataload for validation dataset.
+        writer (SummaryWriter, optional): Tensorboard SummaryWriter. Defaults to None.
+        show_network (bool, optional): Whether print network architecture. Defaults to True.
+
+    Raises:
+        NotImplementedError: Raise error if using undefined loss function.
+        NotImplementedError: Raise error if using undefined optim function.
+
+    Returns:
+        list: Return engine, net, loss
+    """
     # Print the model type
     print('\nInitialising model {}'.format(opts.model_name))
     weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
@@ -275,6 +291,15 @@ from monai_ex.transforms import *
 from monai_ex.handlers import *
 from monai_ex.engines import SupervisedEvaluator
 def get_test_engine(opts, test_loader):
+    """Generate engine for testing.
+
+    Args:
+        opts (SimpleNamespace): All arguments from cmd line.
+        test_loader (DataLoader): Pytorch dataload for test dataset.
+
+    Returns:
+        IgniteEngine: Return test engine.
+    """
 
     framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
