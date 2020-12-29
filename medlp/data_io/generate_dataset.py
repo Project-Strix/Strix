@@ -1,11 +1,14 @@
 import os
 import sys
+import logging
+from functools import partial
 from monai_ex.transforms import *
 from monai_ex.data import *
-from monai_ex.utils import ensure_tuple
+from monai_ex.utils import ensure_tuple, first
 import medlp.utilities.oyaml as yaml
 from medlp.utilities.enum import DIMS, FRAMEWORK_TYPES, PHASES
 from medlp.data_io.dataio import DATASET_MAPPING
+from utils_cw import get_items_from_file
 
 root_tree = {
     "ATTRIBUTE": {
@@ -86,9 +89,8 @@ def parse_dataset_config(configs):
             phases = configs["PREPROCESS"][processor][step].get("phase", default_phase)
             phases = ensure_tuple(phases)
 
-            assert isinstance(
-                args, dict
-            ), f"args must be dict, but got {args} ({type(args)})"
+            assert isinstance(args, dict),\
+                f"args must be dict, but got {args} ({type(args)})"
             arguments.update(args)
 
             func = mapping[processor][step]
@@ -122,9 +124,8 @@ def parse_dataset_config(configs):
             )  # default only in train phase
             phases = ensure_tuple(phases)
 
-            assert isinstance(
-                args, dict
-            ), f"args must be dict, but got {args} ({type(args)})"
+            assert isinstance(args, dict),\
+                f"args must be dict, but got {args} ({type(args)})"
             arguments.update(args)
 
             func = mapping["AUGMENTOR"][processor]
@@ -153,7 +154,7 @@ def parse_dataset_config(configs):
                     augmentations[p].append(fn)
 
     transforms = {
-        phase: Compose(preprocessors.get(phase, []) + augmentations.get(phase, []))
+        phase: ComposeEx(preprocessors.get(phase, []) + augmentations.get(phase, []))
         for phase in PHASES
     }
 
@@ -181,49 +182,87 @@ def parse_dataset_config(configs):
     return datasets, dataloader, transforms
 
 
-def register_dataset_config(config_path):
+def create_dataset_from_cfg(
+    files_list,
+    phase,
+    opts,
+    datasets,
+    dataloader,
+    transforms
+):
+    if not datasets:
+        # use default dataset
+        tensor_dim = opts.get("tensor_dim", None)
+        if tensor_dim == "2D":
+            dataset_ = DATASETYPE["CacheDataset"]
+            args_ = {"cache_rate": 0.0 if phase is "test" else opts.get("preload", 1)}
+        elif tensor_dim == "3D":
+            dataset_ = DATASETYPE["PersistentDataset"]
+            args_ = {"cache_dir": opts.get("cache_dir", "./")}
+        else:
+            raise ValueError(
+                f"Invalid tensor dim '{tensor_dim}'"
+                f"Please make sure you have set tensor_dim in cmd line"
+                f"or setup in cfg file."
+            )
+    else:
+        # use custom dataset
+        dataset_ = datasets[phase][0]
+        args_ = datasets[phase][1]
+
+    args = {"data": files_list, "transform": transforms[phase]}
+    args.update(args_)
+
+    if dataloader is None:
+        return dataset_(**args)
+    else:
+        raise NotImplementedError
+
+
+def register_dataset_from_cfg(config_path):
     assert config_path.is_file(), f"Config file is not found: {config_path}"
     with config_path.open() as f:
-        configs = yaml.load(f)
+        configs = yaml.full_load(f)
 
-    datasets, dataloader, transforms = parse_dataset_config(configs)
-
-    def _create_dataset_fn(files_list, phase, opts):
-        if not datasets:
-            # use default dataset
-            tensor_dim = opts.get("tensor_dim")
-            if tensor_dim == "2D":
-                dataset_ = DATASETYPE["CacheDataset"]
-                args_ = {
-                    "cache_rate": 0.0 if phase is "test" else opts.get("preload", 1)
-                }
-            elif tensor_dim == "3D":
-                dataset_ = DATASETYPE["PersistentDataset"]
-                args_ = {"cache_dir": opts.get("cache_dir", "./")}
-            else:
-                raise ValueError(f"Invalid tensor dim '{tensor_dim}'")
-        else:
-            # use custom dataset
-            dataset_ = datasets[phase][0]
-            args_ = datasets[phase][1]
-
-        args = {"data": files_list, "transform": transforms[phase]}
-        args.update(args_)
-
-        if dataloader is None:
-            return dataset_(**args)
-        else:
-            raise NotImplementedError
+    datasets_, dataloader_, transforms_ = parse_dataset_config(configs)
 
     DATASET_MAPPING[configs["ATTRIBUTE"]["FRAMEWORK"]].register(
         configs["ATTRIBUTE"]["DIM"],
         configs["ATTRIBUTE"]["NAME"],
         configs["ATTRIBUTE"]["FILES_LIST"],
-        _create_dataset_fn,
+        partial(
+            create_dataset_from_cfg,
+            datasets=datasets_,
+            dataloader=dataloader_,
+            transforms=transforms_,
+        ),
     )
+
+def test_dataset_from_config(config_path, phase, opts):
+    assert config_path.is_file(), f"Config file is not found: {config_path}"
+    with config_path.open() as f:
+        configs = yaml.full_load(f)
+
+    datasets_, dataloader_, transforms_ = parse_dataset_config(configs)
+    transforms_[phase].add_transforms(
+        DataStatsD(
+            keys=configs["ATTRIBUTE"]["KEYS"],
+            prefix=configs["ATTRIBUTE"]["KEYS"],
+            logger_handler=logging.StreamHandler(sys.stdout) #! No output!
+            )
+    )
+    dataset = create_dataset_from_cfg(
+        get_items_from_file(configs["ATTRIBUTE"]["FILES_LIST"], format='auto'),
+        phase,
+        opts,
+        datasets_,
+        dataloader_,
+        transforms_
+    )
+    first(dataset)
 
 
 if __name__ == "__main__":
     from pathlib import Path
 
-    register_dataset_config(Path(r"/homes/clwang/test_config.yaml"))
+    register_dataset_from_cfg(Path(r"/homes/clwang/test_config.yaml"))

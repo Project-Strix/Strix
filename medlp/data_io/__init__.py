@@ -10,7 +10,7 @@ from medlp.data_io.dataio import (
     MULTITASK_DATASETS,
     DATASET_MAPPING,
 )
-from medlp.data_io.generate_dataset import register_dataset_config
+from medlp.data_io.generate_dataset import register_dataset_from_cfg
 
 datasets_dir = Path(__file__).parent.parent.joinpath("datasets")
 if datasets_dir.is_dir():
@@ -18,4 +18,4 @@ if datasets_dir.is_dir():
         # print('Import module from file:', str(f))
         import_file(f.stem, str(f))
     for j in datasets_dir.glob("*.yaml"):
-        register_dataset_config(j)
+        register_dataset_from_cfg(j)
