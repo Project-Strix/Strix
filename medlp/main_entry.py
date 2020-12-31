@@ -6,6 +6,7 @@ import logging
 import time
 import torch
 import numpy as np
+from pathlib import Path
 from functools import partial
 from torch.utils.tensorboard import SummaryWriter
 from types import SimpleNamespace as sn
@@ -131,7 +132,6 @@ def train_core(cargs, files_train, files_valid):
 
 
 @click.command("train", context_settings={"allow_extra_args": True})
-@click.option("--config", type=click.Path(exists=True))
 @click.option("--debug", is_flag=True)
 @clb.latent_auxilary_params
 @clb.common_params
@@ -195,7 +195,7 @@ def train(**args):
     "train-from-cfg",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
-@click.argument("config", type=click.Path(exists=True))
+@click.option("--config", type=click.Path(exists=True))
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     """Entry of train-from-cfg command"""
@@ -218,19 +218,25 @@ def train_cfg(**args):
 
 
 @click.command("test-from-cfg")
-@click.argument("config", nargs=1, type=click.Path(exists=True))
+@click.option("--config", type=click.Path(exists=True))
 @click.option(
-    "--test-files", type=str, default="", help="External files (.json) for testing"
+    "--test-files",
+    type=str, default="", help="External files (.json) for testing"
 )
 @click.option(
-    "--out-dir", type=str, default=None, help="Optional output dir to save results"
+    "--out-dir",
+    type=str, default=None, help="Optional output dir to save results"
+)
+@click.option(  #TODO: automatically decide when using patchdataset
+    "--slidingwindow",
+    is_flag=True,
+    callback=clb.input_cropsize,
+    help='Use slidingwindow sampling'
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option(
-    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
-)
+@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 def test_cfg(**args):
     """Entry of test-from-cfg command.
 
@@ -247,23 +253,22 @@ def test_cfg(**args):
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
-    exp_dir = configures.get("experiment_path", os.path.dirname(args["config"]))
+    exp_dir = Path(configures.get("experiment_path", os.path.dirname(args["config"])))
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
     else:
-        if not os.path.isfile(os.path.join(exp_dir, "test_files")):
+        test_fpaths = list(exp_dir.glob('test_files*'))
+        if len(test_fpaths) > 0:
             if configures.get("n_fold", 0) > 1:
                 raise ValueError(
-                    f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json)."
+                    f"{configures['n_fold']} Cross-validation found!"
+                    "You must provide external test file (.json)."
                 )
-            else:
-                raise ValueError(f"Test file does not exists in {exp_dir}!")
-
-        test_fpath = os.path.join(exp_dir, "test_files")
-        test_files = get_items_from_file(
-            os.path.join(exp_dir, "test_files"), format="auto"
-        )
+            test_fpath = test_fpaths[0]
+            test_files = get_items_from_file(test_fpath, format="auto")
+        else:
+            raise ValueError(f"Test file does not exists in {exp_dir}!")
 
     configures["model_path"] = (
         clb.get_trained_models(exp_dir) if configures.get("n_fold", 0) <= 1 else None
@@ -273,6 +278,8 @@ def test_cfg(**args):
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
     configures["experiment_path"] = exp_dir
+    configures['resample'] = True  #! departure
+    configures['slidingwindow'] = args['slidingwindow']
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]

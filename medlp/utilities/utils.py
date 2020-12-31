@@ -168,7 +168,7 @@ def _register_generic_data(module_dict, dim, module_name, fpath, module):
 
 def is_avaible_size(value):
     if isinstance(value, (list, tuple)):
-        if np.all( np.greater(value, 0) ):
+        if np.all(np.greater(value, 0)):
             return True
     return False
 

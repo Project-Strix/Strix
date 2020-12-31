@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from utils_cw.utils import get_items_from_file
 from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
-from medlp.models.cnn.losses.losses import DeepSupervisionLoss, CEDiceLoss
+from medlp.models.cnn.losses.losses import DeepSupervisionLoss, CEDiceLoss, FocalDiceLoss
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.models.cnn import ARCHI_MAPPING
@@ -16,7 +16,7 @@ from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 
 from monai_ex.networks.nets import UNet, HighResNet, VNet
-from monai_ex.losses import DiceLoss, GeneralizedDiceLoss
+from monai_ex.losses import DiceLoss, GeneralizedDiceLoss, FocalLoss
 from monai_ex.utils import Activation, ChannelMatching, Normalisation
 
 
@@ -50,28 +50,28 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
 
 def get_network(opts):
-    assert hasattr(opts,'model_name') and hasattr(opts,'input_nc') and \
-           hasattr(opts, 'tensor_dim') and hasattr(opts,'output_nc')
+    assert hasattr(opts, 'model_name') and hasattr(opts, 'input_nc') and \
+           hasattr(opts, 'tensor_dim') and hasattr(opts, 'output_nc')
 
     model_name = opts.model_name
     in_channels, out_channels = opts.input_nc, opts.output_nc
     is_deconv = get_attr_(opts, 'is_deconv', False)
-    f_maps = get_attr_(opts, 'n_features', 64)
     n_depth = get_attr_(opts, 'n_depth', -1)
-    skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
-    n_groups = get_attr_(opts, 'n_groups', 8)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
-    crop_size = get_attr_(opts, 'crop_size', (512,512))
-    image_size = get_attr_(opts, 'image_size', (512,512))
-    layer_order = get_attr_(opts, 'layer_order', 'crb')
+    crop_size = get_attr_(opts, 'crop_size', (512, 512))
+    image_size = get_attr_(opts, 'image_size', (512, 512))
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
+    # f_maps = get_attr_(opts, 'n_features', 64)
+    # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
+    # n_groups = get_attr_(opts, 'n_groups', 8)
+    # layer_order = get_attr_(opts, 'layer_order', 'crb')
 
     model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
 
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
-                 np.any(np.less_equal(crop_size,0)) else crop_size
+                 np.any(np.less_equal(crop_size, 0)) else crop_size
 
     if model_name == 'unet' or model_name == 'res-unet':
         last_act = 'sigmoid' if opts.framework == 'selflearning' else None
@@ -187,7 +187,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
 
     framework_type = opts.framework
     device = torch.device("cuda") if opts.gpus != '-1' else torch.device("cpu")
-    model_dir = check_dir(opts.experiment_path,'Models')
+    model_dir = check_dir(opts.experiment_path, 'Models')
 
     loss = lr_scheduler = None
     if opts.criterion == 'CE':
@@ -213,21 +213,28 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         else:
             loss = GeneralizedDiceLoss(include_background=False, to_onehot_y=True, softmax=True)
     elif opts.criterion == 'CE-DCE':
-        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(), 
+        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(),
                           DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
     elif opts.criterion == 'WCE-DCE':
         w_ = torch.tensor(opts.loss_params).to(device)
-        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(weight=w_), 
+        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(weight=w_),
                           DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
+    elif opts.criterion == 'Wassert-DCE':
+        raise NotImplementedError
+    elif opts.criterion == 'FocalLoss':
+        loss = FocalLoss(gamma=2.0, weight=None)
+    elif opts.criterion == 'FocalDiceLoss':
+        loss = FocalDiceLoss(FocalLoss(gamma=2.0),
+                             DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
     else:
         raise NotImplementedError
-    
+
     if opts.deep_supervision:
         loss = DeepSupervisionLoss(loss)
 
     net_ = get_network(opts)
 
-    if len(opts.gpu_ids)>1: # and not opts.amp:
+    if len(opts.gpu_ids) > 1:  # and not opts.amp:
         net = torch.nn.DataParallel(net_.to(device))
     else:
         net = net_.to(device)
@@ -247,7 +254,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         optim = RAdam(net.parameters(), opts.lr, weight_decay=weight_decay)
     else:
         raise NotImplementedError
-    
+
     if opts.lr_policy == 'const':
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x:1)
     elif opts.lr_policy == 'poly':

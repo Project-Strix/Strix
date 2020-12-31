@@ -1,26 +1,24 @@
-import os, re, logging, copy 
+import os
+import re
+import logging
+import copy
 from pathlib import Path
-import numpy as np
 from functools import partial
 
 import torch
-from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
+from medlp.utilities.utils import assert_network_type, output_filename_check
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai_ex.engines import multi_gpu_supervised_trainer
-from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from monai_ex.networks import predict_segmentation, one_hot
-from monai_ex.utils import Activation, Normalisation
-from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
+from monai_ex.inferers import SimpleInferer
+from monai_ex.networks import one_hot
+from ignite.metrics import Accuracy, Precision, Recall
 from monai_ex.transforms import (
-    Compose, 
-    ActivationsD, 
-    AsDiscreteD, 
-    KeepLargestConnectedComponentD, 
-    MeanEnsembleD, 
+    Compose,
+    ActivationsD,
+    AsDiscreteD,
+    MeanEnsembleD,
     VoteEnsembleD,
     SqueezeDimD
 )
@@ -31,35 +29,32 @@ from monai_ex.handlers import (
     TensorBoardStatsHandler,
     TensorBoardImageHandlerEx,
     ValidationHandler,
-    LrScheduleHandler,
     LrScheduleTensorboardHandler,
     CheckpointSaver,
     CheckpointLoader,
     SegmentationSaver,
     ClassificationSaver,
-    MeanDice,
-    MetricLogger,
     ROCAUC,
 )
 
 
 @TRAIN_ENGINES.register('classification')
 def build_classification_engine(**kwargs):
-    opts = kwargs['opts'] 
-    train_loader = kwargs['train_loader']  
-    test_loader = kwargs['test_loader'] 
+    opts = kwargs['opts']
+    train_loader = kwargs['train_loader']
+    test_loader = kwargs['test_loader']
     net = kwargs['net']
-    loss = kwargs['loss'] 
-    optim = kwargs['optim'] 
-    lr_scheduler = kwargs['lr_scheduler'] 
-    writer = kwargs['writer'] 
-    valid_interval = kwargs['valid_interval'] 
-    device = kwargs['device'] 
+    loss = kwargs['loss']
+    optim = kwargs['optim']
+    lr_scheduler = kwargs['lr_scheduler']
+    writer = kwargs['writer']
+    valid_interval = kwargs['valid_interval']
+    device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
 
-    if opts.criterion in ['BCE','WBCE']:
+    if opts.criterion in ['BCE', 'WBCE']:
         prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device))
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x : (x["pred"], one_hot(x["label"],num_classes=opts.output_nc))
@@ -238,33 +233,31 @@ def build_classification_test_engine(**kwargs):
 
 @ENSEMBLE_TEST_ENGINES.register('classification')
 def build_classification_ensemble_test_engine(**kwargs):
-    opts = kwargs['opts'] 
-    test_loader = kwargs['test_loader'] 
+    opts = kwargs['opts']
+    test_loader = kwargs['test_loader']
     net = kwargs['net']
-    device = kwargs['device'] 
+    device = kwargs['device']
     best_model = kwargs.get('best_val_model', True)
     logger_name = kwargs.get('logger_name', None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc>1
 
-    assert_network_type(opts.model_name, 'CNN')
-
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
-    cv_folders = filter(lambda x : x.is_dir() , cv_folders)
+    cv_folders = filter(lambda x: x.is_dir(), cv_folders)
     float_regex = r'=(-?\d+\.\d+).pt'
     int_regex = r'=(\d+).pt'
     if best_model:
         best_models = []
         for folder in cv_folders:
-            models = list(filter(lambda x : x.is_file(), [model for model in folder.joinpath('Models').iterdir()]))
-            models.sort(key=lambda x : float(re.search(float_regex, x.name).group(1)))
+            models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').iterdir()]))
+            models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
             best_models.append(models[-1])
-    else: #get last
+    else:  # get last
         best_models = []
         for folder in cv_folders:
-            models = list(filter(lambda x : x.is_file(), [model for model in (folder/'Models'/'Checkpoint').iterdir()]))
+            models = list(filter(lambda x: x.is_file(), [model for model in (folder/'Models'/'Checkpoint').iterdir()]))
             try:
-                models.sort(key=lambda x : int(re.search(int_regex, x.name).group(1)))
+                models.sort(key=lambda x: int(re.search(int_regex, x.name).group(1)))
             except AttributeError as e:
                 invalid_models = list(filter(lambda x: re.search(int_regex, x.name) is None, models))
                 print('invalid models:', invalid_models)
@@ -272,9 +265,12 @@ def build_classification_ensemble_test_engine(**kwargs):
             best_models.append(models[-1])
 
     if len(best_models) != opts.n_fold:
-        print(f'Found {len(best_models)} best models, not equal to {opts.n_fold} n_folds.\nUse {len(best_models)} best models')
+        print(
+            f'Found {len(best_models)} best models,'
+            f'not equal to {opts.n_fold} n_folds.\n'
+            f'Use {len(best_models)} best models'
+            )
     print(f'Using models: {[m.name for m in best_models]}')
-
 
     nets = [copy.deepcopy(net), ]*len(best_models)
     for net, m in zip(nets, best_models):
@@ -287,7 +283,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     # else:
     #     output_transform = lambda x: (x['pred'], x['label'])
 
-    if opts.output_nc == 1: # ensemble_type is 'mean':
+    if opts.output_nc == 1:  # ensemble_type is 'mean':
         if best_model:
             w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models]
         else:
@@ -298,23 +294,23 @@ def build_classification_ensemble_test_engine(**kwargs):
                           # in this particular example, we use validation metrics as weights
                           weights=w_,
                           )
-        
+
         acc_post_transforms = Compose([
             ActivationsD(keys="pred", sigmoid=True),
             AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
-            partial(output_onehot_transform,n_classes=opts.output_nc),
+            partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
-        auc_post_transforms =  Compose([
+        auc_post_transforms = Compose([
             ActivationsD(keys="pred", sigmoid=True),
-            partial(output_onehot_transform,n_classes=opts.output_nc),
+            partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         ClsSaver_transform = Compose([
-            ActivationsD(keys="pred", sigmoid=True), 
+            ActivationsD(keys="pred", sigmoid=True),
             AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
-            lambda x : x['pred'].cpu().numpy()
+            lambda x: x['pred'].cpu().numpy()
         ])
 
-    else: # ensemble_type is 'vote'
+    else:  # ensemble_type is 'vote'
         post_transforms = None
 
         acc_post_transforms = Compose([
@@ -322,16 +318,16 @@ def build_classification_ensemble_test_engine(**kwargs):
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),
             VoteEnsembleD(keys=pred_keys, output_key="pred", num_classes=opts.output_nc),
-            partial(output_onehot_transform,n_classes=opts.output_nc),
+            partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         auc_post_transforms = Compose([
             ActivationsD(keys=pred_keys, softmax=True),
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),
             VoteEnsembleD(keys=pred_keys, output_key="pred", num_classes=opts.output_nc),
-            partial(output_onehot_transform,n_classes=opts.output_nc),
+            partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
-        ClsSaver_transform =Compose([
+        ClsSaver_transform = Compose([
             ActivationsD(keys=pred_keys, softmax=True),
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),

@@ -1,5 +1,6 @@
 import inspect
 
+from termcolor import colored
 from click import Choice, ParamType, Option, confirm, Command
 from click.types import convert_type, Path
 from click.utils import echo
@@ -44,7 +45,7 @@ def _build_prompt(text, suffix, show_default=False, default=None, show_choices=T
 
 def prompt_ex(text, default=None, hide_input=False, confirmation_prompt=False,
               type=None, value_proc=None, prompt_suffix=': ', show_default=True,
-              err=False, show_choices=True):
+              err=False, show_choices=True, color=None):
     result = None
 
     def prompt_func(text):
@@ -66,6 +67,8 @@ def prompt_ex(text, default=None, hide_input=False, confirmation_prompt=False,
         value_proc = convert_type(type, default)
 
     prompt = _build_prompt(text, prompt_suffix, show_default, default, show_choices, type)
+    if color is not None:
+        prompt = colored(prompt, color=color)
 
     while 1:
         while 1:

@@ -60,3 +60,20 @@ class CEDiceLoss(Module):
         else:
             raise NotImplementedError
         return result
+
+
+class FocalDiceLoss(Module):
+    def __init__(self, focal_loss, dice_loss, aggregate="sum"):
+        super(FocalDiceLoss, self).__init__()
+        self.aggregate = aggregate
+        self.fc = focal_loss
+        self.dc = dice_loss
+
+    def forward(self, net_output, target):
+        dc_loss = self.dc(net_output, target)
+        fc_loss = self.fc(net_output, target)
+        if self.aggregate == "sum":
+            result = fc_loss + dc_loss
+        else:
+            raise NotImplementedError
+        return result
