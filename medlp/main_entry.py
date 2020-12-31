@@ -280,6 +280,7 @@ def test_cfg(**args):
     configures["experiment_path"] = exp_dir
     configures['resample'] = True  #! departure
     configures['slidingwindow'] = args['slidingwindow']
+    configures['crop_size'] = args['crop_size']
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]

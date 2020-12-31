@@ -78,7 +78,7 @@ def get_nni_exp_name(ctx, param, value):
     return get_exp_name(context_, param, value)
 
 
-def split_input_str_(value):
+def split_input_str_(value, dtype=float):
     if value is not None:
         value = value.strip()
         if "," in value:
@@ -87,7 +87,7 @@ def split_input_str_(value):
             sep = ";"
         else:
             sep = " "
-        return [float(s) for s in value.split(sep)]
+        return [dtype(s) for s in value.split(sep)]
     else:
         return None
 
@@ -189,9 +189,13 @@ def input_cropsize(ctx, param, value):
     if is_avaible_size(configures.get('crop_size', None)):
         return value
     if configures['tensor_dim'] == '2D':
-        crop_size = _prompt("Crop size", tuple, (0, 0), split_input_str_, color='green')
+        crop_size = _prompt(
+            "Crop size", tuple, (0, 0), partial(split_input_str_,dtype=int), color='green'
+        )
     else:
-        crop_size = _prompt("Crop size", tuple, (0, 0, 0), split_input_str_, color='green')
+        crop_size = _prompt(
+            "Crop size", tuple, (0, 0, 0), partial(split_input_str_,dtype=int), color='green'
+        )
     ctx.params["crop_size"] = crop_size
     return value
 
