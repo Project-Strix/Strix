@@ -170,7 +170,7 @@ def train(**args):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
-            Print(f"Processing {ith}/{cargs.n_fold} cross-validation", color="g")
+            Print(f"Processing {i}/{cargs.n_fold} cross-validation", color="g")
             files_train = list(np.array(files_list)[train_index])
             files_valid = list(np.array(files_list)[test_index])
 

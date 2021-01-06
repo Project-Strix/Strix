@@ -13,7 +13,10 @@ from medlp.models.cnn.utils import output_onehot_transform
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.inferers import SimpleInferer
 from monai_ex.networks import one_hot
+from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
+from ignite.handlers import EarlyStopping
+
 from monai_ex.transforms import (
     Compose,
     ActivationsD,
@@ -35,6 +38,7 @@ from monai_ex.handlers import (
     SegmentationSaver,
     ClassificationSaver,
     ROCAUC,
+    stopping_fn_from_metric
 )
 
 
@@ -61,6 +65,7 @@ def build_classification_engine(**kwargs):
     else:
         prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
 
+    val_metric_name = 'val_auc'
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
@@ -101,13 +106,13 @@ def build_classification_engine(**kwargs):
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_val_metric={"val_auc": key_val_metric},
+        key_val_metric={val_metric_name: key_val_metric},
         val_handlers=val_handlers,
         amp=opts.amp
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x: evaluator.state.metrics["val_auc"]
+        lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
     else:
         lr_step_transform = lambda x: ()
 
@@ -140,6 +145,16 @@ def build_classification_engine(**kwargs):
         train_handlers=train_handlers,
         amp=opts.amp
     )
+
+    if opts.early_stop > 0:
+        early_stopper = EarlyStopping(
+            patience=opts.early_stop,
+            score_function=stopping_fn_from_metric(val_metric_name),
+            trainer=trainer,
+        )
+        evaluator.add_event_handler(
+            event_name=Events.EPOCH_COMPLETED, handler=early_stopper
+        )
 
     return trainer
 
