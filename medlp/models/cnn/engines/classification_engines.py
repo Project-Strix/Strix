@@ -30,7 +30,7 @@ from monai_ex.handlers import (
     TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleTensorboardHandler,
-    CheckpointSaver,
+    CheckpointSaverEx,
     CheckpointLoader,
     SegmentationSaver,
     ClassificationSaver,
@@ -52,7 +52,7 @@ def build_classification_engine(**kwargs):
     device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
-    is_multilabel = opts.output_nc>1
+    # is_multilabel = opts.output_nc>1
 
     if opts.criterion in ['BCE', 'WBCE']:
         prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device))
@@ -64,16 +64,16 @@ def build_classification_engine(**kwargs):
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
-        CheckpointSaver(
-            save_dir=model_dir, 
-            save_dict={"net": net}, 
-            save_key_metric=True, 
+        CheckpointSaverEx(
+            save_dir=model_dir,
+            save_dict={"net": net},
+            save_key_metric=True,
             key_metric_n_saved=4,
             key_metric_save_after_epoch=100
         ),
         TensorBoardImageHandlerEx(
-            summary_writer=writer, 
-            batch_transform=lambda x : (None, None),
+            summary_writer=writer,
+            batch_transform=lambda x: (None, None),
             output_transform=lambda x: x["image"],
             prefix_name='Val'
         )
@@ -82,7 +82,7 @@ def build_classification_engine(**kwargs):
     if opts.output_nc == 1:
         train_post_transforms = Compose([
             ActivationsD(keys="pred", sigmoid=True),
-            #AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+            # AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
         ])
     else:
         train_post_transforms = Compose([
@@ -107,7 +107,7 @@ def build_classification_engine(**kwargs):
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x : evaluator.state.metrics["val_auc"]
+        lr_step_transform = lambda x: evaluator.state.metrics["val_auc"]
     else:
         lr_step_transform = lambda x: ()
 
@@ -116,10 +116,10 @@ def build_classification_engine(**kwargs):
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
         StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
-        CheckpointSaver(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5), #!n_saved=None
+        CheckpointSaverEx(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5), #!n_saved=None
         TensorBoardImageHandlerEx(
-            summary_writer=writer, 
-            batch_transform=lambda x : (None, None),
+            summary_writer=writer,
+            batch_transform=lambda x: (None, None),
             output_transform=lambda x: x["image"],
             prefix_name='Train'
         )
@@ -146,10 +146,10 @@ def build_classification_engine(**kwargs):
 
 @TEST_ENGINES.register('classification')
 def build_classification_test_engine(**kwargs):
-    opts = kwargs['opts'] 
-    test_loader = kwargs['test_loader'] 
+    opts = kwargs['opts']
+    test_loader = kwargs['test_loader']
     net = kwargs['net']
-    device = kwargs['device'] 
+    device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc>1
 

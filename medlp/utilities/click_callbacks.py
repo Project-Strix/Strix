@@ -436,6 +436,7 @@ def latent_auxilary_params(func):
         help="Pruning ratio of wights/channels",
     )
     @optionex("--n-fold", type=int, default=0)
+    @optionex("--config", type=click.Path(exists=True))
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import copy
 from pathlib import Path
@@ -17,7 +18,6 @@ from medlp.models.cnn.engines.utils import get_models
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.inferers import SimpleInferer, SlidingWindowInferer
 from monai_ex.networks import one_hot
-from monai_ex.transforms import Activationsd, AsDiscreted
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping
 
@@ -244,21 +244,22 @@ def build_segmentation_test_engine(**kwargs):
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
+        print('patch size:', crop_size)
     else:
         print("---Use simple infer!---")
 
     if opts.output_nc == 1:
         post_transforms = Compose(
             [
-                Activationsd(keys="pred", sigmoid=True),
-                AsDiscreted(keys="pred", threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys="pred", sigmoid=True),
+                AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         post_transforms = Compose(
             [
-                Activationsd(keys="pred", softmax=True),
-                AsDiscreted(keys="pred", argmax=True, n_classes=opts.output_nc),
+                ActivationsD(keys="pred", softmax=True),
+                AsDiscreteD(keys="pred", argmax=True, n_classes=opts.output_nc),
             ]
         )
 
@@ -345,6 +346,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
     use_slidingwindow = is_avaible_size(opts.crop_size)
+    float_regex = r"=(-?\d+\.\d+).pt"
 
     cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
@@ -369,6 +371,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
         w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models]
     else:
         w_ = None
+    
     post_transforms = MeanEnsembleD(
         keys=pred_keys,
         output_key="pred",

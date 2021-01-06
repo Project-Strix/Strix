@@ -64,7 +64,7 @@ def get_default_setting(phase, **kwargs):
 
 def get_dataloader(args, files_list, phase="train"):
     params = get_default_setting(
-        phase, train_n_batch=args.n_batch, valid_n_batch=1
+        phase, train_n_batch=args.n_batch, valid_n_batch=4
     )  #! How to customize?
     arguments = {"files_list": files_list, "phase": phase, "opts": vars(args)}
 

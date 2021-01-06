@@ -109,7 +109,7 @@ class OptionEx(Option):
             prompt=prompt,
             confirmation_prompt=confirmation_prompt,
             hide_input=hide_input,
-            is_flag=None,
+            is_flag=is_flag,
             flag_value=flag_value,
             multiple=multiple,
             count=count,

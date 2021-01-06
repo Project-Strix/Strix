@@ -175,11 +175,10 @@ def train(**args):
             files_valid = list(np.array(files_list)[test_index])
 
             if "-th" in os.path.basename(cargs.experiment_path):
-                cargs.experiment_path = check_dir(
-                    os.path.dirname(cargs.experiment_path), f"{i}-th"
-                )
+                cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f"{i}-th")
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
+
             train_core(cargs, files_train, files_valid)
             Print("Cleaning CUDA cache...", color="g")
             torch.cuda.empty_cache()

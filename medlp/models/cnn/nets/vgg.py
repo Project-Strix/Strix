@@ -153,7 +153,8 @@ def vgg9(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg11', 'S', False, pretrained, progress, **kwargs)
 
-@CLASSIFICATION_ARCHI.register('3D','vgg9_bn')
+@CLASSIFICATION_ARCHI.register('2D', 'vgg9_bn')
+@CLASSIFICATION_ARCHI.register('3D', 'vgg9_bn')
 def vgg9_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 9-layer model (configuration "S") with batch normalization for small size dataset
     Args:
@@ -174,7 +175,7 @@ def vgg11(pretrained=False, progress=True, **kwargs):
     return _vgg('vgg11', 'A', False, pretrained, progress, **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D','vgg11_bn')
+@CLASSIFICATION_ARCHI.register('2D', 'vgg11_bn')
 def vgg11_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_
