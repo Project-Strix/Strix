@@ -56,7 +56,7 @@ def train_core(cargs, files_train, files_valid):
 
     # Tensorboard Logger
     writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, "tensorboard"))
-    if not cargs.debug:
+    if not cargs.debug and cargs.symbolic_tb:
         tb_dir = check_dir(os.path.dirname(cargs.experiment_path), "tb")
         target_dir = os.path.join(tb_dir, os.path.basename(cargs.experiment_path))
         if os.path.islink(target_dir):
@@ -154,9 +154,7 @@ def train(**args):
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
-        cargs.data_list + "_fpath"
-    ]
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
     assert os.path.isfile(data_list), "Data list not exists!"
     files_list = get_items_from_file(data_list, format="auto")
 
@@ -170,7 +168,7 @@ def train(**args):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
-            Print(f"Processing {i}/{cargs.n_fold} cross-validation", color="g")
+            Print(f"Processing {i+1}/{cargs.n_fold} cross-validation", color="g")
             files_train = list(np.array(files_list)[train_index])
             files_valid = list(np.array(files_list)[test_index])
 
@@ -183,7 +181,7 @@ def train(**args):
             Print("Cleaning CUDA cache...", color="g")
             torch.cuda.empty_cache()
     else:  #! Plain training
-        cargs.split = int(cargs.split) if cargs.split > 1 else cargs.split
+        cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
         )
@@ -256,14 +254,14 @@ def test_cfg(**args):
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
+    elif configures.get("n_fold", 0) > 1:
+        raise ValueError(
+            f"{configures['n_fold']} Cross-validation found!"
+            "You must provide external test file (.json/.yaml)."
+        )
     else:
         test_fpaths = list(exp_dir.glob('test_files*'))
         if len(test_fpaths) > 0:
-            if configures.get("n_fold", 0) > 1:
-                raise ValueError(
-                    f"{configures['n_fold']} Cross-validation found!"
-                    "You must provide external test file (.json)."
-                )
             test_fpath = test_fpaths[0]
             test_files = get_items_from_file(test_fpath, format="auto")
         else:
@@ -279,7 +277,7 @@ def test_cfg(**args):
     configures["experiment_path"] = exp_dir
     configures['resample'] = True  #! departure
     configures['slidingwindow'] = args['slidingwindow']
-    configures['crop_size'] = args['crop_size']
+    configures['crop_size'] = args.get('crop_size', None)
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]

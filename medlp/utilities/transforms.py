@@ -1,18 +1,20 @@
-from typing import Dict, Hashable, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Hashable, Mapping, Optional, Sequence, Union
 
 import random
 import torch
 import numpy as np
 from scipy import ndimage as ndi
 from skimage import exposure
+import nibabel as nib
 
 from monai_ex.config import KeysCollection
-from monai_ex.transforms import Transform, MapTransform, Randomizable, SpatialCrop
-from monai_ex.utils import ensure_tuple_rep, ensure_tuple
+from monai_ex.transforms import Transform, MapTransform, Randomizable
+from monai_ex.utils import ensure_tuple
+from monai_ex.transforms import generate_spatial_bounding_box 
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.utilities.utils import is_avaible_size, bbox_2D, bbox_3D
-from utils_cw import get_connected_comp
+from medlp.utilities.utils import bbox_2D, bbox_3D
+from utils_cw import remove_outlier
 
 class CoordToBoxList(Transform):
     """
@@ -283,6 +285,161 @@ class RandLabelToMaskD(Randomizable, MapTransform):
             d[key] = self.converter(d[key], select_label=self.select_label)
 
         return d
+
+
+class SeparateCropSTSdataD(MapTransform):
+    def __init__(
+        self,
+        keys,
+        mask_key,
+        label_key=None,
+        crop_size=None,
+        margin_size=None,
+        labels=[1, 2],
+        flip_label=2,
+        flip_axis=1,
+        outlier_size=20,
+    ):
+        super(SeparateCropSTSdataD, self).__init__(keys)
+        assert len(labels) == 2, 'Only separate two labels'
+        self.mask_key = mask_key
+        self.label_key = label_key
+        self.crop_size = crop_size
+        self.margin_size = margin_size
+        self.labels = labels
+        self.flip_label = flip_label
+        self.flip_axis = flip_axis
+        self.outlier_size = outlier_size
+
+    def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
+        d = dict(data)
+        mask_data = d[self.mask_key]
+        bboxes = []
+        labels = []
+        for label in self.labels:
+            if np.count_nonzero(mask_data == label) == 0:
+                continue
+            mask_data_ = remove_outlier(mask_data == label, outlier_size=self.outlier_size)
+            bboxes.append(generate_spatial_bounding_box(mask_data_))
+            labels.append(label)
+        # bboxes = [generate_spatial_bounding_box(mask_data, lambda x: x == label) for label in self.labels]
+
+        new_bboxes = []
+        for bbox in bboxes:
+            margin = [0, ] * len(bboxes[0][0])
+            if self.crop_size:
+                margin = np.add(
+                    margin,
+                    [(self.crop_size[i]-(end-start))/2 for i, (start, end) in enumerate(zip(bbox[0], bbox[1]))]
+                )
+            if self.margin_size:
+                margin = np.add(
+                    margin,
+                    self.margin_size
+                )
+            bbox = [
+                np.subtract(bbox[0], margin-0.1).round().astype(int),
+                np.add(bbox[1], margin+0.1).round().astype(int)
+            ]
+            new_bboxes.append(bbox)
+
+        results: List[Dict[Hashable, np.ndarray]] = [dict() for _ in new_bboxes]
+        for key in data.keys():
+            if key in self.keys:
+                for i, (bbox, label) in enumerate(zip(new_bboxes, labels)):
+                    roi = tuple([..., ]+[slice(s, e) for s, e in zip(bbox[0], bbox[1])])
+                    if label == self.flip_label:
+                        results[i][key] = np.flip(d[key][roi], axis=self.flip_axis)
+                    else:
+                        results[i][key] = d[key][roi]
+                    # nib.save( nib.Nifti1Image(results[i][key].squeeze(), np.eye(4)), f'/homes/clwang/{key}-{i}.nii.gz')
+            elif self.label_key is not None and key == self.label_key:
+                # separate labels
+                for i in range(len(results)):
+                    results[i][key] = data[self.label_key][i]
+            else:
+                for i in range(len(results)):
+                    results[i][key] = data[key]
+
+        return results
+
+
+class ExtractSTSlicesD(MapTransform):
+    """Extract the slices between SN and RN.
+    Design for specific dataset. DONOT USE!
+    """
+    def __init__(self, keys, mask_key, n_slices=3, rn_label=3, axial=(0, 1)):
+        """
+        Args:
+            keys ([type]): Keys to pick data for transformation.
+            mask_key ([type]): Key to pick mask data.
+            n_slices (int, optional): Extract ``n_slices`` slices. Defaults to 3.
+            rn_label (int, optional): Label of RN. Defaults to 3.
+            axial (tuple, optional): Axial dims of image. Defaults to (0, 1).
+        """
+        super(ExtractSTSlicesD, self).__init__(keys)
+        self.mask_key = mask_key
+        self.rn_label = rn_label
+        self.axial = axial
+        self.n_slices = n_slices
+
+    def __call__(self, data):
+        d = dict(data)
+
+        rn_z = np.any(
+            d[self.mask_key].squeeze() == self.rn_label,
+            axis=self.axial
+        )
+        sn_z = np.any(
+            np.logical_and(
+                d[self.mask_key].squeeze() > 0,
+                d[self.mask_key].squeeze() != self.rn_label
+            ),
+            axis=self.axial
+        )
+
+        try:
+            rn_zmin, rn_zmax = np.where(rn_z)[0][[0, -1]]
+            sn_zmin, sn_zmax = np.where(sn_z)[0][[0, -1]]
+        except:
+            print('mask shape:', d[self.mask_key].squeeze().shape, 'unique:', np.unique(d[self.mask_key]))
+            raise ValueError(
+                "No nonzero mask is found!\n"
+                f"Image path: {d['image_meta_dict']['filename_or_obj']}")
+
+        for key in self.keys:
+            if sn_zmin < rn_zmin or (sn_zmax+sn_zmin) < (rn_zmax+rn_zmin):
+                # selected_slices = slice(rn_zmin-self.n_slices-1, rn_zmin-1)
+                selected_slices = slice(rn_zmin-self.n_slices, rn_zmin)
+            else:
+                print(d['image_meta_dict']['filename_or_obj'])
+                raise NotImplementedError(f'rn z range: {rn_zmin} {rn_zmax}, sn z range: {sn_zmin} {sn_zmax}')
+
+            d[key] = d[key][..., selected_slices].copy()
+            #print('Slice shape:', d[key].shape, )
+            if 0 in list(d[key].shape):
+                raise ValueError(d['image_meta_dict']['filename_or_obj'])
+
+        return d
+
+
+# class SeparateClassLabelD(MapTransform):
+#     """
+#     SeparateClassLabel seperates classes labels
+#     from single list to multi lists
+#     """
+#     def __init__(self, keys):
+#         super(SeparateClassLabelD, self).__init__(keys)
+
+#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
+#         d = dict(data)
+#         results: List[Dict[Hashable, np.ndarray]] = [dict() for _ in new_bboxes]
+#         for key in self.keys:
+#             d[key] = np.array(d[key])[...,np.newaxis]
+#             print(d[key].shape)
+#         return d
+
+
 
 # class RandSelectSlice(Randomizable):
 #     def __init__(self, dim: int) -> None:

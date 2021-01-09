@@ -260,25 +260,25 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     elif opts.lr_policy == 'poly':
         lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=0.0001, power=0.9)
     elif opts.lr_policy == 'step':
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 
-                                                       step_size=opts.lr_policy_params['step_size'], 
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim,
+                                                       step_size=opts.lr_policy_params['step_size'],
                                                        gamma=opts.lr_policy_params['gamma'])
     elif opts.lr_policy == 'plateau':
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim, 
-                                                                  mode='max', 
-                                                                  factor=0.2, 
-                                                                  patience=opts.lr_policy_params['patience'], 
-                                                                  cooldown=50, 
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,
+                                                                  mode='max',
+                                                                  factor=0.2,
+                                                                  patience=opts.lr_policy_params['patience'],
+                                                                  cooldown=50,
                                                                   min_lr=1e-5)
     elif opts.lr_policy == 'SGDR':
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, 
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim,
                                                                             T_0=opts.lr_policy_params['T_0'],
                                                                             T_mult=opts.lr_policy_params['T_mult'],
                                                                             eta_min=opts.lr_policy_params['eta_min'])
 
     params = {
         'opts': opts,
-        'train_loader': train_loader, 
+        'train_loader': train_loader,
         'test_loader': test_loader,
         'net': net,
         'optim': optim,
@@ -290,13 +290,11 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         'model_dir': model_dir,
         'logger_name': f'{opts.tensor_dim}-Trainer'
     }
-    
+
     engine = TRAIN_ENGINES[framework_type](**params)
     return engine, net, loss
 
-from monai_ex.transforms import *
-from monai_ex.handlers import *
-from monai_ex.engines import SupervisedEvaluator
+
 def get_test_engine(opts, test_loader):
     """Generate engine for testing.
 

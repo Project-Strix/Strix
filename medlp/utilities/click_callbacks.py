@@ -186,8 +186,9 @@ def data_select(ctx, param, value):
 
 def input_cropsize(ctx, param, value):
     configures = get_items_from_file(ctx.params["config"], format="json")
-    if is_avaible_size(configures.get('crop_size', None)):
+    if is_avaible_size(configures.get('crop_size', None)) or value is False:
         return value
+
     if configures['tensor_dim'] == '2D':
         crop_size = _prompt(
             "Crop size", tuple, (0, 0), partial(split_input_str_,dtype=int), color='green'
@@ -307,6 +308,7 @@ def common_params(func):
     @optionex("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
     @optionex("--seed", type=int, default=101, help="random seed")
     @optionex("--compact-log", is_flag=True, help="Output compact log info")
+    @optionex("--symbolic-tb", is_flag=True, help='Create symbolic for tensorboard logs')
     @optionex(
         "--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp"
     )

@@ -31,17 +31,13 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         dim = kwargs.get('dim', 2)
         is_prunable = kwargs.get('is_prunable', False)
+        bottleneck_size = kwargs.get('bottleneck_size', 7)
 
         pool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
         fc_type: Callable = nn.Linear if not is_prunable else PrunableLinear
 
         self.features = features
-        if dim == 2:
-            output_size = (7,7)
-        elif dim == 3:
-            output_size = (4,4,4) #(2,2,2) #For OOM issue
-        else:
-            raise ValueError(f'Only support 2D&3D data, but got dim = {dim}')
+        output_size = (bottleneck_size, )*dim #(2,2,2) #For OOM issue
         
         self.avgpool = pool_type(output_size)
         num_ = np.prod(output_size)
@@ -152,6 +148,7 @@ def vgg9(pretrained=False, progress=True, **kwargs):
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vgg('vgg11', 'S', False, pretrained, progress, **kwargs)
+
 
 @CLASSIFICATION_ARCHI.register('2D', 'vgg9_bn')
 @CLASSIFICATION_ARCHI.register('3D', 'vgg9_bn')

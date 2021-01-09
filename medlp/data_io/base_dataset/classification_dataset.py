@@ -1,8 +1,8 @@
 import os
 import math
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
-from monai_ex.data import CacheDataset, PersistentDataset
+from monai_ex.data import Dataset, CacheDataset, PersistentDataset
 from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
 
@@ -10,24 +10,27 @@ from monai_ex.utils import ensure_list
 class BasicClassificationDataset(object):
     def __init__(
         self,
-        files_list,
-        loader,
-        channeler,
-        orienter,
-        spacer,
-        rescaler,
-        resizer,
-        cropper,
-        caster,
-        to_tensor,
-        additional_transforms,
-        is_supervised,
-        verbose=False,
+        files_list: Sequence,
+        loader: Union[Sequence[MapTransform], MapTransform],
+        channeler: Union[Sequence[MapTransform], MapTransform],
+        orienter: Union[Sequence[MapTransform], MapTransform],
+        spacer: Union[Sequence[MapTransform], MapTransform],
+        rescaler: Union[Sequence[MapTransform], MapTransform],
+        resizer: Union[Sequence[MapTransform], MapTransform],
+        cropper: Union[Sequence[MapTransform], MapTransform],
+        caster: Union[Sequence[MapTransform], MapTransform],
+        to_tensor: Union[Sequence[MapTransform], MapTransform],
+        is_supervised: bool,
+        dataset_type: Dataset,
+        dataset_kwargs: dict,
+        additional_transforms: Optional[Sequence[MapTransform]] = None,
+        verbose: Optional[bool] = False,
     ):
         self.files_list = files_list
         self.verbose = verbose
         self.input_data = self.get_input_data(is_supervised)
-        self.dataset = None
+        self.dataset = dataset_type
+        self.dataset_kwargs = dataset_kwargs
 
         self.transforms = ensure_list(loader)
         if channeler is not None:
@@ -97,7 +100,8 @@ class BasicClassificationDataset(object):
         return input_data
 
     def get_dataset(self):
-        return self.dataset
+        return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
+
 
 
 class SupervisedClassificationDataset2D(BasicClassificationDataset):
@@ -152,13 +156,11 @@ class SupervisedClassificationDataset2D(BasicClassificationDataset):
             cropper,
             caster,
             to_tensor,
-            additional_transforms,
             True,
+            CacheDataset,
+            {'cache_rate': preload},
+            additional_transforms,
             verbose,
-        )
-
-        self.dataset = CacheDataset(
-            self.input_data, transform=self.transforms, cache_rate=preload
         )
 
 
@@ -170,9 +172,7 @@ class SupervisedClassificationDataset3D(BasicClassificationDataset):
         channeler: Optional[MapTransform] = AddChanneld(keys="image"),
         orienter: Optional[MapTransform] = Orientationd(keys="image", axcodes="LPI"),
         spacer: Optional[MapTransform] = Spacingd(keys="image", pixdim=(1, 1, 1)),
-        rescaler: Optional[MapTransform] = ScaleIntensityRanged(
-            keys="image", a_min=0, a_max=65535, b_min=0, b_max=1, clip=True
-        ),
+        rescaler: Optional[MapTransform] = NormalizeIntensityD(keys='image'),
         resizer: Optional[MapTransform] = ResizeWithPadOrCropd(
             keys="image", spatial_size=(512, 512, 256)
         ),
@@ -216,16 +216,9 @@ class SupervisedClassificationDataset3D(BasicClassificationDataset):
             cropper,
             caster,
             to_tensor,
-            additional_transforms,
             True,
+            PersistentDataset if preload == 1.0 else CacheDataset,
+            {'cache_dir': cache_dir} if preload == 1.0 else {'cache_rate': preload},
+            additional_transforms,
             verbose,
         )
-
-        if preload == 1.0:
-            self.dataset = PersistentDataset(
-                self.input_data, transform=self.transforms, cache_dir=cache_dir
-            )
-        else:
-            self.dataset = CacheDataset(
-                self.input_data, transform=self.transforms, cache_rate=preload
-            )
