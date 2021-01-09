@@ -137,21 +137,30 @@ def get_pretrain_pruned_unet(opts, in_model, origin_model, channel_mask, verbose
                    'Weight dim mismatch {}!={}'.format(m1.weight.data.shape, w1.shape)
             m1.weight.data = w1.clone()
             m1.bias.data = m0.bias.data.clone() 
-    
+
     return new_model 
 
-def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_dir=None):
+
+def SNIP(
+    input_net,
+    prepare_batch_fn,
+    loss_fn,
+    keep_ratio,
+    train_dataloader,
+    device='cpu',
+    output_dir=None
+):
     # TODO: shuffle?
-
     # Grab a single batch from the training dataset
-    input_data_dict = next(iter(train_dataloader))
-    inputs = input_data_dict['image']
-    targets = input_data_dict['label']
-    spatial_ndim = inputs.ndim - 2 #assume inputs dim [BCHWD]or[BCHW]
-    assert spatial_ndim in [2,3], f'Currently only support 2&3D data, but got dim={spatial_ndim}'
+    batchdata = next(iter(train_dataloader))
+    batch = prepare_batch_fn(batchdata, device, False)
+    if len(batch) == 2:
+        inputs, targets = batch
+    else:
+        raise NotImplementedError
 
-    inputs = inputs.to(device).float()
-    targets = targets.to(device).long()
+    spatial_ndim = inputs.ndim - 2  # assume inputs dim [BCHWD]or[BCHW]
+    assert spatial_ndim in [2, 3], f'Currently only support 2&3D data, but got dim={spatial_ndim}'
 
     # Let's create a fresh copy of the network so that we're not worried about
     # affecting the actual training-phase
@@ -174,7 +183,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
         # Override the forward methods:
         if isinstance(layer, (PrunableConv3d, PrunableConv2d)):
-                layer.forward = types.MethodType(snip_conv_forward, layer)
+            layer.forward = types.MethodType(snip_conv_forward, layer)
 
         if isinstance(layer, (PrunableDeconv3d, PrunableDeconv2d)):
             layer.forward = types.MethodType(snip_deconv_forward, layer)
@@ -225,7 +234,7 @@ def SNIP(input_net, loss_fn, keep_ratio, train_dataloader, device='cpu', output_
 
     return keep_masks
 
-    
+
 def cSNIP(input_net, loss_fn, keep_ratio, train_dataloader, min_chs=3, use_cuda=True, output_dir=None):
     # TODO: shuffle?
 

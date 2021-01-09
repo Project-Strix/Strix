@@ -68,9 +68,7 @@ def train_core(cargs, files_train, files_valid):
             target_is_directory=True,
         )
 
-    trainer, net, loss_fn = get_engine(
-        cargs, train_loader, valid_loader, writer=writer, show_network=cargs.visualize
-    )
+    trainer, net, loss_fn = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
@@ -117,10 +115,11 @@ def train_core(cargs, files_train, files_valid):
             trainer.add_event_handler(
                 event_name=Events.ITERATION_STARTED(once=1),
                 handler=SNIP_prune_handler(
-                    net,
-                    loss_fn,
+                    trainer.network,
+                    trainer.prepare_batch,
+                    trainer.loss_function,
                     cargs.snip_percent,
-                    train_loader,
+                    trainer.data_loader,
                     device=original_device,
                     snip_device=snip_device,
                     verbose=cargs.debug,

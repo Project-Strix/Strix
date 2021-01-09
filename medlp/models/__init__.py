@@ -163,7 +163,7 @@ def get_network(opts):
     return model
 
 
-def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
+def get_engine(opts, train_loader, test_loader, writer=None):
     """Generate engines for specified config.
 
     Args:
@@ -171,7 +171,6 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
         train_loader (DataLoader): Pytorch dataload for training dataset.
         test_loader (DataLoader): Pytorch dataload for validation dataset.
         writer (SummaryWriter, optional): Tensorboard SummaryWriter. Defaults to None.
-        show_network (bool, optional): Whether print network architecture. Defaults to True.
 
     Raises:
         NotImplementedError: Raise error if using undefined loss function.
@@ -239,7 +238,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     else:
         net = net_.to(device)
 
-    if show_network:
+    if opts.visualize:
         print_network(net)
 
     if opts.optim == 'adam':
@@ -275,6 +274,8 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
                                                                             T_0=opts.lr_policy_params['T_0'],
                                                                             T_mult=opts.lr_policy_params['T_mult'],
                                                                             eta_min=opts.lr_policy_params['eta_min'])
+    else:
+        raise NotImplementedError
 
     params = {
         'opts': opts,
@@ -292,6 +293,7 @@ def get_engine(opts, train_loader, test_loader, writer=None, show_network=True):
     }
 
     engine = TRAIN_ENGINES[framework_type](**params)
+
     return engine, net, loss
 
 

@@ -94,18 +94,21 @@ class NNIReporterHandler:
             self.logger.info(f'{engine.state.epoch} report final')
             NNi.report_final_result(engine.state.metrics[self.metric_name])
 
+
 class SNIP_prune_handler:
     def __init__(self,
                  net,
+                 prepare_batch_fn,
                  loss_fn,
                  prune_percent,
                  data_loader,
                  device='cuda',
-                 snip_device = 'cpu',
-                 verbose = False,
+                 snip_device='cpu',
+                 verbose=False,
                  logger_name: Optional[str] = None
     ) -> None:
         self.net = net
+        self.prepare_batch_fn = prepare_batch_fn
         self.loss_fn = loss_fn
         self.prune_percent = prune_percent
         self.data_loader = data_loader
@@ -114,10 +117,18 @@ class SNIP_prune_handler:
         self.verbose = verbose
         self.logger_name = logger_name
         self.logger = logging.getLogger(logger_name)
-    
+
     def __call__(self, engine: Engine) -> None:
         self.logger.debug("-------------- In SNIP handler ---------------")
-        keep_masks = SNIP(self.net, self.loss_fn, self.prune_percent, self.data_loader, self.snip_device, None)
+        keep_masks = SNIP(
+            self.net,
+            self.prepare_batch_fn,
+            self.loss_fn,
+            self.prune_percent,
+            self.data_loader,
+            self.snip_device,
+            None
+        )
         net_ = apply_prune_mask(self.net, keep_masks, self.device, self.verbose)
         # self.net.load_state_dict(net_.state_dict())
 

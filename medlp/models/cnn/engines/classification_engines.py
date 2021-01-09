@@ -65,11 +65,19 @@ def build_classification_engine(**kwargs):
     # is_multilabel = opts.output_nc>1
 
     if opts.criterion in ['BCE', 'WBCE']:
-        prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device))
+        prepare_batch_fn = lambda x, device, nb: (
+            x["image"].to(device),
+            torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device)
+        )
         if opts.output_nc > 1:
-            key_metric_transform_fn = lambda x: (x["pred"], one_hot(x["label"], num_classes=opts.output_nc))
+            key_metric_transform_fn = lambda x, device, nb: (
+                x["pred"],
+                one_hot(x["label"], num_classes=opts.output_nc)
+            )
     else:
-        prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), x["label"].to(device))
+        prepare_batch_fn = lambda x, device, nb: (
+            x["image"].to(device), x["label"].to(device)
+        )
 
     val_metric_name = 'val_auc'
     val_handlers = [
@@ -123,11 +131,33 @@ def build_classification_engine(**kwargs):
         lr_step_transform = lambda x: ()
 
     train_handlers = [
-        LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
-        ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
-        StatsHandler(tag_name="train_loss", output_transform=lambda x: x["loss"], name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x["loss"]),
-        CheckpointSaverEx(save_dir=os.path.join(model_dir,"Checkpoint"), save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5), #!n_saved=None
+        LrScheduleTensorboardHandler(
+            lr_scheduler=lr_scheduler,
+            summary_writer=writer,
+            step_transform=lr_step_transform
+        ),
+        ValidationHandler(
+            validator=evaluator,
+            interval=valid_interval,
+            epoch_level=True
+        ),
+        StatsHandler(
+            tag_name="train_loss",
+            output_transform=lambda x: x["loss"],
+            name=logger_name
+        ),
+        TensorBoardStatsHandler(
+            summary_writer=writer,
+            tag_name="train_loss",
+            output_transform=lambda x: x["loss"]
+        ),
+        CheckpointSaverEx(
+            save_dir=os.path.join(model_dir, "Checkpoint"),
+            save_dict={"net": net, "optim": optim},
+            save_interval=opts.save_epoch_freq,
+            epoch_level=True,
+            n_saved=5
+        ),  #!n_saved=None
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
