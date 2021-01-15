@@ -38,7 +38,7 @@ class VGG(nn.Module):
 
         self.features = features
         output_size = (bottleneck_size, )*dim #(2,2,2) #For OOM issue
-        
+
         self.avgpool = pool_type(output_size)
         num_ = np.prod(output_size)
         self.classifier = nn.Sequential(
@@ -75,8 +75,8 @@ class VGG(nn.Module):
 
 
 def make_layers(
-    cfg, 
-    dim, 
+    cfg,
+    dim,
     in_channels=3, 
     batch_norm=False,
     is_prunable=False

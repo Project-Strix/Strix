@@ -62,6 +62,7 @@ def get_network(opts):
     image_size = get_attr_(opts, 'image_size', (512, 512))
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
+    bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
     # f_maps = get_attr_(opts, 'n_features', 64)
     # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     # n_groups = get_attr_(opts, 'n_groups', 8)
@@ -79,7 +80,7 @@ def get_network(opts):
         kernel_size = (3,)+(3,)*n_depth
         strides = (1,)+(2,)*n_depth
         upsample_kernel_size=(1,)+(2,)*n_depth
-        
+
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -137,7 +138,8 @@ def get_network(opts):
                       in_channels=in_channels,
                       num_classes=out_channels,
                       dim=dim,
-                      is_prunable=is_prunable)
+                      is_prunable=is_prunable,
+                      bottleneck_size=bottleneck_size)
     elif 'resnet' in model_name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,

@@ -208,18 +208,18 @@ class UnetUpBlock(nn.Module):
             norm_name=norm_name,
             is_prunable=is_prunable,
         )
-    
+
     def groupwise_concate(self, f1, f2):
-        output      = torch.cat((f1.unsqueeze(2), f2.unsqueeze(2)), dim = 2)
-        output      = output.reshape([f1.shape[0],-1]+f1.shape[2:])
-        return output 
+        output = torch.cat((f1.unsqueeze(2), f2.unsqueeze(2)), dim=2)
+        output = output.reshape([f1.shape[0], -1] + f1.shape[2:])
+        return output
 
     def forward(self, inp, skip):
         # number of channels for skip should equals to out_channels
         out = self.transp_conv(inp)
         if self.num_groups == 1:
             out = torch.cat((out, skip), dim=1)
-        else: #num_groups > 1
+        else:  #num_groups > 1
             out = self.groupwise_concate(out, skip)
 
         out = self.conv_block(out)
@@ -228,28 +228,28 @@ class UnetUpBlock(nn.Module):
 
 class UnetOutBlock(nn.Module):
     def __init__(
-        self, 
-        spatial_dims: int, 
-        in_channels: int, 
+        self,
+        spatial_dims: int,
+        in_channels: int,
         out_channels: int,
         num_groups: int,
         **kwargs
     ):
         super(UnetOutBlock, self).__init__()
         kernel_size = kwargs.get('kernel_size', 1)
-        stride = kwargs.get('stride',1)
-        bias = kwargs.get('bias',True)
-        conv_only = kwargs.get('conv_only',True)
+        stride = kwargs.get('stride', 1)
+        bias = kwargs.get('bias', True)
+        conv_only = kwargs.get('conv_only', True)
         activation = kwargs.get('activation', None)
         is_prunable = kwargs.get('is_prunable', False)
 
         self.conv = get_conv_layer(
-            spatial_dims, 
-            in_channels, 
-            out_channels, 
-            kernel_size=kernel_size, 
-            stride=stride, 
-            bias=bias, 
+            spatial_dims,
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=bias,
             conv_only=conv_only,
             num_groups=num_groups,
             is_prunable=is_prunable,

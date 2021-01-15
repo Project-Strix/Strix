@@ -118,10 +118,10 @@ def add_3D_image_to_summary(manager, image, name, centers=None):
     manager.add_image(name + '_x', segmentation_overlay_x)
     manager.add_image(name + '_y', segmentation_overlay_y)
     manager.add_image(name + '_z', segmentation_overlay_z)
-    
+
 
 def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
-    assert len(torch_dataset)>1, 'dataset must have at least 2 items!'
+    assert len(torch_dataset) > 1, 'dataset must have at least 2 items!'
     prev_data = torch_dataset[0]
     next_data = torch_dataset[1]
 
@@ -132,7 +132,7 @@ def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
                                              Path(next_data[meta_key]['filename_or_obj']).parents)):
         if prev_v.stem != next_v.stem:
             return i+1
-    
+
     return 0
 
 def detect_port(port):
@@ -238,7 +238,7 @@ class Registry(dict):
 class DimRegistry(dict):
     def __init__(self, *args, **kwargs):
         super(DimRegistry, self).__init__(*args, **kwargs)
-        self.dim_mapping = {'2':'2D','3':'3D',2:'2D',3:'3D','2D':'2D','3D':'3D'}
+        self.dim_mapping = {'2': '2D', '3': '3D', 2: '2D', 3: '3D', '2D': '2D', '3D': '3D'}
         self['2D'] = {}
         self['3D'] = {}
 
@@ -255,12 +255,12 @@ class DimRegistry(dict):
             _register_generic_dim(self, dim, module_name, fn)
             return fn 
         return register_fn
-    
+
 
 class DatasetRegistry(DimRegistry):
     def __init__(self, *args, **kwargs):
         super(DatasetRegistry, self).__init__(*args, **kwargs)
-    
+
     def register(self, dim, module_name, fpath, module=None):
         assert dim in DIMS, "Only support 2D&3D dataset now"
         dim = self.dim_mapping[dim]

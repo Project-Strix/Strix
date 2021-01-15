@@ -259,7 +259,7 @@ def build_segmentation_test_engine(**kwargs):
         post_transforms = Compose(
             [
                 ActivationsD(keys="pred", softmax=True),
-                AsDiscreteD(keys="pred", argmax=True, n_classes=opts.output_nc),
+                AsDiscreteD(keys="pred", argmax=True, to_onehot=True, n_classes=opts.output_nc)
             ]
         )
 
@@ -274,7 +274,6 @@ def build_segmentation_test_engine(**kwargs):
             output_name_uplevel=uplevel,
             resample=resample,
             batch_transform=lambda x: x["image_meta_dict"],
-            # batch_transform=lambda x: {"filename_or_obj": list(map(lambda x: os.path.dirname(x), x["image_meta_dict"]["filename_or_obj"])), "affine":x["image_meta_dict"]["prev_affine"]},
             output_transform=lambda output: output["pred"],
         ),
     ]
@@ -303,11 +302,8 @@ def build_segmentation_test_engine(**kwargs):
         key_metric_transform_fn = lambda x: (x["pred"], None)
         key_val_metric = None
     elif opts.phase == "test":
-        prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            x["label"].to(device),
-        )
-        key_metric_transform_fn = lambda x: (x["pred"], x["label"])
+        prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), x["label"].to(device))
+        key_metric_transform_fn = lambda x: (x["pred"], one_hot(x["label"], num_classes=opts.output_nc))
         key_val_metric = {
             "val_mean_dice": MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
@@ -315,7 +311,7 @@ def build_segmentation_test_engine(**kwargs):
         }
 
     inferer = (
-        SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.3)
+        SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.4)
         if use_slidingwindow
         else SimpleInferer()
     )

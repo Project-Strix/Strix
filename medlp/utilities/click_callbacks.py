@@ -428,7 +428,10 @@ def latent_auxilary_params(func):
         help="Use deep supervision module",
     )
     @optionex(
-        "--deep-supr-num", type=int, default=1, help="Num of features will be output"
+        "--deep-supr-num",
+        type=int,
+        default=1,
+        help="Num of features will be output"
     )
     @optionex(
         "--snip_percent",
@@ -439,6 +442,7 @@ def latent_auxilary_params(func):
     )
     @optionex("--n-fold", type=int, default=0)
     @optionex("--config", type=click.Path(exists=True))
+    @optionex("--bottleneck-size", type=int, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
