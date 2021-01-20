@@ -290,13 +290,6 @@ def build_segmentation_test_engine(**kwargs):
             )
         ]
 
-    # if opts.criterion == 'CE' or opts.criterion == 'WCE':
-    #     prepare_batch_fn = lambda x : (x["image"], x["label"].squeeze(dim=1))
-    #     key_metric_transform_fn = lambda x : (x["pred"], x["label"].unsqueeze(dim=1))
-    # else:
-    #     prepare_batch_fn = lambda x : (x["image"], x["label"])
-    #     key_metric_transform_fn = lambda x : (x["pred"], x["label"])
-
     if opts.phase == "test_wo_label":
         prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), None)
         key_metric_transform_fn = lambda x: (x["pred"], None)
