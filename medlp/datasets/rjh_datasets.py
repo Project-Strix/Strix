@@ -78,6 +78,7 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
 
     return dataset
 
+
 @SEGMENTATION_DATASETS.register('3D', 'rjh_tswi_v2',
     "/homes/clwang/Data/RJH/RJ_data/tSWI_preprocessed/train_datalist_sn.json")
 def get_rjh_tswi_roi45(files_list, phase, opts):
@@ -146,6 +147,7 @@ def get_rjh_tswi_roi45(files_list, phase, opts):
 
     return dataset
 
+
 @SEGMENTATION_DATASETS.register('3D','rjh_swim', 
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
@@ -208,12 +210,13 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
     in_channels=opts.get('input_nc', 3)
     preload=opts.get('preload', 0)
     augment_ratio=opts.get('augment_ratio', 0.4)
-    orientation=opts.get('orientation','RAI')
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
+    orientation=opts.get('orientation', 'RAI')
+    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')), 'caches')
+    image_keys = opts.get('image_keys', ['image'])
 
     cropper = [
             SeparateCropSTSdataD(
-                keys=["image", "mask"],
+                keys=image_keys+["mask"],
                 mask_key="mask",
                 label_key='label',
                 crop_size=(32,32,16),
@@ -223,21 +226,21 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
                 flip_axis=1,
             ),
             ExtractSTSlicesD(
-                keys=['image', 'mask'],
+                keys=image_keys+['mask'],
                 mask_key='mask'
             ),
             SqueezeDimD(
-                keys=['image', 'mask'], 
+                keys=image_keys+['mask'],
                 dim=0
             ),
             AsChannelFirstD(
-                keys=['image', 'mask']
+                keys=image_keys+['mask']
             )
         ]
     if spatial_size != (32, 32):
         cropper += [
             ResizeD(
-                keys=['image', 'mask'],
+                keys=image_keys+['mask'],
                 spatial_size=spatial_size,
                 mode=['bilinear', 'nearest']
             )
@@ -246,7 +249,7 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
     if phase == 'train':
         additional_transforms = [
             RandAffineD(
-                keys=['image', 'mask'],
+                keys=image_keys+['mask'],
                 spatial_size=spatial_size,
                 prob=augment_ratio,
                 rotate_range=[math.pi/30, math.pi/30],
@@ -266,15 +269,19 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
 
     dataset = BasicClassificationDataset(
         files_list,
-        loader=LoadNiftid(keys=["image","mask"], dtype=np.float32),
-        channeler=AddChannelD(keys=['image', 'mask']),
+        loader=LoadNiftid(keys=image_keys+["mask"], dtype=np.float32),
+        channeler=AddChannelD(keys=image_keys+['mask']),
         orienter=None, #Orientationd(keys=['image','mask'], axcodes=orientation),
-        spacer=SpacingD(keys=["image","mask"], pixdim=spacing, mode=[GridSampleMode.BILINEAR, GridSampleMode.NEAREST]),
+        spacer=SpacingD(
+            keys=image_keys+["mask"],
+            pixdim=spacing,
+            mode=[GridSampleMode.BILINEAR, GridSampleMode.NEAREST]
+        ),
         rescaler=None,
         resizer=None,
         cropper=cropper,
-        caster=CastToTyped(keys="image", dtype=np.float32),
-        to_tensor=ToTensord(keys=["image", "mask"]),
+        caster=CastToTyped(keys=image_keys, dtype=np.float32),
+        to_tensor=ToTensord(keys=image_keys+["mask"]),
         is_supervised=True,
         dataset_type=CacheDataset,
         dataset_kwargs={'cache_rate':preload},
@@ -283,13 +290,22 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
 
     return dataset
 
+
 @CLASSIFICATION_DATASETS.register('2D', 'rjh_tswi_oneside',
     "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1229_2131-train.json")
 def get_oneside_dataset(files_list, phase, opts):
     return get_basis_rjh_tswi_dataset(files_list, phase, opts, (32,32))
 
+
 @CLASSIFICATION_DATASETS.register('2D', 'rjh_tswi_oneside_larger',
     "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1229_2131-train.json")
 def get_oneside_dataset(files_list, phase, opts):
     return get_basis_rjh_tswi_dataset(files_list, phase, opts, (64,64))
+
+
+@CLASSIFICATION_DATASETS.register('2D', 'rjh_tswi_multimodal',
+    "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1229_2131-train.json")
+def get_oneside_dataset(files_list, phase, opts):
+    opts['image_keys'] = ['image1', 'image2']
+    return get_basis_rjh_tswi_dataset(files_list, phase, opts, (32,32))
 

@@ -47,14 +47,14 @@ class BasicBlock(nn.Module):
         conv_type: Callable = Conv[Conv.CONV, dim]
         maxpool_type: Callable = Pool[Pool.MAX, dim]
         avgpool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
-        
+
         if norm_layer is None:
             norm_layer = norm_type
         if groups != 1 or base_width != 64:
             raise ValueError('BasicBlock only supports groups=1 and base_width=64')
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
-        
+
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride, dim=self.dim)
         self.bn1 = norm_layer(planes)
@@ -246,7 +246,7 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     if pretrained:
         num_classes_ = kwargs['num_classes']
         kwargs['num_classes'] = 1000
-    
+
     model = ResNet(block, layers, **kwargs)
 
     if pretrained:
@@ -259,8 +259,9 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
 
     return model
 
-@CLASSIFICATION_ARCHI.register('2D','resnet18')
-@CLASSIFICATION_ARCHI.register('3D','resnet18')
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet18')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet18')
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -272,8 +273,9 @@ def resnet18(pretrained=False, progress=True, **kwargs):
     return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
                    **kwargs)
 
-@CLASSIFICATION_ARCHI.register('2D','resnet34')
-@CLASSIFICATION_ARCHI.register('3D','resnet34')
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet34')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet34')
 def resnet34(pretrained=False, progress=True, **kwargs):
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -285,8 +287,9 @@ def resnet34(pretrained=False, progress=True, **kwargs):
     return _resnet('resnet34', BasicBlock, [3, 4, 6, 3], pretrained, progress,
                    **kwargs)
 
-@CLASSIFICATION_ARCHI.register('2D','resnet50')
-@CLASSIFICATION_ARCHI.register('3D','resnet50')
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet50')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet50')
 def resnet50(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_

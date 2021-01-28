@@ -66,12 +66,12 @@ class MG_Unet(DynUNet):
         self.downsamples = self.get_downsamples()
         self.upsamples = self.get_upsamples()
         self.output_block = self.get_output_block(0, last_activation=last_activation)
-    
+
     def get_downsamples(self):
         inp, out = self.filters[:-2], self.filters[1:-1]
         strides, kernel_size = self.strides[1:-1], self.kernel_size[1:-1]
         return self.get_module_list(inp, out, kernel_size, strides, self.conv_block)
-    
+
     def get_upsamples(self):
         inp, out = self.filters[1:][::-1], self.filters[:-1][::-1]
         strides, kernel_size = self.strides[1:][::-1], self.kernel_size[1:][::-1]
@@ -79,22 +79,22 @@ class MG_Unet(DynUNet):
         return self.get_module_list(inp, out, kernel_size, strides, UnetUpBlock, upsample_kernel_size)
 
     def get_output_block(self, idx: int, upsample: int = 0, last_activation: Optional[str] = None):
-            if upsample > 1:
-                return nn.Sequential(UnetOutBlock(self.spatial_dims, 
-                                                  self.filters[idx], 
-                                                  self.out_channels*self.num_groups,
-                                                  self.num_groups,
-                                                  is_prunable=self.is_prunable,), 
-                                     nn.UpsamplingBilinear2d(scale_factor=upsample))
-            else:
-                return UnetOutBlock(
-                    self.spatial_dims, 
-                    self.filters[idx], 
-                    self.out_channels*self.num_groups, 
-                    self.num_groups,
-                    activation=last_activation, 
-                    is_prunable=self.is_prunable,
-                )
+        if upsample > 1:
+            return nn.Sequential(UnetOutBlock(self.spatial_dims,
+                                                self.filters[idx],
+                                                self.out_channels*self.num_groups,
+                                                self.num_groups,
+                                                is_prunable=self.is_prunable,),
+                                    nn.UpsamplingBilinear2d(scale_factor=upsample))
+        else:
+            return UnetOutBlock(
+                self.spatial_dims,
+                self.filters[idx],
+                self.out_channels*self.num_groups,
+                self.num_groups,
+                activation=last_activation,
+                is_prunable=self.is_prunable,
+            )
 
     def get_module_list(
         self,
@@ -151,11 +151,13 @@ class MG_Unet(DynUNet):
             out = upsample(out, skip)
             upsample_outs.append(out)
         out = self.output_block(out)
+
         if self.training and self.deep_supervision:
             start_output_idx = len(upsample_outs) - 1 - self.deep_supr_num
             upsample_outs = upsample_outs[start_output_idx:-1][::-1]
             preds = [self.deep_supervision_heads[i](out) for i, out in enumerate(upsample_outs)]
             return [out] + preds
+
         return out
 
 class MGNet(nn.Module):

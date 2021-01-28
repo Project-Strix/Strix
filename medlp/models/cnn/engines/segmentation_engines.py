@@ -259,7 +259,7 @@ def build_segmentation_test_engine(**kwargs):
         post_transforms = Compose(
             [
                 ActivationsD(keys="pred", softmax=True),
-                AsDiscreteD(keys="pred", argmax=True, to_onehot=True, n_classes=opts.output_nc)
+                AsDiscreteD(keys="pred", argmax=True, to_onehot=False, n_classes=opts.output_nc)
             ]
         )
 
@@ -296,7 +296,10 @@ def build_segmentation_test_engine(**kwargs):
         key_val_metric = None
     elif opts.phase == "test":
         prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), x["label"].to(device))
-        key_metric_transform_fn = lambda x: (x["pred"], one_hot(x["label"], num_classes=opts.output_nc))
+        key_metric_transform_fn = lambda x: (
+            one_hot(x["pred"], num_classes=opts.output_nc),
+            one_hot(x["label"], num_classes=opts.output_nc)
+        )
         key_val_metric = {
             "val_mean_dice": MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
@@ -304,7 +307,7 @@ def build_segmentation_test_engine(**kwargs):
         }
 
     inferer = (
-        SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.4)
+        SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
         if use_slidingwindow
         else SimpleInferer()
     )
