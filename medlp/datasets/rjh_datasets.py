@@ -1,12 +1,10 @@
-import os, sys, time, torch, random, tqdm, math
+import os, math
 import numpy as np
-from utils_cw import Print, load_h5, check_dir
-import nibabel as nib
+from utils_cw import check_dir
 
-from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
 from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
 from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
-from medlp.data_io.base_dataset.classification_dataset import SupervisedClassificationDataset3D, BasicClassificationDataset
+from medlp.data_io.base_dataset.classification_dataset import BasicClassificationDataset
 from medlp.utilities.utils import is_avaible_size
 from medlp.utilities.transforms import (
     DataLabellingD,
@@ -15,9 +13,12 @@ from medlp.utilities.transforms import (
     ExtractSTSlicesD
 )
 
-from monai_ex.data import CacheDataset, Dataset, PersistentDataset
-from monai_ex.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
+from monai_ex.data import CacheDataset, PersistentDataset
 from monai_ex.transforms import *
+
+# import nibabel as nib
+# from typing import Any, Callable, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
+# from monai_ex.utils import Method, NumpyPadMode, ensure_tuple, ensure_tuple_rep, fall_back_tuple, InterpolateMode
 
 
 @SEGMENTATION_DATASETS.register('3D', 'rjh_tswi',
@@ -148,7 +149,7 @@ def get_rjh_tswi_roi45(files_list, phase, opts):
     return dataset
 
 
-@SEGMENTATION_DATASETS.register('3D','rjh_swim', 
+@SEGMENTATION_DATASETS.register('3D', 'rjh_swim',
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
     spacing=(0.666667,0.666667,2)
