@@ -108,9 +108,9 @@ def get_network(opts):
             out_channels=out_channels,
             channels=channels,
             strides=strides,
-            kernel_size = 3,
-            up_kernel_size = 3,
-            num_res_units = 2 if model_name=='res-unet' else 0,
+            kernel_size=3,
+            up_kernel_size=3,
+            num_res_units=2 if model_name=='res-unet' else 0,
             act='prelu',
             norm=layer_norm,
             dropout=0,
@@ -153,8 +153,18 @@ def get_network(opts):
             dropout_prob=0.5,
             dropout_dim=dim,
         )
+    elif model_name == 'ild_net':
+        model = model(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            n_depth=5,
+            k=4,
+            feature_policy='proportional',
+            dim=dim,
+            is_prunable=is_prunable,
+        )
     elif model_name in RCNN_MODEL_TYPES:
-        pass
+        raise NotImplementedError
         # config_file = get_rcnn_config(model_name, opts.backbone)
         # assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
         # config_content = get_items_from_file(config_file, format='yaml')
