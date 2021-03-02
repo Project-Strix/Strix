@@ -333,13 +333,13 @@ class RandCrop2dByPosNegLabelD(Randomizable, MapTransform):
 
     def get_new_spatial_size(self):
         spatial_size_ = ensure_list(self.spatial_size)
-        if self.crop_mode is 'single':
+        if self.crop_mode == 'single':
             spatial_size_.insert(self.z_axis, 1)
-        elif self.crop_mode is 'parallel':
+        elif self.crop_mode == 'parallel':
             spatial_size_.insert(self.z_axis, 3)
         else:
             spatial_size_ = [max(spatial_size_),]*3
-        
+
         return spatial_size_
 
     def randomize(
@@ -396,6 +396,7 @@ class RandCrop2dByPosNegLabelD(Randomizable, MapTransform):
                     results[i][key] = data[key]
 
         return results
+
 
 class RandCropSliceD(Randomizable, MapTransform):
     def __init__(

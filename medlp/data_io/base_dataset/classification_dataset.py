@@ -45,8 +45,8 @@ class BasicClassificationDataset(object):
             self.transforms += ensure_list(resizer)
         if cropper is not None:
             self.transforms += ensure_list(cropper)
-
-        self.transforms += ensure_list(additional_transforms)
+        if additional_transforms is not None:
+            self.transforms += ensure_list(additional_transforms)
 
         if caster is not None:
             self.transforms += ensure_list(caster)
@@ -101,7 +101,6 @@ class BasicClassificationDataset(object):
 
     def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
-
 
 
 class SupervisedClassificationDataset2D(BasicClassificationDataset):

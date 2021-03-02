@@ -253,7 +253,7 @@ def common_params(func):
     @optionex("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @optionex("--input-nc", type=int, default=1, help="input data channels")
     @optionex("--output-nc", type=int, default=3, help="output channels (classes)")
-    @optionex("--split", type=float, default=0.2, help="Training/testing split ratio")
+    @optionex("--split", type=float, default=0.1, help="Training/testing split ratio")
     @optionex(
         "-W",
         "--pretrained-model-path",
@@ -442,7 +442,7 @@ def latent_auxilary_params(func):
     )
     @optionex("--n-fold", type=int, default=0)
     @optionex("--config", type=click.Path(exists=True))
-    @optionex("--bottleneck-size", type=int, help='Size of bottleneck size of VGG net')
+    @optionex("--bottleneck-size", type=int, default=7, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
