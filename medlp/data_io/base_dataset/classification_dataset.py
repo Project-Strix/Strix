@@ -22,7 +22,7 @@ class BasicClassificationDataset(object):
         to_tensor: Union[Sequence[MapTransform], MapTransform],
         is_supervised: bool,
         dataset_type: Dataset,
-        dataset_kwargs: dict,
+        dataset_kwargs: Optional[dict] = {},
         additional_transforms: Optional[Sequence[MapTransform]] = None,
         verbose: Optional[bool] = False,
     ):

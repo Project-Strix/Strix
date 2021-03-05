@@ -68,7 +68,7 @@ def train_core(cargs, files_train, files_valid):
             target_is_directory=True,
         )
 
-    trainer, net, loss_fn = get_engine(cargs, train_loader, valid_loader, writer=writer)
+    trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)

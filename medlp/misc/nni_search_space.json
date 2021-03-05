@@ -11,7 +11,7 @@
         "_type":"choice", 
         "_value":[4,5]
     },
-    "model_type": {
+    "model_name": {
         "_type":"choice",
         "_value":["res-unet","res-unetv2"]
     },

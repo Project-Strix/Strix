@@ -7,7 +7,7 @@ import nibabel as nib
 from monai_ex.data import DataLoader, Dataset
 from monai_ex.transforms import *
 
-file = r"/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/datalist.json"
+file = r"/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/datalist-train.json"
 
 data_list = get_items_from_file(file, format='json')
 

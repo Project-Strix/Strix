@@ -353,7 +353,8 @@ def resnext101_32x8d(pretrained=False, progress=True, **kwargs):
     return _resnet('resnext101_32x8d', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
 
-
+@CLASSIFICATION_ARCHI.register('2D', 'WRN50')
+@CLASSIFICATION_ARCHI.register('3D', 'WRN50')
 def wide_resnet50_2(pretrained=False, progress=True, **kwargs):
     r"""Wide ResNet-50-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_

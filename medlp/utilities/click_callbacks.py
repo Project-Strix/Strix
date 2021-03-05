@@ -112,6 +112,11 @@ def lr_schedule_params(ctx, param, value):
         iters = _prompt("step iter", int, 50)
         gamma = _prompt("step gamma", float, 0.1)
         ctx.params["lr_policy_params"] = {"step_size": iters, "gamma": gamma}
+    elif value == 'multistep':
+        steps = _prompt('steps', tuple, (100, 300), value_proc=lambda x: list(map(int, x.split(','))))
+        gamma = _prompt("step gamma", float, 0.1)
+        ctx.params["lr_policy_params"] = {"milestones": steps, "gamma": gamma}
+        # print("lr_policy_params", ctx.params["lr_policy_params"])
     elif value == "SGDR":
         t0 = _prompt("SGDR T-0", int, 50)
         eta = _prompt("SGDR Min LR", float, 1e-4)
@@ -253,7 +258,7 @@ def common_params(func):
     @optionex("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @optionex("--input-nc", type=int, default=1, help="input data channels")
     @optionex("--output-nc", type=int, default=3, help="output channels (classes)")
-    @optionex("--split", type=float, default=0.1, help="Training/testing split ratio")
+    @optionex("--split", type=float, default=0.2, help="Training/testing split ratio")
     @optionex(
         "-W",
         "--pretrained-model-path",
@@ -269,7 +274,7 @@ def common_params(func):
         default="/homes/clwang/Data/medlp_exp",
     )
     @optionex(
-        "--augment-ratio", type=float, default=0.3, help="Data aug ratio."
+        "--augment-ratio", type=float, default=0.5, help="Data aug ratio."
     )
     @optionex(
         "-P",
@@ -293,7 +298,7 @@ def common_params(func):
     @optionex(
         "--early-stop",
         type=int,
-        default=200,
+        default=300,
         help="Patience of early stopping. default: 200epochs",
     )
     @optionex(
@@ -306,7 +311,7 @@ def common_params(func):
     )
     @optionex("--n-fold", type=int, default=0, help="K fold cross-validation")
     @optionex("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
-    @optionex("--seed", type=int, default=101, help="random seed")
+    @optionex("--seed", type=int, default=10, help="random seed")
     @optionex("--compact-log", is_flag=True, help="Output compact log info")
     @optionex("--symbolic-tb", is_flag=True, help='Create symbolic for tensorboard logs')
     @optionex(

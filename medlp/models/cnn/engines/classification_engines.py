@@ -8,6 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, output_filename_check
+from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.inferers import SimpleInferer
@@ -41,7 +42,7 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaver,
+    SegmentationSaverEx,
     ClassificationSaverEx,
     ROCAUC,
     stopping_fn_from_metric
@@ -62,7 +63,7 @@ def build_classification_engine(**kwargs):
     device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
-    # is_multilabel = opts.output_nc>1
+    is_multilabel = opts.output_nc>1
 
     if opts.criterion in ['BCE', 'WBCE']:
         prepare_batch_fn = lambda x, device, nb: (
@@ -78,8 +79,11 @@ def build_classification_engine(**kwargs):
         prepare_batch_fn = lambda x, device, nb: (
             x["image"].to(device), x["label"].to(device)
         )
+    if is_multilabel:
+        val_metric_name = 'val_acc'
+    else:
+        val_metric_name = 'val_auc'
 
-    val_metric_name = 'val_auc'
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
@@ -98,6 +102,13 @@ def build_classification_engine(**kwargs):
             prefix_name='Val'
         )
     ]
+    # If in nni search mode
+    if opts.nni:
+        val_handlers += [
+            NNIReporterHandler(
+                metric_name=val_metric_name, max_epochs=opts.n_epoch, logger_name=logger_name
+            )
+        ]
 
     if opts.output_nc == 1:
         train_post_transforms = Compose([
@@ -111,8 +122,10 @@ def build_classification_engine(**kwargs):
             SqueezeDimD(keys='pred')
         ])
 
-    # key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc),is_multilabel=is_multilabel)
-    key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
+    if is_multilabel:
+        key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc), is_multilabel=is_multilabel)
+    else:
+        key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -206,12 +219,21 @@ def build_classification_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
 
-    post_transform = Compose([
-        ActivationsD(keys="pred", sigmoid=True),
-        AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
-        lambda x: x['pred'].cpu().numpy()
-    ])
-    if opts.output_nc == 1:
+    if is_multilabel:
+        post_transform = Compose([
+            ActivationsD(keys="pred", softmax=True),
+            AsDiscreteD(keys="pred", argmax=True, to_onehot=False),
+            SqueezeDimD(keys="pred"),
+            lambda x: x['pred'].cpu().numpy()
+        ])
+    else:
+        post_transform = Compose([
+            ActivationsD(keys="pred", sigmoid=True),
+            AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+            lambda x: x['pred'].cpu().numpy()
+        ])
+
+    if not is_multilabel:
         acc_post_transforms = Compose([
             ActivationsD(keys="pred", sigmoid=True),
             AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
@@ -221,7 +243,6 @@ def build_classification_test_engine(**kwargs):
             ActivationsD(keys="pred", sigmoid=True),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
-
     else:
         acc_post_transforms = Compose([
             ActivationsD(keys="pred", softmax=True),
@@ -241,7 +262,9 @@ def build_classification_test_engine(**kwargs):
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
         ClassificationSaverEx(
             output_dir=opts.out_dir,
-            batch_transform=lambda x: x['image_meta_dict'],
+            save_errors=opts.phase=='test',
+            batch_transform=lambda x: (x['image_meta_dict'], x['image'], x['label']) \
+                            if opts.phase=='test' else lambda x: x['image_meta_dict'],
             output_transform=post_transform,
         ),
     ]
@@ -250,7 +273,7 @@ def build_classification_test_engine(**kwargs):
         # check output filename
         uplevel = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaver(
+            SegmentationSaverEx(
                 output_dir=opts.out_dir,
                 output_postfix='image',
                 output_name_uplevel=uplevel,
@@ -269,11 +292,11 @@ def build_classification_test_engine(**kwargs):
         inferer=SimpleInferer(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
         post_transform=None,  # post_transforms,
         val_handlers=val_handlers,
-        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms,is_multilabel=is_multilabel)},
+        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
         additional_metrics={
             'test_auc': ROCAUC(output_transform=auc_post_transforms),
-            'Prec': Precision(output_transform=acc_post_transforms),
-            'Recall': Recall(output_transform=acc_post_transforms),
+            'Prec': Precision(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
+            'Recall': Recall(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
             'ROC': DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms)
         },
         amp=opts.amp
@@ -397,7 +420,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     if opts.save_image:
         uplevel = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaver(
+            SegmentationSaverEx(
                 output_dir=opts.out_dir,
                 output_postfix='image',
                 output_name_uplevel=uplevel,

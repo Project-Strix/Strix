@@ -17,7 +17,7 @@ LOSSES = [
     "FocalLoss",
     "FocalDiceLoss",
 ]
-LR_SCHEDULE = ["const", "poly", "step", "SGDR", "plateau"]
+LR_SCHEDULE = ["const", "poly", "step", 'multistep', "SGDR", "plateau"]
 FRAMEWORK_TYPES = [
     "segmentation",
     "classification",

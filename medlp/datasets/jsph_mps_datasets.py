@@ -17,18 +17,25 @@ from medlp.utilities.transforms import (
 from monai_ex.data import CacheDataset, PersistentDataset
 from monai_ex.transforms import *
 
+"""
+MP/S 课题数据集
+MP指的是微乳头型肺腺癌，S指的是实体型肺腺癌
+"""
 
-@CLASSIFICATION_DATASETS.register('2D', 'jsph_nodule_larger',
+
+@CLASSIFICATION_DATASETS.register('2D', 'jsph_mps_larger',
     "/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/datalist-train.json")
 def get_25d_dataset_larger(files_list, phase, opts):
-    return get_lung_nodule_dataset(files_list, phase, opts, (96,96))
+    return get_lung_mps_dataset(files_list, phase, opts, (96,96))
 
-@CLASSIFICATION_DATASETS.register('2D', 'jsph_nodule',
+
+@CLASSIFICATION_DATASETS.register('2D', 'jsph_mps',
     "/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/datalist-train.json")
 def get_25d_dataset(files_list, phase, opts):
-    return get_lung_nodule_dataset(files_list, phase, opts, (40,40))
+    return get_lung_mps_dataset(files_list, phase, opts, (40,40))
 
-@CLASSIFICATION_DATASETS.register('3D', 'jsph_nodule_3d',
+
+@CLASSIFICATION_DATASETS.register('3D', 'jsph_mps_3d',
     "/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/datalist-train.json")
 def get_3d_dataset(files_list, phase, opts):
     spacing = opts.get('spacing', (0.7, 0.7, 1.5))
@@ -81,8 +88,9 @@ def get_3d_dataset(files_list, phase, opts):
     return dataset
 
 
-def get_lung_nodule_dataset(files_list, phase, opts, spatial_size):
+def get_lung_mps_dataset(files_list, phase, opts, spatial_size):
     # median reso: 0.70703125 z_reso: 1.5
+    # 0.5 & 99.5 percentile: -1024, 388
     spacing = opts.get('spacing', (0.7, 0.7, 1.5))
     in_channels = opts.get('input_nc', 3)
     preload = opts.get('preload', 0)
@@ -90,16 +98,13 @@ def get_lung_nodule_dataset(files_list, phase, opts, spatial_size):
     orientation = opts.get('orientation', 'RAI')
     image_keys = opts.get('image_keys', ['image'])
     mask_keys = opts.get('mask_keys', ['mask'])
-    cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), 'caches')
+
+    use_mask = False
+    crop_mode = 'parallel'
+    center_mode = 'maximum'
 
     if phase == 'train':
         additional_transforms = [
-            RandGaussianNoiseD(
-                keys=image_keys,
-                prob=augment_ratio,
-                mean=0.0,
-                std=0.1,
-            ),
             RandRotate90D(
                 keys=image_keys,
                 prob=augment_ratio,
@@ -116,56 +121,56 @@ def get_lung_nodule_dataset(files_list, phase, opts, spatial_size):
             #     as_tensor_output=False
             # )
         ]
+        if not use_mask:
+            additional_transforms += [
+                RandGaussianNoiseD(
+                    keys=image_keys,
+                    prob=augment_ratio,
+                    mean=0.0,
+                    std=0.05,
+                ),
+            ]
     elif phase in ['valid', 'test']:
         additional_transforms = []
     elif phase == 'test_wo_label':
         raise NotImplementedError
 
-    if np.any(np.greater(spatial_size, (50,50))):
-        cropper = [
-            RandCrop2dByPosNegLabelD(
-                keys=image_keys+mask_keys,
-                label_key=mask_keys[0],
-                spatial_size=(50, 50),
-                crop_mode='parallel',
-                z_axis=2,
-                pos=1,
-                neg=0,
-            ),
-            ResizeD(
-                keys=image_keys+mask_keys,
-                spatial_size=spatial_size,
-                mode=['bilinear', 'nearest']
-            )
-        ]
+    if np.any(np.greater(spatial_size, (60,60))):
+        raise NotImplementedError
     else:
         cropper = [
-            # LabelMorphologyD(
-            #     keys=mask_keys,
-            #     mode='dilation',
-            #     radius=3,
-            #     binary=True
-            # ),
-            # MaskIntensityExD(
-            #     keys=image_keys,
-            #     mask_key='mask',
-            # ),
-            RandCrop2dByPosNegLabelD(
+            LabelMorphologyD(
+                keys=mask_keys,
+                mode='dilation',
+                radius=2,
+                binary=True
+            ),
+            MaskIntensityExD(
+                keys=image_keys,
+                mask_key='mask',
+            ),
+        ] if use_mask else []
+
+        cropper += [
+            CenterMask2DSliceCropD(
                 keys=image_keys+mask_keys,
-                label_key=mask_keys[0],
-                spatial_size=spatial_size,
+                mask_key=mask_keys[0],
+                roi_size=spatial_size,
                 crop_mode='parallel',
+                center_mode='maximum',
                 z_axis=2,
-                pos=1,
-                neg=0,
             )
         ]
+
+        cache_dir_name = 'cache' if not use_mask else 'cache-mask'
+        cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
+        cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
 
     dataset = BasicClassificationDataset(
         files_list,
         loader=LoadNiftiD(keys=image_keys+mask_keys, dtype=np.float32),
         channeler=AddChannelD(keys=image_keys+mask_keys),
-        orienter=None, #Orientationd(keys=['image','mask'], axcodes=orientation),
+        orienter=None,  # Orientationd(keys=['image','mask'], axcodes=orientation),
         spacer=SpacingD(
             keys=image_keys+mask_keys,
             pixdim=spacing,
@@ -179,11 +184,12 @@ def get_lung_nodule_dataset(files_list, phase, opts, spatial_size):
             b_max=1,
             clip=True,
         ),
-        resizer=CropForegroundD(
-            keys=image_keys+mask_keys,
-            source_key='mask',
-            margin=25,
-        ),
+        resizer=None,
+        # CropForegroundD(
+        #     keys=image_keys+mask_keys,
+        #     source_key='mask',
+        #     margin=40,
+        # ),
         cropper=cropper,
         caster=CastToTyped(keys=image_keys, dtype=np.float32),
         to_tensor=ToTensord(keys=image_keys+mask_keys),
