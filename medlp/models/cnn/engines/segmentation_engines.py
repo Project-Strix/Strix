@@ -15,11 +15,16 @@ from medlp.utilities.utils import (
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.engines.utils import get_models
 
-from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.inferers import SimpleInferer, SlidingWindowInferer
 from monai_ex.networks import one_hot
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping
+
+from monai_ex.engines import (
+    SupervisedTrainer,
+    SupervisedEvaluator,
+    EnsembleEvaluator
+)
 
 # from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
 
@@ -38,7 +43,7 @@ from monai_ex.handlers import (
     TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleTensorboardHandler,
-    CheckpointSaver,
+    CheckpointSaverEx,
     CheckpointLoader,
     SegmentationSaverEx,
     MeanDice,
@@ -73,13 +78,20 @@ def build_segmentation_engine(**kwargs):
             max_channels=opts.output_nc,
             prefix_name="Val",
         ),
-        CheckpointSaver(
-            save_dir=model_dir,
-            save_dict={"net": net},
-            save_key_metric=True,
-            key_metric_n_saved=3,
-        ),
     ]
+
+    # save N best model handler
+    if opts.save_n_best > 0:
+        val_handlers += [
+            CheckpointSaverEx(
+                save_dir=model_dir,
+                save_dict={"net": net},
+                save_key_metric=True,
+                key_metric_n_saved=opts.save_n_best,
+                key_metric_save_after_epoch=10
+            )
+        ]
+
     # If in nni search mode
     if opts.nni:
         val_handlers += [
@@ -175,7 +187,7 @@ def build_segmentation_engine(**kwargs):
             output_transform=lambda x: x["loss"],
             name=logger_name,
         ),
-        CheckpointSaver(
+        CheckpointSaverEx(
             save_dir=os.path.join(model_dir, "Checkpoint"),
             save_dict={"net": net, "optim": optim},
             save_interval=opts.save_epoch_freq,

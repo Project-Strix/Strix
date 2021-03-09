@@ -196,11 +196,13 @@ def input_cropsize(ctx, param, value):
 
     if configures['tensor_dim'] == '2D':
         crop_size = _prompt(
-            "Crop size", tuple, (0, 0), partial(split_input_str_,dtype=int), color='green'
+            "Crop size", tuple, (0, 0),
+            partial(split_input_str_, dtype=int), color='green'
         )
     else:
         crop_size = _prompt(
-            "Crop size", tuple, (0, 0, 0), partial(split_input_str_,dtype=int), color='green'
+            "Crop size", tuple, (0, 0, 0),
+            partial(split_input_str_, dtype=int), color='green'
         )
     ctx.params["crop_size"] = crop_size
     return value
@@ -208,50 +210,31 @@ def input_cropsize(ctx, param, value):
 
 def common_params(func):
     @optionex(
-        "--tensor-dim",
-        prompt=True,
-        type=Choice(["2D", "3D"], show_index=True),
-        default=0,
-        help="2D or 3D",
+        "--tensor-dim", prompt=True, type=Choice(["2D", "3D"], show_index=True),
+        default=0, help="2D or 3D",
     )
     @optionex(
-        "--framework",
-        prompt=True,
-        type=Choice(FRAMEWORK_TYPES, show_index=True),
-        default=0,
-        help="Choose your framework type",
+        "--framework", prompt=True, type=Choice(FRAMEWORK_TYPES, show_index=True),
+        default=0, help="Choose your framework type",
     )
     @optionex(
-        "--data-list",
-        type=str,
-        callback=data_select,
-        default=None,
-        help="Data file list (json)",
+        "--data-list", type=str, callback=data_select,
+        default=None, help="Data file list (json)",
     )
     @optionex(
         "--preload", type=float, default=1.0, help="Ratio of preload data"
     )
     @optionex(
-        "--n-epoch",
-        prompt=True,
-        show_default=True,
-        type=int,
-        default=1000,
-        help="Epoch number",
+        "--n-epoch", prompt=True, show_default=True,
+        type=int, default=1000, help="Epoch number",
     )
     @optionex(
-        "--n-epoch-len",
-        type=float,
-        default=1.0,
+        "--n-epoch-len", type=float, default=1.0,
         help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch",
     )
     @optionex(
-        "--n-batch",
-        prompt=True,
-        show_default=True,
-        type=int,
-        default=10,
-        help="Batch size",
+        "--n-batch", prompt=True, show_default=True,
+        type=int, default=10, help="Batch size",
     )
     @optionex("--istrain", type=bool, default=True, help="train/test phase flag")
     @optionex("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
@@ -260,53 +243,43 @@ def common_params(func):
     @optionex("--output-nc", type=int, default=3, help="output channels (classes)")
     @optionex("--split", type=float, default=0.2, help="Training/testing split ratio")
     @optionex(
-        "-W",
-        "--pretrained-model-path",
-        type=str,
-        default="",
-        help="pretrained model path",
+        "-W", "--pretrained-model-path", type=str,
+        default="", help="pretrained model path",
     )
     @optionex(
-        "--out-dir",
-        type=str,
-        prompt=True,
-        show_default=True,
-        default="/homes/clwang/Data/medlp_exp",
+        "--out-dir", type=str, prompt=True,
+        show_default=True, default="/homes/clwang/Data/medlp_exp",
     )
     @optionex(
         "--augment-ratio", type=float, default=0.5, help="Data aug ratio."
     )
     @optionex(
-        "-P",
-        "--partial",
-        type=float, default=1, help="Only load part of data"
+        "-P", "--partial", type=float, default=1,
+        help="Only load part of data"
     )
     @optionex(
-        "-V",
-        "--visualize",
-        is_flag=True, help="Visualize the network architecture"
+        "-V", "--visualize", is_flag=True,
+        help="Visualize the network architecture"
     )
     @optionex(
-        "--valid-interval",
-        type=int,
-        default=4,
+        "--valid-interval", type=int, default=4,
         help="Interval of validation during training",
     )
     @optionex(
         "--save-epoch-freq", type=int, default=5, help="Save model freq"
     )
     @optionex(
-        "--early-stop",
-        type=int,
-        default=300,
+        "--save-n-best", type=int, default=5, help='Save N best models'
+    )
+    @optionex(
+        "--early-stop", type=int, default=300,
         help="Patience of early stopping. default: 200epochs",
     )
     @optionex(
         "--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6"
     )
     @optionex(
-        "--nni",
-        is_flag=True,
+        "--nni", is_flag=True,
         help="Flag of using nni-search, you dont need to modify this.",
     )
     @optionex("--n-fold", type=int, default=0, help="K fold cross-validation")

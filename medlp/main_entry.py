@@ -106,9 +106,8 @@ def train_core(cargs, files_train, files_valid):
             Print("Invalid snip_percent. Skip SNIP!", color="y")
         else:
             Print("Begin SNIP pruning", color="g")
-            snip_device = torch.device(
-                "cuda"
-            )  # torch.device("cpu") #! TMP solution to solve OOM issue
+            snip_device = torch.device("cuda")
+            # snip_device = torch.device("cpu")  #! TMP solution to solve OOM issue
             original_device = (
                 torch.device("cuda") if cargs.gpus != "-1" else torch.device("cpu")
             )
@@ -270,7 +269,8 @@ def test_cfg(**args):
     configures["experiment_path"] = exp_dir
     configures['resample'] = True  #! departure
     configures['slidingwindow'] = args['slidingwindow']
-    configures['crop_size'] = args.get('crop_size', None)
+    if args.get('crop_size', None):
+        configures['crop_size'] = args['crop_size']
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]

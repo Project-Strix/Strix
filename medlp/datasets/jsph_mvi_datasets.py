@@ -108,7 +108,6 @@ def get_mvi_dataset(files_list, phase, opts, spatial_size):
     cache_dir_name = 'cache' if not use_mask else 'cache-mask'
     cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
     cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
-    cache_dir = "/homes/clwang/Data/medlp_exp/NNI/classification/jsph_mvi_all/cache-mask-parallel-maximum-(64, 64)"
 
     dataset = BasicClassificationDataset(
         files_list,
@@ -122,8 +121,10 @@ def get_mvi_dataset(files_list, phase, opts, spatial_size):
         caster=CastToTypeExD(keys=image_keys, dtype=np.float32),
         to_tensor=ToTensord(keys=image_keys+mask_keys),
         is_supervised=True,
-        dataset_type=PersistentDataset,  # CacheDataset
-        dataset_kwargs={'cache_dir': cache_dir},  # {'cache_rate': preload}
+        dataset_type=CacheDataset,
+        dataset_kwargs={'cache_rate': preload},
+        #dataset_type=PersistentDataset,
+        #dataset_kwargs={'cache_dir': cache_dir},
         additional_transforms=additional_transforms,
     ).get_dataset()
 

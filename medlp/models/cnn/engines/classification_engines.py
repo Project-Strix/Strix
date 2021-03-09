@@ -8,7 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, output_filename_check
-from medlp.utilities.handlers import NNIReporterHandler
+from medlp.utilities.handlers import NNIReporterHandler, AUCGapHandler
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.inferers import SimpleInferer
@@ -87,13 +87,6 @@ def build_classification_engine(**kwargs):
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
-        CheckpointSaverEx(
-            save_dir=model_dir,
-            save_dict={"net": net},
-            save_key_metric=True,
-            key_metric_n_saved=4,
-            key_metric_save_after_epoch=100
-        ),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
@@ -102,6 +95,20 @@ def build_classification_engine(**kwargs):
             prefix_name='Val'
         )
     ]
+
+    # save N best model handler
+    if opts.save_n_best > 0:
+        val_handlers += [
+            CheckpointSaverEx(
+                save_dir=model_dir,
+                save_dict={"net": net},
+                file_prefix=val_metric_name,
+                save_key_metric=True,
+                key_metric_n_saved=opts.save_n_best,
+                key_metric_save_after_epoch=100
+            )
+        ]
+
     # If in nni search mode
     if opts.nni:
         val_handlers += [
@@ -180,6 +187,28 @@ def build_classification_engine(**kwargs):
             prefix_name='Train'
         )
     ]
+
+    if isinstance(key_val_metric, ROCAUC):
+        train_handlers += [
+            AUCGapHandler(
+                validator=evaluator,
+                interval=valid_interval,
+                epoch_level=True,
+                summary_writer=writer,
+                save_metric=True,
+                metric_name='rect_auc'
+            )]
+        if opts.save_n_best > 0:
+            train_handlers += [
+                CheckpointSaverEx(
+                    save_dir=os.path.join(model_dir, "Best_RAUC_Model"),
+                    save_dict={"net": net},
+                    file_prefix='RAUC',
+                    save_key_metric=True,
+                    key_metric_name='rect_auc',
+                    key_metric_n_saved=opts.save_n_best
+                )
+            ]
 
     trainer = SupervisedTrainer(
         device=device,
