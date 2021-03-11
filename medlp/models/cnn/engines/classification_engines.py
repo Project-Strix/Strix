@@ -196,7 +196,7 @@ def build_classification_engine(**kwargs):
                 epoch_level=True,
                 summary_writer=writer,
                 save_metric=True,
-                metric_name='rect_auc'
+                save_metric_name='rect_auc'
             )]
         if opts.save_n_best > 0:
             train_handlers += [
@@ -295,6 +295,12 @@ def build_classification_test_engine(**kwargs):
             batch_transform=lambda x: (x['image_meta_dict'], x['image'], x['label']) \
                             if opts.phase=='test' else lambda x: x['image_meta_dict'],
             output_transform=post_transform,
+        ),
+        ClassificationSaverEx(
+            output_dir=opts.out_dir,
+            filename="logits.csv",
+            batch_transform=lambda x: x['image_meta_dict'],
+            output_transform=lambda x: x['pred'].cpu().numpy(),
         ),
     ]
 

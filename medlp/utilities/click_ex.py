@@ -220,6 +220,23 @@ class ChoiceEx(Choice):
         else:
             return 'Choice(%r)' % ['{}.{}'.format(idx,ch) for idx, ch in self.choices.items()]
 
+class NumericChoice(Choice):
+    def __init__(self, choices, **kwargs):
+        choicepairs = []
+        choicestrs = []
+        for i, choice in enumerate(choices, start=1):
+            choicepairs.append((str(i), choice))
+            choicestrs.append(f"[{i}] {choice}")
+        self.choicemap = dict(choicepairs)
+        super().__init__(choicestrs, **kwargs)
+
+    def convert(self, value, param, ctx):
+        try:
+            return self.choicemap[value]
+        except KeyError as e:
+            self.fail('invalid choice: %s. (choose from %s)' %
+                      (value, ', '.join(self.choices)), param, ctx)
+
 def optionex(*param_decls, **attrs):
     """Attaches an option to the command.  All positional arguments are
     passed as parameter declarations to :class:`Option`; all keyword

@@ -192,7 +192,7 @@ class AUCGapHandler:
         summary_writer: Optional[SummaryWriter] = None,
         logger_name: Optional[str] = None,
         save_metric: bool = False,
-        metric_name: str = 'rect_auc'
+        save_metric_name: str = 'rect_auc'
     ) -> None:
         """
         Args:
@@ -213,7 +213,7 @@ class AUCGapHandler:
         self.summary_writer = summary_writer
         self.logger_name = logger_name
         self.save_metric = save_metric
-        self.metric_name = metric_name
+        self.metric_name = save_metric_name
         if self.summary_writer is None and self.logger_name is None:
             raise ValueError("Either tensorboard summary writer or logger should be specified!")
         if logger_name is not None:
