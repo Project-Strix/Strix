@@ -8,7 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, output_filename_check
-from medlp.utilities.handlers import NNIReporterHandler, AUCGapHandler
+from medlp.utilities.handlers import NNIReporterHandler, AUCGapHandler, ROCOverlapHandler
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.inferers import SimpleInferer
@@ -16,6 +16,7 @@ from monai_ex.networks import one_hot
 from monai_ex.metrics import DrawRocCurve
 from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
+from ignite.contrib.metrics import RocCurve
 from ignite.handlers import EarlyStopping
 
 from monai_ex.engines import (
@@ -36,7 +37,9 @@ from monai_ex.transforms import (
 
 from monai_ex.handlers import (
     StatsHandler,
+    StatsHandlerEx,
     TensorBoardStatsHandler,
+    TensorBoardStatsHandlerEx,
     TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleTensorboardHandler,
@@ -45,6 +48,7 @@ from monai_ex.handlers import (
     SegmentationSaverEx,
     ClassificationSaverEx,
     ROCAUC,
+    ROC,
     stopping_fn_from_metric
 )
 
@@ -85,8 +89,8 @@ def build_classification_engine(**kwargs):
         val_metric_name = 'val_auc'
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
+        StatsHandlerEx(output_transform=lambda x: None, name=logger_name),
+        TensorBoardStatsHandlerEx(summary_writer=writer, tag_name="val_acc"),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
@@ -133,6 +137,7 @@ def build_classification_engine(**kwargs):
         key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc), is_multilabel=is_multilabel)
     else:
         key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
+        add_roc_metric = ROC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -142,6 +147,7 @@ def build_classification_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_val_metric={val_metric_name: key_val_metric},
+        additional_metrics={"roccurve": add_roc_metric},
         val_handlers=val_handlers,
         amp=opts.amp
     )
@@ -162,12 +168,12 @@ def build_classification_engine(**kwargs):
             interval=valid_interval,
             epoch_level=True
         ),
-        StatsHandler(
+        StatsHandlerEx(
             tag_name="train_loss",
             output_transform=lambda x: x["loss"],
             name=logger_name
         ),
-        TensorBoardStatsHandler(
+        TensorBoardStatsHandlerEx(
             summary_writer=writer,
             tag_name="train_loss",
             output_transform=lambda x: x["loss"]
@@ -197,7 +203,17 @@ def build_classification_engine(**kwargs):
                 summary_writer=writer,
                 save_metric=True,
                 save_metric_name='rect_auc'
-            )]
+            ),
+            ROCOverlapHandler(
+                validator=evaluator,
+                interval=valid_interval,
+                roc_metric_name="roccurve",
+                epoch_level=True,
+                summary_writer=writer,
+                save_metric=True,
+                save_metric_name='rect_roc',
+            )
+        ]
         if opts.save_n_best > 0:
             train_handlers += [
                 CheckpointSaverEx(
@@ -206,6 +222,14 @@ def build_classification_engine(**kwargs):
                     file_prefix='RAUC',
                     save_key_metric=True,
                     key_metric_name='rect_auc',
+                    key_metric_n_saved=opts.save_n_best
+                ),
+                CheckpointSaverEx(
+                    save_dir=os.path.join(model_dir, "Best_RROC_Model"),
+                    save_dict={"net": net},
+                    file_prefix='RROC',
+                    save_key_metric=True,
+                    key_metric_name='rect_roc',
                     key_metric_n_saved=opts.save_n_best
                 )
             ]
@@ -222,6 +246,7 @@ def build_classification_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_train_metric={"train_auc": key_val_metric},
+        additional_metrics={"roccurve": add_roc_metric},
         train_handlers=train_handlers,
         amp=opts.amp
     )

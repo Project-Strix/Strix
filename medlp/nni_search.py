@@ -111,22 +111,12 @@ def train_nni(**kwargs):
 
 
 @click.command("nni-search")
-@click.option(
-    "--param-list",
-    type=click.Path(exists=True),
-    help="Base hyper-param setting (.json)",
-)
+@click.option("--param-list", type=click.Path(exists=True), help="Base hyper-param setting (.json)")
 @click.option("--search-space", type=click.Path(exists=True), help="NNI search space file (.json)")
 @click.option("--nni-config", type=str, default="", help="NNI config file (.yaml)")
 @click.option("--port", type=int, default=8080, help="Port of nni server")
 @click.option("--background", is_flag=True, help="Run nni in background")
-@click.option(
-    "--out-dir",
-    type=str,
-    prompt=True,
-    show_default=True,
-    default="/homes/clwang/Data/medlp_exp/NNI",
-)
+@click.option("--out-dir", type=str, prompt=True, show_default=True, default="/homes/clwang/Data/medlp_exp/NNI")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=clb.get_nni_exp_name, default="nni-search")
 def nni_search(**args):

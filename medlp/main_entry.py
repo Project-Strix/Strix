@@ -71,7 +71,7 @@ def train_core(cargs, files_train, files_valid):
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
+    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer")  # level=logging_level)
     if cargs.compact_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
 
@@ -217,10 +217,7 @@ def train_cfg(**args):
 @click.option("--test-files", type=str, default="", help="External files (.json) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option(  #TODO: automatically decide when using patchdataset
-    "--slidingwindow",
-    is_flag=True,
-    callback=clb.input_cropsize,
-    help='Use slidingwindow sampling'
+    "--slidingwindow", is_flag=True, callback=clb.input_cropsize, help='Use slidingwindow sampling'
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")

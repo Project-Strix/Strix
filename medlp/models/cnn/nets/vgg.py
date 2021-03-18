@@ -194,7 +194,7 @@ def vgg13(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg13', 'B', False, pretrained, progress, **kwargs)
 
-@CLASSIFICATION_ARCHI.register('2D','vgg13_bn')
+
 def vgg13_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 13-layer model (configuration "B") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_
@@ -216,7 +216,7 @@ def vgg16(pretrained=False, progress=True, **kwargs):
     """
     return _vgg('vgg16', 'D', False, pretrained, progress, **kwargs)
 
-
+@CLASSIFICATION_ARCHI.register('2D', 'vgg16_bn')
 def vgg16_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 16-layer model (configuration "D") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_
