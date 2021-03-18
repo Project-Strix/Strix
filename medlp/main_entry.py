@@ -216,11 +216,12 @@ def train_cfg(**args):
 @click.option("--config", type=click.Path(exists=True))
 @click.option("--test-files", type=str, default="", help="External files (.json) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
-@click.option(  #TODO: automatically decide when using patchdataset
+@click.option(  # TODO: automatically decide when using patchdataset
     "--slidingwindow", is_flag=True, callback=clb.input_cropsize, help='Use slidingwindow sampling'
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 def test_cfg(**args):
@@ -256,9 +257,10 @@ def test_cfg(**args):
         else:
             raise ValueError(f"Test file does not exists in {exp_dir}!")
 
-    configures["model_path"] = (
-        clb.get_trained_models(exp_dir) if configures.get("n_fold", 0) <= 1 else None
-    )
+    # configures["model_path"] = (
+    #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
+    # )
+    best_models = clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else [None]
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
     configures["phase"] = phase
@@ -277,20 +279,24 @@ def test_cfg(**args):
     Print(f"{len(test_files)} test files", color="g")
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
-    engine = get_test_engine(sn(**configures), test_loader)
-    engine.logger = setup_logger(
-        f"{configures['tensor_dim']}-Tester", level=logging.INFO
-    )  #! not work
+    for model_path in best_models:
+        configures['model_path'] = str(model_path)
 
-    if isinstance(engine, SupervisedEvaluator):
-        Print("Begin testing...", color="g")
-    elif isinstance(engine, EnsembleEvaluator):
-        Print("Begin ensemble testing...", color="g")
+        engine = get_test_engine(sn(**configures), test_loader)
+        engine.logger = setup_logger(
+            f"{configures['tensor_dim']}-Tester", level=logging.INFO
+        )  #! not work
 
-    shutil.copyfile(
-        test_fpath, os.path.join(configures["out_dir"], os.path.basename(test_fpath))
-    )
-    engine.run()
+        if isinstance(engine, SupervisedEvaluator):
+            Print("Begin testing...", color="g")
+        elif isinstance(engine, EnsembleEvaluator):
+            Print("Begin ensemble testing...", color="g")
+
+        shutil.copyfile(
+            test_fpath, configures["out_dir"]/os.path.basename(test_fpath)
+        )
+        engine.run()
+        os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
 
 
 @click.command("unlink")

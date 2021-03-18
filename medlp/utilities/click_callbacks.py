@@ -19,19 +19,27 @@ from utils_cw import (
     )
 
 
-def get_trained_models(exp_folder):
+def get_trained_models(exp_folder, use_best_model=False):
     model_dir = Path(exp_folder)/"Models"
     assert model_dir.is_dir(), f"Model dir is not found! {model_dir}"
 
     subcategories = list(filter(lambda x: x.is_dir(), model_dir.iterdir()))
-    prompt_1 = {i: f.stem for i, f in enumerate(subcategories)}
-    selected = prompt_ex(f"Choose model dir: {prompt_1}", type=int)
+    if use_best_model:
+        best_models = []
+        for subdir in subcategories:
+            files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subdir.iterdir()))
+            best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
+            best_models.append(best_model)
+        return best_models
+    else:
+        prompt_1 = {i: f.stem for i, f in enumerate(subcategories)}
+        selected = prompt_ex(f"Choose model dir: {prompt_1}", type=int)
 
-    files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subcategories[selected].iterdir()))
-    # files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
-    prompt_2 = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
-    selected = prompt_ex(f"Choose model: {prompt_2}", type=int)
-    return str(files[selected])
+        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subcategories[selected].iterdir()))
+        # files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
+        prompt_2 = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
+        selected = prompt_ex(f"Choose model: {prompt_2}", type=int)
+        return [str(files[selected])]
 
 
 def get_exp_name(ctx, param, value):
