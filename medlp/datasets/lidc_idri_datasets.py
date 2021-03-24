@@ -1,5 +1,6 @@
 import os, math
 import numpy as np
+from numpy.lib.npyio import savez_compressed
 from utils_cw import check_dir
 
 from medlp.data_io import CLASSIFICATION_DATASETS
@@ -18,15 +19,23 @@ from monai_ex.data import CacheDataset, PersistentDataset
 from monai_ex.transforms import *
 
 
-@CLASSIFICATION_DATASETS.register('2D', 'lidc-73',
-    "/homes/clwang/Data/LIDC-IDRI-Crops/train_datalist_7-3_cls.json")
-def get_25d_dataset(files_list, phase, opts):
-    return get_lung_dataset(files_list, phase, opts, (32,32))
-
 @CLASSIFICATION_DATASETS.register('2D', 'lidc-82',
     "/homes/clwang/Data/LIDC-IDRI-Crops/train_datalist_8-2_cls.json")
 def get_25d_dataset(files_list, phase, opts):
     return get_lung_dataset(files_list, phase, opts, (32,32))
+
+
+@CLASSIFICATION_DATASETS.register('2D', 'lidc-55-N',
+    "/homes/clwang/Data/LIDC-IDRI-Crops-Norm/train_datalist_5-5_cls.json")
+def get_25d_dataset(files_list, phase, opts):
+    return get_lung_dataset(files_list, phase, opts, (32,32))
+
+
+@CLASSIFICATION_DATASETS.register('2D', 'lidc-28-N',
+    "/homes/clwang/Data/LIDC-IDRI-Crops-Norm/train_datalist_2-8_cls.json")
+def get_25d_dataset(files_list, phase, opts):
+    return get_lung_dataset(files_list, phase, opts, (32,32))
+    
 
 def get_lung_dataset(files_list, phase, opts, spatial_size):
     # median reso: 0.70703125 z_reso: 1.5
@@ -112,8 +121,11 @@ def get_lung_dataset(files_list, phase, opts, spatial_size):
         loader=LoadNiftiD(keys=image_keys+mask_keys, dtype=np.float32),
         channeler=AddChannelD(keys=image_keys+mask_keys),
         orienter=None,  # Orientationd(keys=['image','mask'], axcodes=orientation),
-        spacer=None,
-        rescaler=LambdaD(keys='label', func=lambda x: int(x>3)),
+        spacer=SpacingD(keys=image_keys+mask_keys, pixdim=spacing),
+        rescaler=[
+            #NormalizeIntensityD(keys=image_keys),
+            LambdaD(keys='label', func=lambda x: int(x>3))
+        ],
         resizer=None,
         cropper=cropper,
         caster=CastToTyped(keys=image_keys, dtype=np.float32),

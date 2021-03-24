@@ -103,7 +103,7 @@ class BasicClassificationDataset(object):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
 
 
-class SupervisedClassificationDataset2D(BasicClassificationDataset):
+class SupervisedClassificationDataset(BasicClassificationDataset):
     def __init__(
         self,
         files_list,
@@ -163,7 +163,7 @@ class SupervisedClassificationDataset2D(BasicClassificationDataset):
         )
 
 
-class SupervisedClassificationDataset3D(BasicClassificationDataset):
+class UnSupervisedClassificationDataset(BasicClassificationDataset):
     def __init__(
         self,
         files_list,
@@ -180,9 +180,9 @@ class SupervisedClassificationDataset3D(BasicClassificationDataset):
         ),
         additional_transforms: Optional[Sequence] = None,
         caster: Optional[MapTransform] = CastToTyped(
-            keys=["image", "label"], dtype=[np.float32, np.int64]
+            keys="image", dtype=np.float32
         ),
-        to_tensor: Optional[MapTransform] = ToTensord(keys=["image", "label"]),
+        to_tensor: Optional[MapTransform] = ToTensord(keys="image"),
         augment_ratio: float = 0.5,
         preload: float = 1.0,
         cache_dir: str = "./",
@@ -215,9 +215,9 @@ class SupervisedClassificationDataset3D(BasicClassificationDataset):
             cropper,
             caster,
             to_tensor,
-            True,
-            PersistentDataset if preload == 1.0 else CacheDataset,
-            {'cache_dir': cache_dir} if preload == 1.0 else {'cache_rate': preload},
+            False,
+            CacheDataset,
+            {'cache_rate': preload},
             additional_transforms,
             verbose,
         )

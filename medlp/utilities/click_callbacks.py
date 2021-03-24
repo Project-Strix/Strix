@@ -6,6 +6,7 @@ from types import SimpleNamespace as sn
 from functools import partial, wraps
 from click import Tuple
 from monai.transforms.utility.dictionary import LambdaD
+from torch._C import default_generator
 from medlp.utilities.click_ex import ChoiceEx as Choice
 from medlp.utilities.click_ex import optionex, prompt_ex
 from medlp.utilities.enum import *
@@ -28,8 +29,11 @@ def get_trained_models(exp_folder, use_best_model=False):
         best_models = []
         for subdir in subcategories:
             files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subdir.iterdir()))
-            best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
-            best_models.append(best_model)
+            if len(files) > 0:
+                best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
+                best_models.append(best_model)
+            else:
+                continue
         return best_models
     else:
         prompt_1 = {i: f.stem for i, f in enumerate(subcategories)}
@@ -77,6 +81,8 @@ def get_exp_name(ctx, param, value):
 
     if ctx.params["n_fold"] > 0:
         exp_name = exp_name + f"-CV{ctx.params['n_fold']}"
+    elif ctx.params["n_repeat"] > 0:
+        exp_name = exp_name + f"-RE{ctx.params['n_repeat']}"
 
     # suffix = '-redo' if ctx.params.get('config') is not None else ''
 
@@ -301,6 +307,7 @@ def common_params(func):
         help="Flag of using nni-search, you dont need to modify this.",
     )
     @optionex("--n-fold", type=int, default=0, help="K fold cross-validation")
+    @optionex("--n-repeat", type=int, default=0, help="K times random permutation cross-validator")
     @optionex("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
     @optionex("--seed", type=int, default=10, help="random seed")
     @optionex("--compact-log", is_flag=True, help="Output compact log info")

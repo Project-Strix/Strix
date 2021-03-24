@@ -104,12 +104,12 @@ def build_classification_engine(**kwargs):
     if opts.save_n_best > 0:
         val_handlers += [
             CheckpointSaverEx(
-                save_dir=model_dir,
+                save_dir=model_dir/'Best_Models',
                 save_dict={"net": net},
                 file_prefix=val_metric_name,
                 save_key_metric=True,
                 key_metric_n_saved=opts.save_n_best,
-                key_metric_save_after_epoch=100
+                key_metric_save_after_epoch=0
             )
         ]
 
@@ -179,11 +179,11 @@ def build_classification_engine(**kwargs):
             output_transform=lambda x: x["loss"]
         ),
         CheckpointSaverEx(
-            save_dir=os.path.join(model_dir, "Checkpoint"),
+            save_dir=model_dir/"Checkpoint",
             save_dict={"net": net, "optim": optim},
             save_interval=opts.save_epoch_freq,
             epoch_level=True,
-            n_saved=5
+            n_saved=opts.save_n_best
         ),  #!n_saved=None
         TensorBoardImageHandlerEx(
             summary_writer=writer,
@@ -217,7 +217,7 @@ def build_classification_engine(**kwargs):
         if opts.save_n_best > 0:
             train_handlers += [
                 CheckpointSaverEx(
-                    save_dir=os.path.join(model_dir, "Best_RAUC_Model"),
+                    save_dir=model_dir/"Best_RAUC_Model",
                     save_dict={"net": net},
                     file_prefix='RAUC',
                     save_key_metric=True,
@@ -225,7 +225,7 @@ def build_classification_engine(**kwargs):
                     key_metric_n_saved=opts.save_n_best
                 ),
                 CheckpointSaverEx(
-                    save_dir=os.path.join(model_dir, "Best_RROC_Model"),
+                    save_dir=model_dir/"Best_RROC_Model",
                     save_dict={"net": net},
                     file_prefix='RROC',
                     save_key_metric=True,
@@ -316,9 +316,9 @@ def build_classification_test_engine(**kwargs):
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
         ClassificationSaverEx(
             output_dir=opts.out_dir,
-            save_errors=opts.phase=='test',
-            batch_transform=lambda x: (x['image_meta_dict'], x['image'], x['label']) \
-                            if opts.phase=='test' else lambda x: x['image_meta_dict'],
+            save_errors=False,  # opts.phase=='test',
+            batch_transform=lambda x: x['image_meta_dict'],  #lambda x: (x['image_meta_dict'], x['image'], x['label']) \
+                            #if opts.phase=='test' else lambda x: x['image_meta_dict'],
             output_transform=post_transform,
         ),
         ClassificationSaverEx(

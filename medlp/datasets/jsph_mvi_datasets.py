@@ -28,10 +28,6 @@ from monai_ex.transforms import *
 def get_25d_dataset(files_list, phase, opts):
     return get_mvi_dataset(files_list, phase, opts, (70,70))
 
-@CLASSIFICATION_DATASETS.register('2D', 'jsph_mvi_all',
-    "/homes/clwang/Data/jsph_lung/MVI/data_crops/datalist.json")
-def get_25d_dataset(files_list, phase, opts):
-    return get_mvi_dataset(files_list, phase, opts, (64,64))
 
 def get_mvi_dataset(files_list, phase, opts, spatial_size):
     preload = opts.get('preload', 0)
