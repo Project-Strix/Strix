@@ -109,7 +109,6 @@ venv.bak/
 
 # my extension
 *.nii.gz
-*.png
 *.json
 *.list
 *.zip
