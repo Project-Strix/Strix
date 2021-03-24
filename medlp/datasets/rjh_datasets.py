@@ -1,19 +1,23 @@
-import os, math
+import os
+import math
 import numpy as np
 from utils_cw import check_dir
 
-from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
-from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
-from medlp.data_io.base_dataset.classification_dataset import BasicClassificationDataset
+from medlp.data_io import (
+    SupervisedSegmentationDataset,
+    UnsupervisedSegmentationDataset,
+    BasicClassificationDataset,
+    CLASSIFICATION_DATASETS,
+    SEGMENTATION_DATASETS
+)
 from medlp.utilities.utils import is_avaible_size
 from medlp.utilities.transforms import (
     DataLabellingD,
-    RandLabelToMaskD,
     SeparateCropSTSdataD,
     ExtractSTSlicesD
 )
 
-from monai_ex.data import CacheDataset, PersistentDataset
+from monai_ex.data import CacheDataset
 from monai_ex.transforms import *
 
 # import nibabel as nib
@@ -24,25 +28,25 @@ from monai_ex.transforms import *
 @SEGMENTATION_DATASETS.register('3D', 'rjh_tswi',
     "/homes/clwang/Data/RJH/RJ_data/preprocessed/labeled_data_list.json")
 def get_rjh_tswi_seg_dataset(files_list, phase, opts):
-    spacing=(0.666667,0.666667,1.34)
-    in_channels=opts.get('input_nc', 1)
-    crop_size=opts.get('crop_size', (96,96,64))
-    preload=opts.get('preload', 0)
-    augment_ratio=opts.get('augment_ratio',0.4)
-    orientation='RAI'
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
+    spacing = (0.666667, 0.666667, 1.34)
+    in_channels = opts.get('input_nc', 1)
+    crop_size = opts.get('crop_size', (96, 96, 64))
+    preload = opts.get('preload', 0)
+    augment_ratio = opts.get('augment_ratio', 0.4)
+    orientation = 'RAI'
+    cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), 'caches')
 
     assert in_channels == 1, 'Currently only support single channel input'
 
-    cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if \
+    cropper = RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', pos=1, neg=1, spatial_size=crop_size) if \
               is_avaible_size(crop_size) else None
-    
+
     if phase == 'train':
         additional_transforms = [
-            #RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
-            RandRotateD(keys=["image","label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='zeros'),
-            Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(5,10),
-                           magnitude_range=(50,150), mode=["bilinear","nearest"], padding_mode='zeros')
+            # RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
+            RandRotateD(keys=["image", "label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='zeros'),
+            Rand3DElasticD(keys=["image", "label"], prob=augment_ratio, sigma_range=(5,10),
+                           magnitude_range=(50,150), mode=["bilinear", "nearest"], padding_mode='zeros')
         ]
     elif phase == 'valid':
         additional_transforms = []
@@ -50,12 +54,14 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
         cropper = None
         additional_transforms = []
     elif phase == 'test_wo_label':
-        return UnsupervisedSegmentationDataset3D(
+        return UnsupervisedSegmentationDataset(
                     files_list,
+                    loader=LoadNiftid(keys="image", dtype=np.float32),
+                    channeler=AddChanneld(keys="image"),
                     orienter=Orientationd(keys='image', axcodes=orientation),
                     spacer=SpacingD(keys="image", pixdim=spacing),
-                    resizer=None,
                     rescaler=NormalizeIntensityD(keys='image'),
+                    resizer=None,
                     cropper=None,
                     additional_transforms=[],
                     preload=0,
@@ -64,13 +70,18 @@ def get_rjh_tswi_seg_dataset(files_list, phase, opts):
     else:
         raise ValueError
 
-    dataset = SupervisedSegmentationDataset3D(
+    dataset = SupervisedSegmentationDataset(
         files_list,
+        loader=LoadNiftid(keys=["image", "label"], dtype=np.float32),
+        channeler=AddChanneld(keys=["image", "label"]),
         orienter=Orientationd(keys=['image', 'label'], axcodes=orientation),
         spacer=SpacingD(keys=["image", "label"], pixdim=spacing, mode=[GridSampleMode.BILINEAR, GridSampleMode.NEAREST]),
+        rescaler=[
+            NormalizeIntensityD(keys='image'),
+            DataLabellingD(keys='label'),
+            LabelMorphologyD(keys='label', mode='dilation', radius=1, binary=False)
+        ],
         resizer=None,
-        rescaler=[NormalizeIntensityD(keys='image'),]+[DataLabellingD(keys='label'),
-                                                       LabelMorphologyD(keys='label',mode='dilation',radius=1,binary=False)],
         cropper=cropper,
         additional_transforms=additional_transforms,
         preload=preload,
@@ -120,12 +131,14 @@ def get_rjh_tswi_roi45(files_list, phase, opts):
         cropper = None
         additional_transforms = []
     elif phase == 'test_wo_label':
-        return UnsupervisedSegmentationDataset3D(
+        return UnsupervisedSegmentationDataset(
                     files_list,
+                    loader=LoadNiftid(keys="image", dtype=np.float32),
+                    channeler=AddChanneld(keys="image"),
                     orienter=Orientationd(keys='image', axcodes=orientation),
                     spacer=SpacingD(keys="image", pixdim=spacing),
-                    resizer=None,  #CropForegroundD(keys="image", source_key="image"),
                     rescaler=NormalizeIntensityD(keys='image'),
+                    resizer=None,  # CropForegroundD(keys="image", source_key="image"),
                     cropper=None,
                     additional_transforms=[],
                     preload=0,
@@ -133,13 +146,15 @@ def get_rjh_tswi_roi45(files_list, phase, opts):
                 ).get_dataset()
     else:
         raise ValueError
-    
-    dataset = SupervisedSegmentationDataset3D(
+
+    dataset = SupervisedSegmentationDataset(
         files_list,
-        orienter=Orientationd(keys=['image','label'], axcodes=orientation),
-        spacer=SpacingD(keys=["image","label"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
-        resizer=None,  #CropForegroundD(keys=["image","label"], source_key="image"),
+        loader=LoadNiftid(keys=["image", "label"], dtype=np.float32),
+        channeler=AddChanneld(keys=["image", "label"]),
+        orienter=Orientationd(keys=['image', 'label'], axcodes=orientation),
+        spacer=SpacingD(keys=["image", "label"], pixdim=spacing, mode=[GridSampleMode.BILINEAR,GridSampleMode.NEAREST]),
         rescaler=NormalizeIntensityD(keys='image'),
+        resizer=None,  # CropForegroundD(keys=["image","label"], source_key="image"),
         cropper=cropper,
         additional_transforms=additional_transforms,
         preload=preload,
@@ -152,24 +167,26 @@ def get_rjh_tswi_roi45(files_list, phase, opts):
 @SEGMENTATION_DATASETS.register('3D', 'rjh_swim',
     "/homes/clwang/Data/RJH/RJ_data/SWIM_preprocessed/swim_train.json")
 def get_rjh_swim_seg_dataset(files_list, phase, opts):
-    spacing=(0.666667,0.666667,2)
+    spacing=(0.666667, 0.666667, 2)
     in_channels=opts.get('input_nc', 1)
-    crop_size=opts.get('crop_size', (96,96,48))
+    crop_size=opts.get('crop_size', (96, 96, 48))
     preload=opts.get('preload', 0)
-    augment_ratio=opts.get('augment_ratio',0.4)
+    augment_ratio=opts.get('augment_ratio', 0.4)
     orientation='RAI'
     cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
 
     assert in_channels == 1, 'Currently only support single channel input'
 
-    cropper = [RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=1, neg=1, spatial_size=crop_size)] if is_avaible_size(crop_size) else []
+    cropper = [
+        RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', pos=1, neg=1, spatial_size=crop_size)
+    ] if is_avaible_size(crop_size) else []
     #cropper = [RandSpatialCropD(keys=['image','label'], roi_size=crop_size, random_size=False)] if is_avaible_size(crop_size) else []
     if phase == 'train':
         additional_transforms = [
-            RandFlipD(keys=["image","label"], prob=augment_ratio, spatial_axis=[2]),
-            RandRotateD(keys=["image","label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='border'),
-            Rand3DElasticD(keys=["image","label"], prob=augment_ratio, sigma_range=(5,10),
-                           magnitude_range=(50,150), mode=["bilinear","nearest"], padding_mode='zeros')
+            RandFlipD(keys=["image", "label"], prob=augment_ratio, spatial_axis=[2]),
+            RandRotateD(keys=["image", "label"], range_x=math.pi/40, range_y=math.pi/40, range_z=math.pi/40, prob=augment_ratio, padding_mode='border'),
+            Rand3DElasticD(keys=["image", "label"], prob=augment_ratio, sigma_range=(5, 10),
+                           magnitude_range=(50,150), mode=["bilinear", "nearest"], padding_mode='zeros')
         ]
     elif phase == 'valid':
         additional_transforms = []
@@ -177,12 +194,14 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
         cropper = None
         additional_transforms = []
     elif phase == 'test_wo_label':
-        return UnsupervisedSegmentationDataset3D(
+        return UnsupervisedSegmentationDataset(
                     files_list,
+                    loader=LoadNiftid(keys="image", dtype=np.float32),
+                    channeler=AddChanneld(keys="image"),
                     orienter=Orientationd(keys='image', axcodes=orientation),
                     spacer=SpacingD(keys="image", pixdim=spacing),
+                    rescaler=ScaleIntensityRangePercentilesD(keys='image', lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
                     resizer=None,
-                    rescaler=ScaleIntensityRangePercentilesD(keys='image',lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
                     cropper=None,
                     additional_transforms=[],
                     preload=0,
@@ -191,13 +210,17 @@ def get_rjh_swim_seg_dataset(files_list, phase, opts):
     else:
         raise ValueError
 
-    dataset = SupervisedSegmentationDataset3D(
+    dataset = SupervisedSegmentationDataset(
         files_list,
-        orienter=Orientationd(keys=['image','label'], axcodes=orientation),
-        spacer=SpacingD(keys=["image","label"], pixdim=spacing),
+        loader=LoadNiftid(keys=["image", "label"], dtype=np.float32),
+        channeler=AddChanneld(keys=["image", "label"]),
+        orienter=Orientationd(keys=['image', 'label'], axcodes=orientation),
+        spacer=SpacingD(keys=["image", "label"], pixdim=spacing),
         resizer=None,
-        rescaler=ScaleIntensityRangePercentilesD(keys='image',lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
-        cropper=[CropForegroundD(keys=['image','label'],source_key='image',select_fn=lambda x: x > 0.45, margin=5),]+cropper,
+        rescaler=ScaleIntensityRangePercentilesD(keys='image', lower=0.1, upper=99.9, b_min=0, b_max=1, clip=True),
+        cropper=[
+            CropForegroundD(keys=['image', 'label'], source_key='image', select_fn=lambda x: x > 0.45, margin=5),
+        ] + cropper,
         additional_transforms=additional_transforms,
         preload=preload,
         cache_dir=cache_dir,

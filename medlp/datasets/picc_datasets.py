@@ -13,39 +13,40 @@ from monai_ex.transforms import *
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
 from medlp.data_io import CLASSIFICATION_DATASETS, SEGMENTATION_DATASETS
-from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset2D as SegmentationDataset2D
+from medlp.data_io import SupervisedSegmentationDataset as SegmentationDataset2D
 from medlp.utilities.utils import is_avaible_size
 
-@SEGMENTATION_DATASETS.register('2D','picc_dcm',"/homes/clwang/Data/picc/picc_dcm_nii.json")
+@SEGMENTATION_DATASETS.register('2D', 'picc_dcm',
+    "/homes/clwang/Data/picc/picc_dcm_nii.json")
 def PICC_dcm_seg_dataset(files_list, phase, opts):
-    spacing=opts.get('spacing', (0.3,0.3))
-    in_channels=opts.get('input_nc', 1)
-    image_size=opts.get('image_size', (1024,1024))
-    crop_size=opts.get('crop_size', None)
-    preload=opts.get('preload', 1.0)
-    augment_ratio=opts.get('augment_ratio', 0.5)
+    spacing = opts.get('spacing', (0.3, 0.3))
+    in_channels = opts.get('input_nc', 1)
+    image_size = opts.get('image_size', (1024, 1024))
+    crop_size = opts.get('crop_size', None)
+    preload = opts.get('preload', 1.0)
+    augment_ratio = opts.get('augment_ratio', 0.5)
 
     assert in_channels == 1, 'Currently only support single channel input'
-    
+
     if phase == 'train':
         additional_transforms = [
-            RandRotated(keys=["image","label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
-            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+            RandRotated(keys=["image", "label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipd(keys=["image", "label"], prob=augment_ratio, spatial_axis=[1])
         ]
     elif phase == 'valid':
         additional_transforms = []
     elif phase == 'test':
         additional_transforms = []
 
-    ignore_dcm_keys = ['0040|0244','0040|0245','0040|0253','0040|0254','0032|1060']
+    ignore_dcm_keys = ['0040|0244', '0040|0245', '0040|0253', '0040|0254', '0032|1060']
     dataset = SegmentationDataset2D(
         files_list,
         loader=[LoadImageExD(keys='image', drop_meta_keys=ignore_dcm_keys), LoadNiftiD(keys='label')],
-        channeler=TransposeD(keys='label'), #to match the axes of itk and numpy
+        channeler=TransposeD(keys='label'),  # to match the axes of itk and numpy
         orienter=None,
-        spacer=SpacingD(keys=["image","label"], pixdim=spacing),
+        spacer=SpacingD(keys=["image", "label"], pixdim=spacing),
         rescaler=ScaleIntensityViaDicomD(keys="image", win_center_key='0028|1050', win_width_key='0028|1051', clip=True),
-        resizer=ResizeD(keys=["image","label"], spatial_size=image_size) if is_avaible_size(image_size) else None,#ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size) 
+        resizer=ResizeD(keys=["image", "label"], spatial_size=image_size) if is_avaible_size(image_size) else None,#ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size) 
         cropper=RandSpatialCropd(keys=["image", "label"], roi_size=crop_size, random_size=False) if is_avaible_size(crop_size) else None,
         additional_transforms=additional_transforms,    
         preload=preload
@@ -53,22 +54,23 @@ def PICC_dcm_seg_dataset(files_list, phase, opts):
 
     return dataset
 
-@SEGMENTATION_DATASETS.register('2D','picc_nii',"/homes/clwang/Data/picc/picc_seg_nii.json")
+@SEGMENTATION_DATASETS.register('2D', 'picc_nii',
+    "/homes/clwang/Data/picc/picc_seg_nii.json")
 def PICC_nii_seg_dataset(files_list, phase, opts):
-    spacing=opts.get('spacing', (0.3,0.3)) 
-    winlevel=opts.get('winlevel', (421,2515))
-    in_channels=opts.get('input_nc', 1)
-    image_size=opts.get('image_size', (1024,1024))
-    crop_size=opts.get('crop_size', None)
-    preload=opts.get('preload', 1.0) 
-    augment_ratio=opts.get('augment_ratio', 0.4)
+    spacing = opts.get('spacing', (0.3, 0.3))
+    winlevel = opts.get('winlevel', (421, 2515))
+    in_channels = opts.get('input_nc', 1)
+    image_size = opts.get('image_size', (1024, 1024))
+    crop_size = opts.get('crop_size', None)
+    preload = opts.get('preload', 1.0)
+    augment_ratio = opts.get('augment_ratio', 0.4)
 
     assert in_channels == 1, 'Currently only support single channel input'
-    
+
     if phase == 'train':
         additional_transforms = [
-            RandRotated(keys=["image","label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
-            RandFlipd(keys=["image","label"], prob=augment_ratio, spatial_axis=[1])
+            RandRotated(keys=["image", "label"], range_x=math.pi/20, range_y=math.pi/20, prob=augment_ratio, padding_mode='zeros'),
+            RandFlipd(keys=["image", "label"], prob=augment_ratio, spatial_axis=[1])
         ]
     elif phase == 'valid':
         additional_transforms = []
@@ -91,8 +93,8 @@ def PICC_nii_seg_dataset(files_list, phase, opts):
 def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=None,
                      crop_size=None, preload=1.0, augment_ratio=0.4, downsample=1, verbose=False):
 
-    data_reader = LoadHdf5d(keys=["image","label","coord"], h5_keys=["image","roi","coord"], 
-                            affine_keys=["affine","affine",None], dtype=[np.float32, np.int64, np.float32])
+    data_reader = LoadHdf5d(keys=["image", "label", "coord"], h5_keys=["image", "roi", "coord"],
+                            affine_keys=["affine", "affine", None], dtype=[np.float32, np.int64, np.float32])
 
     if in_channels > 1:
         repeater = RepeatChanneld(keys="image", repeats=in_channels)
@@ -103,19 +105,19 @@ def PICC_seg_dataset(files_list, phase, spacing=[], in_channels=1, image_size=No
         Print('No respacing!', color='g')
         spacer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        spacer = Spacingd(keys=["image","label"], pixdim=spacing)
+        spacer = Spacingd(keys=["image", "label"], pixdim=spacing)
 
     if image_size is None or image_size == [] or np.any(np.less_equal(image_size,0)):
         Print('No resizing!', color='g')
         resizer = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        resizer = ResizeWithPadOrCropd(keys=["image","label"], spatial_size=image_size)
+        resizer = ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=image_size)
 
     if crop_size is None or crop_size == [] or np.any(np.less_equal(crop_size,0)):
         Print('No cropping!', color='g')
         cropper = Lambdad(keys=["image", "label"], func=lambda x : x)
     else:
-        cropper = RandCropByPosNegLabeld(keys=["image","label"], label_key='label', pos=2, neg=1, spatial_size=crop_size)
+        cropper = RandCropByPosNegLabeld(keys=["image", "label"], label_key='label', pos=2, neg=1, spatial_size=crop_size)
 
     if phase == 'train':
         transforms = Compose([

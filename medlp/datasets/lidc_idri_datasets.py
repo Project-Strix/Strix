@@ -4,7 +4,6 @@ from numpy.lib.npyio import savez_compressed
 from utils_cw import check_dir
 
 from medlp.data_io import CLASSIFICATION_DATASETS
-from medlp.data_io.base_dataset.segmentation_dataset import SupervisedSegmentationDataset3D, UnsupervisedSegmentationDataset3D
 from medlp.data_io.base_dataset.classification_dataset import BasicClassificationDataset
 from medlp.utilities.utils import is_avaible_size
 from medlp.utilities.transforms import (
