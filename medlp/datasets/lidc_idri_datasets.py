@@ -18,8 +18,8 @@ from monai_ex.data import CacheDataset, PersistentDataset
 from monai_ex.transforms import *
 
 
-@CLASSIFICATION_DATASETS.register('2D', 'lidc-82',
-    "/homes/clwang/Data/LIDC-IDRI-Crops/train_datalist_8-2_cls.json")
+@CLASSIFICATION_DATASETS.register('2D', 'lidc-82-N',
+    "/homes/clwang/Data/LIDC-IDRI-Crops-Norm/train_datalist_8-2_cls.json")
 def get_25d_dataset(files_list, phase, opts):
     return get_lung_dataset(files_list, phase, opts, (32,32))
 

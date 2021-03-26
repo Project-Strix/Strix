@@ -140,7 +140,9 @@ def get_network(opts):
                       dim=dim,
                       is_prunable=is_prunable,
                       bottleneck_size=bottleneck_size)
-    elif 'resnet' in model_name or 'WRN' in model_name:
+    elif 'resnet' in model_name or \
+         'WRN' in model_name or \
+         'resnext' in model_name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)

@@ -324,6 +324,7 @@ def resnet152(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
+@CLASSIFICATION_ARCHI.register('2D', 'resnext50')
 def resnext50_32x4d(pretrained=False, progress=True, **kwargs):
     r"""ResNeXt-50 32x4d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_

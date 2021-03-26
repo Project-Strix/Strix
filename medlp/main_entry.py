@@ -30,7 +30,7 @@ from utils_cw import (
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import CheckpointLoader, TensorboardGraphHandler
+from monai_ex.handlers import CheckpointLoaderEx, TensorboardGraphHandler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 
@@ -88,7 +88,7 @@ def train_core(cargs, files_train, files_valid):
         )
         trainer.add_event_handler(
             event_name=Events.STARTED,
-            handler=CheckpointLoader(
+            handler=CheckpointLoaderEx(
                 load_path=cargs.pretrained_model_path,
                 load_dict={"net": net},
                 strict=False,

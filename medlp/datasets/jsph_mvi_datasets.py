@@ -25,17 +25,22 @@ from monai_ex.transforms import *
 @CLASSIFICATION_DATASETS.register('2D', 'jsph_mvi',
     "/homes/clwang/Data/jsph_lung/MVI/data_crops/datalist-train.json")
 def get_25d_dataset(files_list, phase, opts):
-    return get_mvi_dataset(files_list, phase, opts, (70,70))
+    return get_mvi_dataset(files_list, phase, opts, (70,70), True)
+
+@CLASSIFICATION_DATASETS.register('2D', 'jsph_mvi_pretrain',
+    "/homes/clwang/Data/jsph_lung/MVI/data_crops/datalist-train.json")
+def get_25d_dataset(files_list, phase, opts):
+    return get_mvi_dataset(files_list, phase, opts, (32,32), False)
 
 
-def get_mvi_dataset(files_list, phase, opts, spatial_size):
+def get_mvi_dataset(files_list, phase, opts, spatial_size, use_mask):
     preload = opts.get('preload', 0)
     augment_ratio = opts.get('augment_ratio', 0.4)
     orientation = opts.get('orientation', 'RAI')
     image_keys = opts.get('image_keys', ['image'])
     mask_keys = opts.get('mask_keys', ['mask'])
 
-    use_mask = True
+    use_mask = use_mask
     crop_mode = 'parallel'
     center_mode = 'maximum'
 
@@ -118,8 +123,8 @@ def get_mvi_dataset(files_list, phase, opts, spatial_size):
         is_supervised=True,
         dataset_type=CacheDataset,
         dataset_kwargs={'cache_rate': preload},
-        #dataset_type=PersistentDataset,
-        #dataset_kwargs={'cache_dir': cache_dir},
+        # dataset_type=PersistentDataset,
+        # dataset_kwargs={'cache_dir': cache_dir},
         additional_transforms=additional_transforms,
     ).get_dataset()
 
