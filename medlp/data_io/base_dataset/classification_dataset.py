@@ -1,10 +1,13 @@
 import os
 import math
+import numpy as np
 from typing import Optional, Sequence, Union
 
 from monai_ex.data import Dataset, CacheDataset, PersistentDataset
+from monai_ex.engines.utils import CustomKeys, get_keys_list
 from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
+from medlp.data_io.base_dataset.utils import get_input_data
 
 
 class BasicClassificationDataset(object):
@@ -28,9 +31,11 @@ class BasicClassificationDataset(object):
     ):
         self.files_list = files_list
         self.verbose = verbose
-        self.input_data = self.get_input_data(is_supervised)
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
+        self.input_data = get_input_data(
+            files_list, is_supervised, verbose, self.__class__.__name__
+        )
 
         self.transforms = ensure_list(loader)
         if channeler is not None:
@@ -59,43 +64,44 @@ class BasicClassificationDataset(object):
         """
         check input file_list format and existence.
         """
+        if self.verbose:
+            print('Custom keys:', get_keys_list(CustomKeys))
+
         input_data = []
         for f in self.files_list:
             if is_supervised:
                 if isinstance(f, (list, tuple)):  # Recognize f as ['image','label']
-                    assert os.path.exists(f[0]), f"Image file not exists: {f[0]}"
-                    assert os.path.exists(f[1]), f"Image file not exists: {f[1]}"
-                    input_data.append({"image": f[0], "label": f[1]})
+                    assert os.path.exists(f[0]), f"File not exists: {f[0]}"
+                    assert os.path.exists(f[1]), f"File not exists: {f[1]}"
+                    input_data.append({CustomKeys.IMAGE: f[0], CustomKeys.LABEL: f[1]})
                 elif isinstance(f, dict):
-                    assert "image" in f, f"File {f} doesn't contain keyword 'image'"
-                    assert os.path.exists(f["image"]), f"File not exists: {f['image']}"
+                    assert CustomKeys.IMAGE in f, f"File {f} doesn't contain image keyword '{CustomKeys.IMAGE}'"
+                    assert CustomKeys.LABEL in f, f"File {f} doesn't contain label keyword '{CustomKeys.LABEL}'"
+                    assert os.path.exists(f[CustomKeys.IMAGE]), f"File not exists: {f[CustomKeys.IMAGE]}"
 
-                    input_dict = {"image": f["image"]}
-                    if "label" in f:
-                        input_dict.update({"label": f["label"]})
-                    if "mask" in f:
-                        input_dict.update({"mask": f["mask"]})
-
-                    input_data.append(input_dict)
+                    input_data.append(  # filter the dict by keys defined in CustomKeys
+                        dict(filter(lambda k: k[0] in get_keys_list(CustomKeys), f.items()))
+                    )
                 else:
                     raise ValueError(
                         f"Not supported file_list format,"
-                        f"Got {type(f)} in SupervisedDataset"
+                        f"Got {type(f)} in SupervisedClassificationDataset"
                     )
             else:
                 if isinstance(f, str):
                     assert os.path.exists(f), f"Image file not exists: {f}"
-                    input_data.append({"image": f})
+                    input_data.append({CustomKeys.IMAGE: f})
                 elif isinstance(f, dict):
-                    assert "image" in f, f"File {f} doesn't contain keyword 'image'"
-                    assert os.path.exists(f["image"]), f"File not exists: {f['image']}"
-                    input_dict = {"image": f["image"]}
-                    if "mask" in f:
-                        input_dict.update({"mask": f["mask"]})
-                    input_data.append(input_dict)
+                    assert CustomKeys.IMAGE in f, f"File {f} doesn't contain image keyword '{CustomKeys.IMAGE}'"
+                    assert os.path.exists(f[CustomKeys.IMAGE]), f"File not exists: {f[CustomKeys.IMAGE]}"
+
+                    input_data.append(
+                        dict(filter(lambda k: k[0] in get_keys_list(CustomKeys), f.items()))
+                    )
                 else:
                     raise ValueError(
-                        f"Not supported file_list format, Got {type(f)} in UnsupervisedDataset"
+                        f"Not supported file_list format,"
+                        f"Got {type(f)} in UnsupervisedClassificationDataset"
                     )
         return input_data
 
@@ -103,121 +109,105 @@ class BasicClassificationDataset(object):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
 
 
-class SupervisedClassificationDataset2D(BasicClassificationDataset):
-    def __init__(
-        self,
-        files_list,
-        loader: MapTransform = LoadPNGExD(keys="image", grayscale=True),
-        channeler: Optional[MapTransform] = AddChannelD(keys="image"),
-        orienter: Optional[MapTransform] = OrientationD(keys="image", axcodes="LPI"),
-        spacer: Optional[MapTransform] = SpacingD(keys="image", pixdim=(0.1, 0.1)),
-        rescaler: Optional[MapTransform] = ScaleIntensityRangeD(
-            keys="image", a_min=0, a_max=255, b_min=0, b_max=1, clip=True
-        ),
-        resizer: Optional[MapTransform] = ResizeD(
-            keys="image", spatial_size=(512, 512)
-        ),
-        cropper: Optional[MapTransform] = RandSpatialCropD(
-            keys="image", roi_size=(256, 256), random_size=False
-        ),
-        additional_transforms: Optional[Sequence] = None,
-        caster: Optional[MapTransform] = CastToTypeD(
-            keys=["image", "label"], dtype=[np.float32, np.int64]
-        ),
-        to_tensor: Optional[MapTransform] = ToTensorD(keys=["image", "label"]),
-        augment_ratio: Optional[float] = 0.5,
-        preload: float = 1.0,
-        verbose: bool = False,
-    ):
-        assert loader is not None, "Loader cannot be None"
+# class SupervisedClassificationDataset2D(BasicClassificationDataset):
+#     def __init__(
+#         self,
+#         files_list,
+#         loader: MapTransform = LoadPNGExD(keys=CustomKeys.IMAGE, grayscale=True),
+#         channeler: Optional[MapTransform] = AddChannelD(keys=CustomKeys.IMAGE),
+#         orienter: Optional[MapTransform] = OrientationD(keys=CustomKeys.IMAGE, axcodes="LPI"),
+#         spacer: Optional[MapTransform] = SpacingD(keys=CustomKeys.IMAGE, pixdim=(0.1, 0.1)),
+#         rescaler: Optional[MapTransform] = ScaleIntensityRangeD(
+#             keys=CustomKeys.IMAGE, a_min=0, a_max=255, b_min=0, b_max=1, clip=True
+#         ),
+#         resizer: Optional[MapTransform] = ResizeD(
+#             keys=CustomKeys.IMAGE, spatial_size=(512, 512)
+#         ),
+#         cropper: Optional[MapTransform] = RandSpatialCropD(
+#             keys=CustomKeys.IMAGE, roi_size=(256, 256), random_size=False
+#         ),
+#         caster: Optional[MapTransform] = CastToTypeD(
+#             keys=[CustomKeys.IMAGE, CustomKeys.LABEL], dtype=[np.float32, np.int64]
+#         ),
+#         to_tensor: Optional[MapTransform] = ToTensorD(keys=[CustomKeys.IMAGE, CustomKeys.LABEL]),
+#         dataset_type: Dataset = CacheDataset,
+#         dataset_kwargs: dict = {'cache_rate': 1.0},
+#         additional_transforms: Optional[Sequence] = None,
+#         verbose: bool = False,
+#     ):
+#         assert loader is not None, "Loader cannot be None"
 
-        # Give default 2D segmentation trasformations
-        if additional_transforms is None:
-            additional_transforms = [
-                RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7, 1.4)),
-                RandRotated(
-                    keys="image",
-                    range_x=math.pi / 18,
-                    range_y=math.pi / 18,
-                    prob=augment_ratio,
-                ),
-                RandFlipd(keys="image", prob=augment_ratio, spatial_axis=[1]),
-            ]
-
-        super().__init__(
-            files_list,
-            loader,
-            channeler,
-            orienter,
-            spacer,
-            rescaler,
-            resizer,
-            cropper,
-            caster,
-            to_tensor,
-            True,
-            CacheDataset,
-            {'cache_rate': preload},
-            additional_transforms,
-            verbose,
-        )
+#         super().__init__(
+#             files_list,
+#             loader,
+#             channeler,
+#             orienter,
+#             spacer,
+#             rescaler,
+#             resizer,
+#             cropper,
+#             caster,
+#             to_tensor,
+#             True,
+#             dataset_type,
+#             dataset_kwargs,
+#             additional_transforms,
+#             verbose,
+#         )
 
 
-class SupervisedClassificationDataset3D(BasicClassificationDataset):
-    def __init__(
-        self,
-        files_list,
-        loader: MapTransform = LoadNiftid(keys="image", dtype=np.float32),
-        channeler: Optional[MapTransform] = AddChanneld(keys="image"),
-        orienter: Optional[MapTransform] = Orientationd(keys="image", axcodes="LPI"),
-        spacer: Optional[MapTransform] = Spacingd(keys="image", pixdim=(1, 1, 1)),
-        rescaler: Optional[MapTransform] = NormalizeIntensityD(keys='image'),
-        resizer: Optional[MapTransform] = ResizeWithPadOrCropd(
-            keys="image", spatial_size=(512, 512, 256)
-        ),
-        cropper: Optional[MapTransform] = RandSpatialCropD(
-            keys="image", roi_size=(96, 96, 96), random_size=False
-        ),
-        additional_transforms: Optional[Sequence] = None,
-        caster: Optional[MapTransform] = CastToTyped(
-            keys=["image", "label"], dtype=[np.float32, np.int64]
-        ),
-        to_tensor: Optional[MapTransform] = ToTensord(keys=["image", "label"]),
-        augment_ratio: float = 0.5,
-        preload: float = 1.0,
-        cache_dir: str = "./",
-        verbose: bool = False,
-    ):
-        assert loader is not None, "Loader cannot be None"
+# class SupervisedClassificationDataset(BasicClassificationDataset):
+#     def __init__(
+#         self,
+#         files_list,
+#         loader: MapTransform = LoadNiftid(
+#             keys=CustomKeys.IMAGE, dtype=np.float32
+#         ),
+#         channeler: Optional[MapTransform] = AddChanneld(
+#             keys=CustomKeys.IMAGE
+#         ),
+#         orienter: Optional[MapTransform] = Orientationd(
+#             keys=CustomKeys.IMAGE, axcodes="LPI"
+#         ),
+#         spacer: Optional[MapTransform] = Spacingd(
+#             keys=CustomKeys.IMAGE, pixdim=(1, 1, 1)
+#         ),
+#         rescaler: Optional[MapTransform] = NormalizeIntensityD(
+#             keys=CustomKeys.IMAGE
+#         ),
+#         resizer: Optional[MapTransform] = ResizeWithPadOrCropd(
+#             keys=CustomKeys.IMAGE, spatial_size=(512, 512, 256)
+#         ),
+#         cropper: Optional[MapTransform] = RandSpatialCropD(
+#             keys=CustomKeys.IMAGE, roi_size=(96, 96, 96), random_size=False
+#         ),
+#         caster: Optional[MapTransform] = CastToTyped(
+#             keys=[CustomKeys.IMAGE, CustomKeys.LABEL], dtype=[np.float32, np.int64]
+#         ),
+#         to_tensor: Optional[MapTransform] = ToTensord(
+#             keys=[CustomKeys.IMAGE, CustomKeys.LABEL]
+#         ),
+#         dataset_type: Dataset = CacheDataset,
+#         dataset_kwargs: dict = {'cache_rate': 1.0},
+#         additional_transforms: Optional[Sequence] = None,
+#         verbose: bool = False,
+#     ):
+#         assert loader is not None, "Loader cannot be None"
 
-        # Give default 2D segmentation trasformations
-        if additional_transforms is None:
-            additional_transforms = [
-                RandAdjustContrastd(keys="image", prob=augment_ratio, gamma=(0.7, 1.4)),
-                RandGaussianNoised(keys="image", prob=augment_ratio, std=0.03),
-                RandRotated(
-                    keys="image",
-                    range_x=math.pi / 18,
-                    range_y=math.pi / 18,
-                    prob=augment_ratio,
-                ),
-                RandFlipd(keys="image", prob=augment_ratio, spatial_axis=[1]),
-            ]
-
-        super().__init__(
-            files_list,
-            loader,
-            channeler,
-            orienter,
-            spacer,
-            rescaler,
-            resizer,
-            cropper,
-            caster,
-            to_tensor,
-            True,
-            PersistentDataset if preload == 1.0 else CacheDataset,
-            {'cache_dir': cache_dir} if preload == 1.0 else {'cache_rate': preload},
-            additional_transforms,
-            verbose,
-        )
+#         super().__init__(
+#             files_list,
+#             loader,
+#             channeler,
+#             orienter,
+#             spacer,
+#             rescaler,
+#             resizer,
+#             cropper,
+#             caster,
+#             to_tensor,
+#             True,
+#             dataset_type,
+#             dataset_kwargs,
+#             additional_transforms,
+#             verbose,
+#         )
