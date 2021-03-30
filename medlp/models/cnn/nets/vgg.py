@@ -4,7 +4,8 @@ from typing import Callable
 from torchvision.models.utils import load_state_dict_from_url
 import numpy as np
 
-from medlp.models.cnn import CLASSIFICATION_ARCHI
+from medlp.models.cnn import CLASSIFICATION_ARCHI, SIAMESE_ARCHI
+from .multihead_net import MultiOutputNet
 from monai_ex.networks.layers import Conv, Dropout, Norm, Pool, PrunableLinear
 
 __all__ = [
@@ -32,15 +33,17 @@ class VGG(nn.Module):
         dim = kwargs.get('dim', 2)
         is_prunable = kwargs.get('is_prunable', False)
         bottleneck_size = kwargs.get('bottleneck_size', 7)
+        self.include_top = kwargs.get('include_top', True)
 
         pool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
         fc_type: Callable = nn.Linear if not is_prunable else PrunableLinear
 
         self.features = features
-        output_size = (bottleneck_size, )*dim #(2,2,2) #For OOM issue
+        output_size = (bottleneck_size, )*dim  # (2,2,2) #For OOM issue
 
         self.avgpool = pool_type(output_size)
         num_ = np.prod(output_size)
+        self.embedder = None
         self.classifier = nn.Sequential(
             fc_type(512 * num_, 4096),
             nn.ReLU(True),
@@ -57,7 +60,8 @@ class VGG(nn.Module):
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.classifier(x)
+        if self.include_top:
+            x = self.classifier(x)
         return x
 
     def _initialize_weights(self):
@@ -109,18 +113,35 @@ cfgs = {
 
 
 def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
-    if pretrained:
-        kwargs['init_weights'] = False
-
     in_channels = kwargs.get('in_channels', 3)
     dim = kwargs.get('dim', 2)
     is_prunable = kwargs.get('is_prunable', False)
+    if kwargs.get('siamese', None):
+        pretrained = False
+        kwargs['include_top'] = False
+        output_size = (kwargs.get('bottleneck_size', 7), )*dim
+        num_ = np.prod(output_size)
+        latent_dim = kwargs.get('latent_dim', 512)
+        embedder_ = nn.Sequential(
+            nn.Linear(512 * num_, 256 * num_),
+            nn.PReLU(),
+            nn.Linear(256 * num_, latent_dim)
+        )
+        classifier_ = nn.Sequential(
+            nn.PReLU(),
+            nn.Linear(latent_dim, kwargs['num_classes'])
+        )
 
     if pretrained:
         num_classes_ = kwargs['num_classes']
         kwargs['num_classes'] = 1000
+        kwargs['init_weights'] = False
 
-    model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable), **kwargs)
+    model = VGG(
+        make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable),
+        **kwargs
+    )
+
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
@@ -138,7 +159,17 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
 
         model.classifier = classifier_
 
-    return model
+    if kwargs.get('siamese') == 'multi':
+        return MultiOutputNet(
+            backbone=model,
+            multiheads=nn.ModuleList([embedder_, classifier_]),
+            mode='continous'
+        )
+    elif kwargs.get('siamese') == 'single':
+        model.classifier = embedder_
+        return model
+    else:
+        return model
 
 
 def vgg9(pretrained=False, progress=True, **kwargs):
@@ -173,6 +204,7 @@ def vgg11(pretrained=False, progress=True, **kwargs):
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'vgg11_bn')
+@SIAMESE_ARCHI.register('2D', 'vgg11_bn')
 def vgg11_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_

@@ -137,6 +137,31 @@ def loss_params(ctx, param, value):
     return value
 
 
+def loss_select(ctx, param, value):
+    from medlp.models.cnn.losses import LOSS_MAPPING
+
+    losslist = list(LOSS_MAPPING[ctx.params["framework"]].keys())
+
+    assert len(losslist) > 0, f"No loss available for {ctx.params['framework']}! Abort!"
+    if value is not None and value in losslist:
+        return value
+    else:
+        value = prompt_ex("Loss list", type=Choice(losslist, show_index=True))
+        # if value in ['WCE', 'WBCE', 'WCE-DCE']:
+        if 'WCE' in value:
+            weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
+            ctx.params["loss_params"] = {"weight": weights}
+        elif value == 'WBCE':
+            pos_weight = _prompt("Pos weight", float, 2.0)
+            ctx.params['loss_params'] = {'pos_weight': pos_weight}
+        elif 'FocalLoss' in value:
+            gamma = _prompt("Gamma", float, 2.0)
+            ctx.params["loss_params"] = {'gamma': gamma}
+        else:
+            ctx.params["loss_params"] = {}
+        return value
+
+
 def model_select(ctx, param, value):
     from medlp.models.cnn import ARCHI_MAPPING
 
@@ -362,10 +387,9 @@ def network_params(func):
     @optionex(
         "-L",
         "--criterion",
-        prompt=True,
-        type=Choice(LOSSES, show_index=True),
-        callback=loss_params,
-        default=0,
+        type=str,
+        callback=loss_select,
+        default=None,
         help="loss criterion type",
     )
     @optionex(

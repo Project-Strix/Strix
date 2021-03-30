@@ -1,4 +1,5 @@
-import os, time
+import os
+import time
 from types import SimpleNamespace as sn
 from pathlib import Path
 from utils_cw import check_dir
@@ -6,18 +7,35 @@ import numpy as np
 
 import torch
 from utils_cw.utils import get_items_from_file
-from medlp.models.cnn.utils import print_network, output_onehot_transform, PolynomialLRDecay
-from medlp.models.cnn.losses.losses import DeepSupervisionLoss, CEDiceLoss, FocalDiceLoss
+from medlp.models.cnn.utils import (
+    print_network,
+    output_onehot_transform,
+    PolynomialLRDecay
+)
 from medlp.models.cnn.layers.radam import RAdam
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.models.cnn import ARCHI_MAPPING
-#from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
+from medlp.models.cnn.engines import (
+    TRAIN_ENGINES,
+    TEST_ENGINES,
+    ENSEMBLE_TEST_ENGINES
+)
+from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
+from medlp.models.cnn.losses import (
+    LOSS_MAPPING,
+    CrossEntropyLossEx,
+    FocalDiceLoss,
+    CEDiceLoss,
+    ContrastiveLoss
+)
 
 from monai_ex.networks.nets import UNet, HighResNet, VNet
-from monai_ex.losses import DiceLoss, GeneralizedDiceLoss, FocalLoss
 from monai_ex.utils import Activation, ChannelMatching, Normalisation
+from monai_ex.losses import (
+    DiceLoss,
+    GeneralizedDiceLoss,
+    FocalLoss
+)
 
 
 def get_rcnn_config(archi, backbone):
@@ -73,6 +91,12 @@ def get_network(opts):
     dim = 2 if opts.tensor_dim == '2D' else 3
     input_size = image_size if crop_size is None or \
                  np.any(np.less_equal(crop_size, 0)) else crop_size
+
+    siamese = None
+    siamese_latent_dim = get_attr_(opts, 'latent_dim', 512)
+    if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
+        loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
+        siamese = 'single' if loss_type == ContrastiveLoss else 'multi'
 
     if model_name == 'unet' or model_name == 'res-unet':
         last_act = 'sigmoid' if opts.framework == 'selflearning' else None
@@ -134,16 +158,22 @@ def get_network(opts):
             use_dilated_conv=True,
             pretrained=load_imagenet)
     elif 'vgg' in model_name:
-        model = model(pretrained=load_imagenet,
-                      in_channels=in_channels,
-                      num_classes=out_channels,
-                      dim=dim,
-                      is_prunable=is_prunable,
-                      bottleneck_size=bottleneck_size)
+        model = model(
+            pretrained=load_imagenet,
+            in_channels=in_channels,
+            num_classes=out_channels,
+            dim=dim,
+            is_prunable=is_prunable,
+            bottleneck_size=bottleneck_size,
+            siamese=siamese,
+            latent_dim=siamese_latent_dim
+        )
     elif 'resnet' in model_name:
-        model = model(pretrained=load_imagenet,
-                      in_channels=in_channels,
-                      num_classes=out_channels)
+        model = model(
+            pretrained=load_imagenet,
+            in_channels=in_channels,
+            num_classes=out_channels
+        )
     elif model_name == 'vnet':
         model = model(
             spatial_dims=dim,
@@ -201,46 +231,24 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     model_dir = check_dir(opts.experiment_path, 'Models')
 
     loss = lr_scheduler = None
-    if opts.criterion == 'CE':
-        loss = torch.nn.CrossEntropyLoss()
-    elif opts.criterion == 'WCE':
-        w_ = torch.tensor(opts.loss_params).to(device)
-        loss = torch.nn.CrossEntropyLoss(weight=w_)
-    elif opts.criterion == 'BCE':
-        loss = torch.nn.BCEWithLogitsLoss()
-    elif opts.criterion == 'WBCE':
-        w_ = torch.tensor(opts.loss_params[1]).to(device)
-        loss = torch.nn.BCEWithLogitsLoss(pos_weight=w_)
-    elif opts.criterion == 'MSE':
-        loss = torch.nn.MSELoss()
-    elif opts.criterion == 'DCE':
+    loss_type = LOSS_MAPPING[framework_type][opts.criterion]
+
+    if loss_type in [DiceLoss, GeneralizedDiceLoss]:
         if opts.output_nc == 1:
-            loss = DiceLoss(include_background=False, to_onehot_y=False, sigmoid=True)
+            loss = loss_type(include_background=False, to_onehot_y=False, sigmoid=True)
         else:
-            loss = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
-    elif opts.criterion == 'GDL':
-        if opts.output_nc == 1:
-            loss = GeneralizedDiceLoss(include_background=False, to_onehot_y=False, sigmoid=True)
-        else:
-            loss = GeneralizedDiceLoss(include_background=False, to_onehot_y=True, softmax=True)
-    elif opts.criterion == 'CE-DCE':
-        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(),
-                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
-    elif opts.criterion == 'WCE-DCE':
-        w_ = torch.tensor(opts.loss_params).to(device)
-        loss = CEDiceLoss(torch.nn.CrossEntropyLoss(weight=w_),
-                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
-    elif opts.criterion == 'Wassert-DCE':
-        raise NotImplementedError
-    elif opts.criterion == 'FocalLoss':
-        loss = FocalLoss(gamma=2.0, weight=None)
-    elif opts.criterion == 'FocalDiceLoss':
-        loss = FocalDiceLoss(FocalLoss(gamma=2.0),
-                             DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
+            loss = loss_type(include_background=False, to_onehot_y=True, softmax=True)
+    elif loss_type == CEDiceLoss:
+        loss = loss_type(CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
+                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))    
+    elif loss_type == FocalDiceLoss:
+        loss = loss_type(FocalLoss(**opts.loss_params),
+                         DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
     else:
-        raise NotImplementedError
+        loss = loss_type(**opts.loss_params)
 
     if opts.deep_supervision:
+        raise NotImplementedError
         loss = DeepSupervisionLoss(loss)
 
     net_ = get_network(opts)

@@ -60,51 +60,6 @@ class BasicClassificationDataset(object):
 
         self.transforms = Compose(self.transforms)
 
-    def get_input_data(self, is_supervised):
-        """
-        check input file_list format and existence.
-        """
-        if self.verbose:
-            print('Custom keys:', get_keys_list(CustomKeys))
-
-        input_data = []
-        for f in self.files_list:
-            if is_supervised:
-                if isinstance(f, (list, tuple)):  # Recognize f as ['image','label']
-                    assert os.path.exists(f[0]), f"File not exists: {f[0]}"
-                    assert os.path.exists(f[1]), f"File not exists: {f[1]}"
-                    input_data.append({CustomKeys.IMAGE: f[0], CustomKeys.LABEL: f[1]})
-                elif isinstance(f, dict):
-                    assert CustomKeys.IMAGE in f, f"File {f} doesn't contain image keyword '{CustomKeys.IMAGE}'"
-                    assert CustomKeys.LABEL in f, f"File {f} doesn't contain label keyword '{CustomKeys.LABEL}'"
-                    assert os.path.exists(f[CustomKeys.IMAGE]), f"File not exists: {f[CustomKeys.IMAGE]}"
-
-                    input_data.append(  # filter the dict by keys defined in CustomKeys
-                        dict(filter(lambda k: k[0] in get_keys_list(CustomKeys), f.items()))
-                    )
-                else:
-                    raise ValueError(
-                        f"Not supported file_list format,"
-                        f"Got {type(f)} in SupervisedClassificationDataset"
-                    )
-            else:
-                if isinstance(f, str):
-                    assert os.path.exists(f), f"Image file not exists: {f}"
-                    input_data.append({CustomKeys.IMAGE: f})
-                elif isinstance(f, dict):
-                    assert CustomKeys.IMAGE in f, f"File {f} doesn't contain image keyword '{CustomKeys.IMAGE}'"
-                    assert os.path.exists(f[CustomKeys.IMAGE]), f"File not exists: {f[CustomKeys.IMAGE]}"
-
-                    input_data.append(
-                        dict(filter(lambda k: k[0] in get_keys_list(CustomKeys), f.items()))
-                    )
-                else:
-                    raise ValueError(
-                        f"Not supported file_list format,"
-                        f"Got {type(f)} in UnsupervisedClassificationDataset"
-                    )
-        return input_data
-
     def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
 
