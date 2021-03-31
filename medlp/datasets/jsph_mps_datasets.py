@@ -159,9 +159,9 @@ def get_lung_mps_dataset(files_list, phase, opts, spatial_size):
         )
     ]
 
-    cache_dir_name = 'cache' if not use_mask else 'cache-mask'
-    cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
-    cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
+    # cache_dir_name = 'cache' if not use_mask else 'cache-mask'
+    # cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
+    # cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
 
     dataset = BasicClassificationDataset(
         files_list,
@@ -177,8 +177,6 @@ def get_lung_mps_dataset(files_list, phase, opts, spatial_size):
         is_supervised=True,
         dataset_type=CacheDataset,
         dataset_kwargs={'cache_rate': preload},
-        # dataset_type=PersistentDataset,
-        # dataset_kwargs={'cache_dir': cache_dir},
         additional_transforms=additional_transforms,
     ).get_dataset()
 

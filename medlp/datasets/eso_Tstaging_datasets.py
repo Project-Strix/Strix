@@ -90,7 +90,7 @@ def Survival_nii_cls_dataset(files_list, phase, opts):
             ScaleIntensityRangePercentilesD(
                 keys="image", lower=0.0, upper=99.5, b_min=0, b_max=1
             ),
-            LambdaD(keys='label', func=lambda x: x > 2),
+            LambdaD(keys='label', func=lambda x: int(x > 2)),
         ],
         resizer=None,
         cropper=cropper,
