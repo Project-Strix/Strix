@@ -116,10 +116,10 @@ def get_mvi_dataset(files_list, phase, opts, spatial_size, use_mask):
         )
     ]
 
-    cache_dir_name = 'cache' if not use_mask else 'cache-mask'
-    cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
-    if opts.get('experiment_path'):
-        cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
+    # cache_dir_name = 'cache' if not use_mask else 'cache-mask'
+    # cache_dir_name += f'-{crop_mode}-{center_mode}-{spatial_size}'
+    # if opts.get('experiment_path'):
+    #     cache_dir = check_dir(os.path.dirname(opts.get('experiment_path')), cache_dir_name)
 
     dataset = BasicClassificationDataset(
         files_list,

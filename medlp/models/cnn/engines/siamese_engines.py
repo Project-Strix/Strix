@@ -51,7 +51,8 @@ from monai_ex.handlers import (
     MeanDice,
     MetricLogger,
     CheckpointSaverEx,
-    stopping_fn_from_metric
+    stopping_fn_from_metric,
+    ROCAUC,
 )
 
 
@@ -69,18 +70,26 @@ def build_siamese_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
+    is_multilabel = opts.output_nc>1
+    single_output = isinstance(loss, ContrastiveLoss)
 
-    prepare_batch_fn = lambda x, device, nb: (
-        x[Keys.IMAGE].to(device),
-        x[Keys.LABEL].to(device),
-    )
+    if opts.output_nc == 1:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[Keys.IMAGE].to(device),
+            x[Keys.LABEL].unsqueeze(1).to(torch.float).to(device),
+        )
+    else:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[Keys.IMAGE].to(device),
+            x[Keys.LABEL].to(device),
+        )
 
-    train_metric_name = 'train_acc'
-    val_metric_name = 'val_acc'
-    key_val_metric = Accuracy(
-        output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
-        is_multilabel=opts.output_nc > 1,
-    )
+    if is_multilabel:
+        train_metric_name = 'train_acc'
+        val_metric_name = 'val_acc'
+    else:
+        train_metric_name = 'train_auc'
+        val_metric_name = 'val_auc'
 
     val_handlers = [
         StatsHandler(
@@ -89,11 +98,25 @@ def build_siamese_engine(**kwargs):
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
-            tag_name="val_loss",
+            tag_name='val_loss',
             output_transform=lambda x: x[Keys.LOSS]
         ),
+        CheckpointSaverEx(
+            save_dir=model_dir,
+            save_dict={"net": net},
+            save_key_metric=True,
+            key_metric_n_saved=4,
+            key_metric_save_after_epoch=0
+        ),
+        TensorBoardImageHandlerEx(
+            summary_writer=writer,
+            batch_transform=lambda x: (None, None),
+            output_transform=lambda x: x["image"],
+            max_channels=3,
+            prefix_name='Val'
+        )
     ]
-    if isinstance(loss, ContrastiveLoss):
+    if single_output:
         train_post_transforms = None
     elif opts.output_nc == 1:
         train_post_transforms = ActivationsD(keys=Keys.PRED, sigmoid=True)
@@ -104,21 +127,30 @@ def build_siamese_engine(**kwargs):
             SqueezeDimD(keys=Keys.PRED)
         ])
 
+    if is_multilabel:
+        key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc), is_multilabel=is_multilabel)
+    else:
+        key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
+
     evaluator = SiameseEvaluator(
         device=device,
         val_data_loader=test_loader,
         network=net,
+        loss_function=loss,
         epoch_length=int(opts.n_epoch_len)
         if opts.n_epoch_len > 1.0
         else int(opts.n_epoch_len*len(test_loader)),
+        prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_val_metric=None,  # {val_metric_name: key_val_metric},
+        key_val_metric={val_metric_name: key_val_metric}
+        if not single_output
+        else None,
         val_handlers=val_handlers,
         amp=opts.amp
     )
 
-    if isinstance(loss, ContrastiveLoss):
+    if single_output:
         save_handler = ModelCheckpoint(
             dirname=model_dir/'Best_Models',
             filename_prefix='Best',
@@ -142,6 +174,11 @@ def build_siamese_engine(**kwargs):
             summary_writer=writer,
             step_transform=lr_step_transform
         ),
+        ValidationHandler(
+            validator=evaluator,
+            interval=valid_interval,
+            epoch_level=True
+        ),
         StatsHandler(
             tag_name="train_loss",
             output_transform=lambda x: x[Keys.LOSS],
@@ -158,6 +195,13 @@ def build_siamese_engine(**kwargs):
             save_interval=opts.save_epoch_freq,
             epoch_level=True,
             n_saved=3,
+        ),
+        TensorBoardImageHandlerEx(
+            summary_writer=writer,
+            batch_transform=lambda x: (None, None),
+            output_transform=lambda x: x[Keys.IMAGE],
+            max_channels=3,
+            prefix_name='Train'
         )
     ]
 
@@ -174,7 +218,9 @@ def build_siamese_engine(**kwargs):
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
-        key_train_metric=None,  # {train_metric_name: key_val_metric},
+        key_train_metric={train_metric_name: key_val_metric}
+        if not single_output
+        else None,
         train_handlers=train_handlers,
         amp=opts.amp,
     )
