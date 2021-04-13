@@ -248,12 +248,13 @@ def common_params(func):
         default=10,
         help="Batch size",
     )
-    @optionex("--istrain", type=bool, default=True, help="train/test phase flag")
     @optionex("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @optionex("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @optionex("--input-nc", type=int, default=1, help="input data channels")
     @optionex("--output-nc", type=int, default=3, help="output channels (classes)")
     @optionex("--split", type=float, default=0.1, help="Training/testing split ratio")
+    @optionex("--train-list", type=str, default='', help='Specified training datalist')
+    @optionex("--valid-list", type=str, default='', help='Specified validation datalist')
     @optionex(
         "-W",
         "--pretrained-model-path",

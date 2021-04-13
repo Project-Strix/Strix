@@ -139,9 +139,7 @@ def train_core(cargs, files_train, files_valid):
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=clb.get_exp_name, default="")
-@click.option("--confirm", callback=partial(
-    confirmation, output_dir_ctx="experiment_path", save_code=True, exist_ok=False),
-)
+@click.option("--confirm", callback=partial(confirmation, output_dir_ctx="experiment_path", save_code=True, exist_ok=False))
 def train(**args):
     """Entry of train command."""
     cargs = sn(**args)
@@ -152,6 +150,12 @@ def train(**args):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
+
+    if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
+        files_train = get_items_from_file(cargs.train_list, format="auto")
+        files_valid = get_items_from_file(cargs.valid_list, format="auto")
+        train_core(cargs, files_train, files_valid)
+        os.sys.exit()
 
     data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
     assert os.path.isfile(data_list), "Data list not exists!"
@@ -178,7 +182,7 @@ def train(**args):
 
             train_core(cargs, files_train, files_valid)
             Print("Cleaning CUDA cache...", color="g")
-            torch.cuda.empty_cache()
+            torch.cuda.empty_cache()        
     else:  #! Plain training
         cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
         files_train, files_valid = train_test_split(

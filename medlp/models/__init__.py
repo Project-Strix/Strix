@@ -58,8 +58,7 @@ def get_network(opts):
     is_deconv = get_attr_(opts, 'is_deconv', False)
     n_depth = get_attr_(opts, 'n_depth', -1)
     load_imagenet = get_attr_(opts, 'load_imagenet', False)
-    crop_size = get_attr_(opts, 'crop_size', (512, 512))
-    image_size = get_attr_(opts, 'image_size', (512, 512))
+    crop_size = get_attr_(opts, 'crop_size', None)
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
     bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
@@ -71,8 +70,7 @@ def get_network(opts):
     model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
 
     dim = 2 if opts.tensor_dim == '2D' else 3
-    input_size = image_size if crop_size is None or \
-                 np.any(np.less_equal(crop_size, 0)) else crop_size
+    input_size = crop_size
 
     if model_name == 'unet' or model_name == 'res-unet':
         last_act = 'sigmoid' if opts.framework == 'selflearning' else None
@@ -80,7 +78,7 @@ def get_network(opts):
         kernel_size = (3,)+(3,)*n_depth
         strides = (1,)+(2,)*n_depth
         upsample_kernel_size=(1,)+(2,)*n_depth
-
+        
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,

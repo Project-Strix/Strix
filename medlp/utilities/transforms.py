@@ -592,24 +592,6 @@ class ExtractSTSlicesD(MapTransform):
         return d
 
 
-# class SeparateClassLabelD(MapTransform):
-#     """
-#     SeparateClassLabel seperates classes labels
-#     from single list to multi lists
-#     """
-#     def __init__(self, keys):
-#         super(SeparateClassLabelD, self).__init__(keys)
-
-#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
-#         d = dict(data)
-#         results: List[Dict[Hashable, np.ndarray]] = [dict() for _ in new_bboxes]
-#         for key in self.keys:
-#             d[key] = np.array(d[key])[...,np.newaxis]
-#             print(d[key].shape)
-#         return d
-
-
-
 # class RandSelectSlice(Randomizable):
 #     def __init__(self, dim: int) -> None:
 #         super().__init__()
