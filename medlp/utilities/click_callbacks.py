@@ -221,7 +221,7 @@ def common_params(func):
         type=str,
         callback=data_select,
         default=None,
-        help="Data file list (json)",
+        help="Data file list (json/yaml)",
     )
     @optionex(
         "--preload", type=float, default=1.0, help="Ratio of preload data"
@@ -267,7 +267,7 @@ def common_params(func):
         type=str,
         prompt=True,
         show_default=True,
-        default="/homes/clwang/Data/medlp_exp",
+        default=OUTPUT_DIR,
     )
     @optionex(
         "--augment-ratio", type=float, default=0.3, help="Data aug ratio."
