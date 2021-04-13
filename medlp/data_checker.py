@@ -13,6 +13,7 @@ import torch
 from torchvision.utils import make_grid, save_image
 
 from medlp.utilities.click_callbacks import data_select
+from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.enum import FRAMEWORK_TYPES, OUTPUT_DIR
 from monai_ex.utils import first
@@ -45,8 +46,8 @@ def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_i
 
 
 @click.command("check-data", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@click.option("--tensor-dim", prompt=True, type=click.Choice(["2D", "3D"]), default="2D", help="2D or 3D")
-@click.option("--framework", prompt=True, type=click.Choice(FRAMEWORK_TYPES), default="segmentation", help="Choose your framework type")
+@click.option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
+@click.option("--framework", prompt=True, type=Choice(FRAMEWORK_TYPES), default="segmentation", help="Choose your framework type")
 @click.option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
 @click.option("--n-batch", prompt=True, type=int, default=10, help="Batch size")
 @click.option("--split", type=float, default=0.2, help="Training/testing split ratio")

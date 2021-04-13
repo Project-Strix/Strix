@@ -7,6 +7,7 @@ from click.utils import echo
 from click.exceptions import Abort, UsageError
 from click.termui import visible_prompt_func, hidden_prompt_func
 
+
 class DynamicTuple(ParamType):
 
     def __init__(self, input_type):
@@ -34,6 +35,7 @@ class DynamicTuple(ParamType):
         types = (self.type,) * len(value)
         return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
 
+
 def _build_prompt(text, suffix, show_default=False, default=None, show_choices=True, type=None):
     prompt = text
     if type is not None and show_choices and isinstance(type, Choice):
@@ -42,6 +44,7 @@ def _build_prompt(text, suffix, show_default=False, default=None, show_choices=T
     if default is not None and show_default:
         prompt = '%s [%s]' % (prompt, default)
     return prompt + suffix
+
 
 def prompt_ex(text, default=None, hide_input=False, confirmation_prompt=False,
               type=None, value_proc=None, prompt_suffix=': ', show_default=True,
@@ -96,6 +99,7 @@ def prompt_ex(text, default=None, hide_input=False, confirmation_prompt=False,
             return result
         echo('Error: the two entered values do not match', err=err)
 
+
 class OptionEx(Option):
     def __init__(self, param_decls=None, show_default=False,
                     prompt=False, confirmation_prompt=False,
@@ -140,6 +144,7 @@ class OptionEx(Option):
                          hide_input=self.hide_input, show_choices=self.show_choices,
                          confirmation_prompt=self.confirmation_prompt,
                          value_proc=lambda x: self.process_value(ctx, x))
+
 
 class ChoiceEx(Choice):
     """The choice type allows a value to be checked against a fixed set
@@ -219,6 +224,30 @@ class ChoiceEx(Choice):
             return 'Choice(%r)' % list(self.choices.values())
         else:
             return 'Choice(%r)' % ['{}.{}'.format(idx,ch) for idx, ch in self.choices.items()]
+
+
+class NumericChoice(Choice):
+    def __init__(self, choices, **kwargs):
+        self.choicemap = {}
+        choicestrs = []
+        for i, choice in enumerate(choices, start=1):
+            self.choicemap[i] = choice
+            choicestrs.append(f"{i}: {choice}")
+        super().__init__(choicestrs, **kwargs)
+
+    def convert(self, value, param, ctx):
+        try:
+            return self.choicemap[int(value)]
+        except ValueError as e:
+            if value in self.choicemap.values():
+                return value
+            self.fail(
+                f'invaid index choice: {value}. Please input integer index or correct value!'
+                f'Error msg: {e}'
+            )
+        except KeyError as e:
+            self.fail(f'invalid choice: {value}. (choose from {self.choicemap})', param, ctx)
+
 
 def optionex(*param_decls, **attrs):
     """Attaches an option to the command.  All positional arguments are
