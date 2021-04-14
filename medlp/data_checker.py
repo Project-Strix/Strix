@@ -14,6 +14,7 @@ from torchvision.utils import make_grid, save_image
 
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
+from medlp.utilities.click_ex import get_unknown_options
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.enum import FRAMEWORK_TYPES, OUTPUT_DIR
 from monai_ex.utils import first
@@ -56,17 +57,14 @@ def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_i
 @click.pass_context
 def check_data(ctx, **args):
     cargs = sn(**args)
+    auxilary_params = get_unknown_options(ctx)
     cargs.out_dir = check_dir(cargs.out_dir, 'Data check')
+
     dataset_type = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
     dataset_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
     files_list = get_items_from_file(dataset_list, format="auto")
 
     files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
-
-    auxilary_params = {
-        (ctx.args[i][2:] if str(ctx.args[i]).startswith("--") else ctx.args[i][1:]): ctx.args[i + 1]
-        for i in range(0, len(ctx.args), 2)
-    }
 
     try:
         train_ds = dataset_type(files_train, 'train', auxilary_params)

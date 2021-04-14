@@ -1,11 +1,5 @@
-import inspect
-
-from termcolor import colored
-from click import Choice, ParamType, Option, confirm, Command
-from click.types import convert_type, Path
-from click.utils import echo
-from click.exceptions import Abort, UsageError
-from click.termui import visible_prompt_func, hidden_prompt_func
+from click import Choice, ParamType
+from click.types import convert_type
 
 
 class DynamicTuple(ParamType):
@@ -148,3 +142,10 @@ class NumericChoice(Choice):
         except KeyError as e:
             self.fail(f'invalid choice: {value}. (choose from {self.choicemap})', param, ctx)
 
+
+def get_unknown_options(ctx):
+    auxilary_params = {
+        (ctx.args[i][2:] if str(ctx.args[i]).startswith("--") else ctx.args[i][1:]): ctx.args[i + 1]
+        for i in range(0, len(ctx.args), 2)
+    }
+    return auxilary_params

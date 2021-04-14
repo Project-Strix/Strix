@@ -15,6 +15,7 @@ from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import SNIP_prune_handler
+from medlp.utilities.click_ex import get_unknown_options
 import medlp.utilities.click_callbacks as clb
 
 from sklearn.model_selection import train_test_split, KFold
@@ -130,7 +131,7 @@ def train_core(cargs, files_train, files_valid):
     trainer.run()
 
 
-@click.command("train", context_settings={"allow_extra_args": True})
+@click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("--debug", is_flag=True)
 @clb.latent_auxilary_params
 @clb.common_params
@@ -140,8 +141,11 @@ def train_core(cargs, files_train, files_valid):
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=clb.get_exp_name, default="")
 @click.option("--confirm", callback=partial(confirmation, output_dir_ctx="experiment_path", save_code=True, exist_ok=False))
-def train(**args):
+@click.pass_context
+def train(ctx, **args):
     """Entry of train command."""
+    auxilary_params = get_unknown_options(ctx)
+    args.update(auxilary_params)
     cargs = sn(**args)
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -191,10 +195,7 @@ def train(**args):
         train_core(cargs, files_train, files_valid)
 
 
-@click.command(
-    "train-from-cfg",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@click.command("train-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("--config", type=click.Path(exists=True))
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
