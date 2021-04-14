@@ -78,7 +78,7 @@ def check_data(ctx, **args):
     train_num = min(cargs.n_batch, len(train_ds))
     valid_num = min(cargs.n_batch, len(valid_ds))
     train_dataloader = DataLoader(train_ds, num_workers=5, batch_size=train_num, shuffle=True)
-    valid_dataloader = DataLoader(valid_ds, num_workers=5, batch_size=valid_num, shuffle=True)
+    valid_dataloader = DataLoader(valid_ds, num_workers=5, batch_size=valid_num, shuffle=False)
     train_data = first(train_dataloader)
     # valid_data = first(valid_dataloader)
 
@@ -115,3 +115,6 @@ def check_data(ctx, **args):
                         i,
                         slice_idx
                     )
+
+    else:
+        raise NotImplementedError
