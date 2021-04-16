@@ -8,7 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, output_filename_check
-from medlp.utilities.handlers import NNIReporterHandler, AUCGapHandler, ROCOverlapHandler
+from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.inferers import SimpleInferer
@@ -16,7 +16,6 @@ from monai_ex.networks import one_hot
 from monai_ex.metrics import DrawRocCurve
 from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
-from ignite.contrib.metrics import RocCurve
 from ignite.handlers import EarlyStopping
 
 from monai_ex.engines import (
@@ -193,46 +192,6 @@ def build_classification_engine(**kwargs):
             prefix_name='Train'
         )
     ]
-
-    if isinstance(key_val_metric, ROCAUC):
-        train_handlers += [
-            AUCGapHandler(
-                validator=evaluator,
-                interval=valid_interval,
-                epoch_level=True,
-                summary_writer=writer,
-                save_metric=True,
-                save_metric_name='rect_auc'
-            ),
-            ROCOverlapHandler(
-                validator=evaluator,
-                interval=valid_interval,
-                roc_metric_name="roccurve",
-                epoch_level=True,
-                summary_writer=writer,
-                save_metric=True,
-                save_metric_name='rect_roc',
-            )
-        ]
-        if opts.save_n_best > 0:
-            train_handlers += [
-                CheckpointSaverEx(
-                    save_dir=model_dir/"Best_RAUC_Model",
-                    save_dict={"net": net},
-                    file_prefix='RAUC',
-                    save_key_metric=True,
-                    key_metric_name='rect_auc',
-                    key_metric_n_saved=opts.save_n_best
-                ),
-                CheckpointSaverEx(
-                    save_dir=model_dir/"Best_RROC_Model",
-                    save_dict={"net": net},
-                    file_prefix='RROC',
-                    save_key_metric=True,
-                    key_metric_name='rect_roc',
-                    key_metric_n_saved=opts.save_n_best
-                )
-            ]
 
     trainer = SupervisedTrainer(
         device=device,
