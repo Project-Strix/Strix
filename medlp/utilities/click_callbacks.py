@@ -19,8 +19,8 @@ def get_trained_models(exp_folder):
     model_dir = os.path.join(exp_folder, "Models")
     assert os.path.isdir(model_dir), f"Model dir is not found! {model_dir}"
     files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
-    prompt = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
-    selected = prompt(f"Choose model: {prompt}", type=int)
+    prompts = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
+    selected = prompt(f"Choose model: {prompts}", type=int)
     return str(files[selected])
 
 

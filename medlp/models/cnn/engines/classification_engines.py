@@ -6,8 +6,12 @@ from pathlib import Path
 from functools import partial
 
 import torch
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.utils import assert_network_type, output_filename_check
+from medlp.models.cnn.engines import (
+    TRAIN_ENGINES,
+    TEST_ENGINES,
+    ENSEMBLE_TEST_ENGINES
+)
+from medlp.utilities.utils import assert_network_type, output_filename_check, get_attr_
 from medlp.models.cnn.utils import output_onehot_transform
 
 from monai_ex.inferers import SimpleInferer
@@ -246,7 +250,7 @@ def build_classification_test_engine(**kwargs):
         ),
     ]
 
-    if opts.save_image:
+    if get_attr_(opts, 'save_image', False):
         # check output filename
         uplevel = output_filename_check(test_loader.dataset)
         val_handlers += [

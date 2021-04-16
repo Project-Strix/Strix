@@ -11,9 +11,11 @@ from medlp.models.cnn.losses.losses import DeepSupervisionLoss, CEDiceLoss, Foca
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.models.cnn import ARCHI_MAPPING
+
 #from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
+from medlp.utilities.utils import get_attr_
 
 from monai_ex.networks.nets import UNet, HighResNet, VNet
 from monai_ex.losses import DiceLoss, GeneralizedDiceLoss, FocalLoss
@@ -43,8 +45,6 @@ def get_rcnn_config(archi, backbone):
         }
     }[archi][backbone]
 
-def get_attr_(obj, name, default):
-    return getattr(obj, name) if hasattr(obj, name) else default
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
