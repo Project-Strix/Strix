@@ -36,9 +36,7 @@ from monai_ex.transforms import (
 
 from monai_ex.handlers import (
     StatsHandler,
-    StatsHandlerEx,
     TensorBoardStatsHandler,
-    TensorBoardStatsHandlerEx,
     TensorBoardImageHandlerEx,
     ValidationHandler,
     LrScheduleTensorboardHandler,
@@ -47,7 +45,6 @@ from monai_ex.handlers import (
     SegmentationSaverEx,
     ClassificationSaverEx,
     ROCAUC,
-    ROC,
     stopping_fn_from_metric
 )
 
@@ -88,8 +85,8 @@ def build_classification_engine(**kwargs):
         val_metric_name = 'val_auc'
 
     val_handlers = [
-        StatsHandlerEx(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandlerEx(summary_writer=writer, tag_name="val_acc"),
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
+        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
@@ -136,7 +133,6 @@ def build_classification_engine(**kwargs):
         key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc), is_multilabel=is_multilabel)
     else:
         key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
-        add_roc_metric = ROC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -146,7 +142,6 @@ def build_classification_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_val_metric={val_metric_name: key_val_metric},
-        additional_metrics={"roccurve": add_roc_metric},
         val_handlers=val_handlers,
         amp=opts.amp
     )
@@ -167,12 +162,12 @@ def build_classification_engine(**kwargs):
             interval=valid_interval,
             epoch_level=True
         ),
-        StatsHandlerEx(
+        StatsHandler(
             tag_name="train_loss",
             output_transform=lambda x: x["loss"],
             name=logger_name
         ),
-        TensorBoardStatsHandlerEx(
+        TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
             output_transform=lambda x: x["loss"]
