@@ -19,7 +19,8 @@ from medlp.utilities.handlers import GradCamHandler
 @click.command('gradcam-from-cfg')
 @click.option("--config", type=click.Path(exists=True))
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
-@click.option('--target-layer', type=str, prompt=True)
+@click.option('--target-layer', type=str, prompt=True, )
+@click.option('--target-class', type=int, prompt=True, default=1, help='GradCAM target class')
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option('--gpus', prompt="Choose GPUs[eg: 0]", type=str)
 def gradcam(**args):
@@ -65,7 +66,7 @@ def gradcam(**args):
         handler=GradCamHandler(
             engine.network,
             args["target_layer"],
-            1,
+            args["target_class"],
             engine.data_loader,
             engine.prepare_batch,
             save_dir=configures["out_dir"],
