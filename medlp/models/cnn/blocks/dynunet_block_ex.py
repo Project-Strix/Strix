@@ -211,7 +211,7 @@ class UnetUpBlock(nn.Module):
 
     def groupwise_concate(self, f1, f2):
         output = torch.cat((f1.unsqueeze(2), f2.unsqueeze(2)), dim=2)
-        output = output.reshape([f1.shape[0], -1] + f1.shape[2:])
+        output = output.reshape([f1.shape[0], -1] + list(f1.shape[2:]))
         return output
 
     def forward(self, inp, skip):
