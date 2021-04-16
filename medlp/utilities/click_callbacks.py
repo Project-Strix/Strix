@@ -1,9 +1,9 @@
 import os, time, click
 from types import SimpleNamespace as sn
 from functools import partial, wraps
-from click import Tuple
-from medlp.utilities.click_ex import ChoiceEx as Choice
-from medlp.utilities.click_ex import optionex, prompt_ex
+from termcolor import colored
+from click import Tuple, option, prompt
+from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.enum import *
 from medlp.utilities.utils import is_avaible_size
 from utils_cw import (
@@ -20,7 +20,7 @@ def get_trained_models(exp_folder):
     assert os.path.isdir(model_dir), f"Model dir is not found! {model_dir}"
     files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
     prompt = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
-    selected = prompt_ex(f"Choose model: {prompt}", type=int)
+    selected = prompt(f"Choose model: {prompt}", type=int)
     return str(files[selected])
 
 
@@ -62,7 +62,7 @@ def get_exp_name(ctx, param, value):
 
     # suffix = '-redo' if ctx.params.get('config') is not None else ''
 
-    input_str = prompt_ex("Experiment name", default=exp_name, type=str)
+    input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
     return os.path.join(
@@ -93,12 +93,15 @@ def split_input_str_(value, dtype=float):
 
 
 def _prompt(prompt_str, data_type, default_value, value_proc=None, color=None):
-    return prompt_ex(
-        "\tInput {}".format(prompt_str),
+    prompt_str = f"\tInput {prompt_str}"
+    if color is not None:
+        prompt_str = colored(prompt_str, color=color)
+
+    return prompt(
+        prompt_str,
         type=data_type,
         default=default_value,
         value_proc=value_proc,
-        color=color
     )
 
 
@@ -150,7 +153,7 @@ def model_select(ctx, param, value):
     if value is not None and value in archilist:
         return value
     else:
-        return prompt_ex("Model list", type=Choice(archilist, show_index=True))
+        return prompt("Model list", type=Choice(archilist))
 
     #! How to handle?
     # if value in ['vgg13', 'vgg16', 'resnet18', 'resnet34','resnet50']:
@@ -160,7 +163,7 @@ def model_select(ctx, param, value):
     # elif value == 'unet':
     #     ctx.params['deep_supervision'] = click.confirm("Whether use deep supervision?", default=False, abort=False, show_default=True)
     #     if ctx.params['deep_supervision']:
-    #         ctx.params['deep_supr_num'] = prompt_ex("Num of deep supervision?", default=1, type=int, show_default=True)
+    #         ctx.params['deep_supr_num'] = prompt("Num of deep supervision?", default=1, type=int, show_default=True)
     # else:
     #     pass
 
@@ -181,7 +184,7 @@ def data_select(ctx, param, value):
     if value is not None and value in datalist:
         return value
     else:
-        return prompt_ex("Data list", type=Choice(datalist, show_index=True))
+        return prompt("Data list", type=Choice(datalist))
 
 
 def input_cropsize(ctx, param, value):
@@ -202,31 +205,31 @@ def input_cropsize(ctx, param, value):
 
 
 def common_params(func):
-    @optionex(
+    @option(
         "--tensor-dim",
         prompt=True,
-        type=Choice(["2D", "3D"], show_index=True),
-        default=0,
+        type=Choice(["2D", "3D"]),
+        default='2D',
         help="2D or 3D",
     )
-    @optionex(
+    @option(
         "--framework",
         prompt=True,
-        type=Choice(FRAMEWORK_TYPES, show_index=True),
-        default=0,
+        type=Choice(FRAMEWORK_TYPES),
+        default=1,
         help="Choose your framework type",
     )
-    @optionex(
+    @option(
         "--data-list",
         type=str,
         callback=data_select,
         default=None,
-        help="Data file list (json)",
+        help="Data file list (json/yaml)",
     )
-    @optionex(
+    @option(
         "--preload", type=float, default=1.0, help="Ratio of preload data"
     )
-    @optionex(
+    @option(
         "--n-epoch",
         prompt=True,
         show_default=True,
@@ -234,13 +237,13 @@ def common_params(func):
         default=1000,
         help="Epoch number",
     )
-    @optionex(
+    @option(
         "--n-epoch-len",
         type=float,
         default=1.0,
         help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch",
     )
-    @optionex(
+    @option(
         "--n-batch",
         prompt=True,
         show_default=True,
@@ -248,71 +251,54 @@ def common_params(func):
         default=10,
         help="Batch size",
     )
-    @optionex("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
-    @optionex("--smooth", type=float, default=0, help="Smooth rate, disable:0")
-    @optionex("--input-nc", type=int, default=1, help="input data channels")
-    @optionex("--output-nc", type=int, default=3, help="output channels (classes)")
-    @optionex("--split", type=float, default=0.1, help="Training/testing split ratio")
-    @optionex("--train-list", type=str, default='', help='Specified training datalist')
-    @optionex("--valid-list", type=str, default='', help='Specified validation datalist')
-    @optionex(
-        "-W",
-        "--pretrained-model-path",
+    @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
+    @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
+    @option("--input-nc", type=int, default=1, help="input data channels")
+    @option("--output-nc", type=int, default=3, help="output channels (classes)")
+    @option("--split", type=float, default=0.1, help="Training/testing split ratio")
+    @option("--train-list", type=str, default='', help='Specified training datalist')
+    @option("--valid-list", type=str, default='', help='Specified validation datalist')
+    @option(
+        "-W", "--pretrained-model-path",
         type=str,
         default="",
         help="pretrained model path",
     )
-    @optionex(
+    @option(
         "--out-dir",
         type=str,
         prompt=True,
         show_default=True,
-        default="/homes/clwang/Data/medlp_exp",
+        default=OUTPUT_DIR,
     )
-    @optionex(
-        "--augment-ratio", type=float, default=0.3, help="Data aug ratio."
-    )
-    @optionex(
-        "-P",
-        "--partial",
+    @option("--augment-ratio", type=float, default=0.3, help="Data aug ratio")
+    @option(
+        "-P", "--partial",
         type=float, default=1, help="Only load part of data"
     )
-    @optionex(
-        "-V",
-        "--visualize",
+    @option(
+        "-V", "--visualize",
         is_flag=True, help="Visualize the network architecture"
     )
-    @optionex(
+    @option(
         "--valid-interval",
-        type=int,
-        default=4,
+        type=int, default=4,
         help="Interval of validation during training",
     )
-    @optionex(
-        "--save-epoch-freq", type=int, default=5, help="Save model freq"
-    )
-    @optionex(
+    @option(
         "--early-stop",
-        type=int,
-        default=200,
+        type=int, default=200,
         help="Patience of early stopping. default: 200epochs",
     )
-    @optionex(
-        "--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6"
-    )
-    @optionex(
-        "--nni",
-        is_flag=True,
-        help="Flag of using nni-search, you dont need to modify this.",
-    )
-    @optionex("--n-fold", type=int, default=0, help="K fold cross-validation")
-    @optionex("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
-    @optionex("--seed", type=int, default=101, help="random seed")
-    @optionex("--compact-log", is_flag=True, help="Output compact log info")
-    @optionex("--symbolic-tb", is_flag=True, help='Create symbolic for tensorboard logs')
-    @optionex(
-        "--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp"
-    )
+    @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
+    @option("--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6")
+    @option("--nni", is_flag=True, help="Flag of using nni-search, you dont need to modify this")
+    @option("--n-fold", type=int, default=0, help="K fold cross-validation")
+    @option("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
+    @option("--seed", type=int, default=101, help="random seed")
+    @option("--compact-log", is_flag=True, help="Output compact log info")
+    @option("--symbolic-tb", is_flag=True, help='Create symbolic for tensorboard logs')
+    @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -321,30 +307,11 @@ def common_params(func):
 
 
 def solver_params(func):
-    @optionex(
-        "--optim", type=Choice(OPTIM_TYPES, show_index=True), default=1
-    )
-    @optionex(
-        "--momentum", type=float, default=0.0, help="Momentum for optimizer"
-    )
-    @optionex(
-        "-WD",
-        "--l2-weight-decay",
-        type=float,
-        default=0,
-        help="weight decay (L2 penalty)",
-    )
-    @optionex(
-        "--lr", type=float, default=1e-3, help="learning rate"
-    )
-    @optionex(
-        "--lr-policy",
-        prompt=True,
-        type=Choice(LR_SCHEDULE, show_index=True),
-        callback=lr_schedule_params,
-        default="plateau",
-        help="learning rate strategy",
-    )
+    @option("--optim", type=Choice(OPTIM_TYPES), default=1)
+    @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
+    @option("-WD", "--l2-weight-decay", type=float, default=0, help="weight decay (L2 penalty)")
+    @option("--lr", type=float, default=1e-3, help="learning rate")
+    @option("--lr-policy", prompt=True, type=Choice(LR_SCHEDULE), callback=lr_schedule_params, default="plateau", help="learning rate strategy")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -353,45 +320,34 @@ def solver_params(func):
 
 
 def network_params(func):
-    @optionex(
+    @option(
         "--model-name",
         type=str,
         callback=model_select,
         default=None,
         help="Select deeplearning model",
     )
-    @optionex(
-        "-L",
-        "--criterion",
+    @option(
+        "-L", "--criterion",
         prompt=True,
-        type=Choice(LOSSES, show_index=True),
+        type=Choice(LOSSES),
         callback=loss_params,
-        default=0,
+        default=1,
         help="loss criterion type",
     )
-    @optionex(
+    @option(
         "--layer-norm",
         prompt=True,
-        type=Choice(NORM_TYPES, show_index=True),
-        default=0,
+        type=Choice(NORM_TYPES),
+        default=1,
         help="Layer norm type",
     )
-    @optionex(
-        "--n-features", type=int, default=64, help="Feature num of first layer"
-    )
-    @optionex(
-        "--n-depth", type=int, default=-1, help="Network depth. -1: use default depth"
-    )
-    @optionex(
-        "--is-deconv", type=bool, default=False, help="use deconv or interplate"
-    )
-    @optionex(
-        "--feature-scale", type=int, default=4, help="not used"
-    )
-    @optionex(
-        "--snip", is_flag=True
-    )
-    # @optionex('--layer-order', prompt=True, type=Choice(LAYER_ORDERS,show_index=True), default=0, help='conv layer order')
+    @option("--n-features", type=int, default=64, help="Feature num of first layer")
+    @option("--n-depth", type=int, default=-1, help="Network depth. -1: use default depth")
+    @option("--is-deconv", type=bool, default=False, help="use deconv or interplate")
+    @option("--feature-scale", type=int, default=4, help="not used")
+    @option("--snip", is_flag=True)
+    # @optionex('--layer-order', prompt=True, type=Choice(LAYER_ORDERS), default=1, help='conv layer order')
     # @optionex('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
     # @optionex('--sep-conv', type=bool, default=False, help='Use Depthwise Separable Convolution')
     @wraps(func)
@@ -404,46 +360,46 @@ def network_params(func):
 # Put these auxilary params to the top of click.options for
 # successfully loading auxilary params.
 def latent_auxilary_params(func):
-    @optionex(
+    @option(
         "--lr-policy-params",
         type=dict,
         default=None,
         help="Auxilary params for lr schedule",
     )
-    @optionex(
+    @option(
         "--loss-params",
         type=(float, float),
         default=(0, 0),
         help="Auxilary params for loss",
     )
-    @optionex(
+    @option(
         "--load-imagenet",
         type=bool,
         default=False,
         help="Load pretrain Imagenet for some net",
     )
-    @optionex(
+    @option(
         "--deep-supervision",
         type=bool,
         default=False,
         help="Use deep supervision module",
     )
-    @optionex(
+    @option(
         "--deep-supr-num",
         type=int,
         default=1,
         help="Num of features will be output"
     )
-    @optionex(
-        "--snip_percent",
+    @option(
+        "--snip-percent",
         type=float,
         default=0.4,
         callback=partial(prompt_when, keyword="snip"),
         help="Pruning ratio of wights/channels",
     )
-    @optionex("--n-fold", type=int, default=0)
-    @optionex("--config", type=click.Path(exists=True))
-    @optionex("--bottleneck-size", type=int, default=7, help='Size of bottleneck size of VGG net')
+    @option("--n-fold", type=int, default=0)
+    @option("--config", type=click.Path(exists=True))
+    @option("--bottleneck-size", type=int, default=7, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -452,20 +408,20 @@ def latent_auxilary_params(func):
 
 
 def rcnn_params(func):
-    @optionex(
+    @option(
         "--model-type",
-        type=Choice(RCNN_MODEL_TYPES, show_index=True),
-        default=0,
+        type=Choice(RCNN_MODEL_TYPES),
+        default=1,
         help="RCNN model type",
     )
-    @optionex(
+    @option(
         "--backbone",
-        type=Choice(RCNN_BACKBONE, show_index=True),
-        default=0,
+        type=Choice(RCNN_BACKBONE),
+        default=1,
         help="RCNN backbone net",
     )
-    @optionex("--min-size", type=int, default=800)
-    @optionex("--max-size", type=int, default=1000)
+    @option("--min-size", type=int, default=800)
+    @option("--max-size", type=int, default=1000)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

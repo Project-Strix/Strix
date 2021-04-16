@@ -1,6 +1,8 @@
 # All enum variables
 # DATASET_LIST = ['picc_h5', 'picc_nii', 'picc_dcm', 'Obj_CXR', 'NIH_CXR', 'rib', 'kits', 'jsph_rcc', 'rjh_tswi', 'rjh_swim', 'rjh_tswi_cls']
 
+OUTPUT_DIR = "/homes/clwang/Data/medlp_exp"
+
 DIMS = ["2D", "3D", "2", "3", 2, 3]
 PHASES = ["train", "valid", "test"]
 NORM_TYPES = ["batch", "instance", "group"]

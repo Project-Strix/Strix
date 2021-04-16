@@ -28,6 +28,7 @@ if __name__ == "__main__":
     from medlp.main_entry import unlink_dirs
     from nni_search import nni_search
     from nni_search import train_nni
+    from data_checker import check_data
 
     main.add_command(train)
     main.add_command(train_cfg)
@@ -35,4 +36,5 @@ if __name__ == "__main__":
     main.add_command(unlink_dirs)
     main.add_command(nni_search)
     main.add_command(train_nni)
+    main.add_command(check_data)
     main()
