@@ -64,33 +64,27 @@ def build_siamese_engine(**kwargs):
 
     if opts.criterion in ["CE", "WCE"]:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            x["label"].squeeze(dim=1).to(device),
+            x["image"].to(device), x["label"].squeeze(dim=1).to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"].unsqueeze(dim=1), num_classes=opts.output_nc),
+                x["pred"], one_hot(x["label"].unsqueeze(dim=1), num_classes=opts.output_nc),
             )
     elif opts.criterion in ["BCE", "WBCE"]:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            torch.as_tensor(x["label"], dtype=torch.float32).to(device),
+            x["image"].to(device), torch.as_tensor(x["label"], dtype=torch.float32).to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"], num_classes=opts.output_nc),
+                x["pred"], one_hot(x["label"], num_classes=opts.output_nc),
             )
     else:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            x["label"].to(device),
+            x["image"].to(device), x["label"].to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"], num_classes=opts.output_nc),
+                x["pred"], one_hot(x["label"], num_classes=opts.output_nc),
             )
 
     trainer = SupervisedTrainer(

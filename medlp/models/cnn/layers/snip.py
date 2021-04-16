@@ -204,7 +204,8 @@ def SNIP(
             grads_abs.append(torch.abs(layer.weight_mask.grad))
         # if isinstance(layer, nn.BatchNorm3d):
         #    Print('BN:', layer, 'bn shape:', layer.weight.shape, color='y')
-
+    assert len(grads_abs) != 0, "No prunable layer defined in the network"
+    
     # Gather all scores in a single vector and normalise
     all_scores = torch.cat([torch.flatten(x) for x in grads_abs])
     norm_factor = torch.sum(all_scores)

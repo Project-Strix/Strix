@@ -4,6 +4,7 @@ import shutil
 import yaml
 import logging
 import time
+import json
 import torch
 import numpy as np
 from pathlib import Path
@@ -18,7 +19,7 @@ from medlp.utilities.handlers import SNIP_prune_handler
 from medlp.utilities.click_ex import get_unknown_options
 import medlp.utilities.click_callbacks as clb
 
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
     Print,
     print_smi,
@@ -30,7 +31,7 @@ from utils_cw import (
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import CheckpointLoader, TensorboardGraphHandler
+from monai_ex.handlers import CheckpointLoaderEx, TensorboardGraphHandler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 
@@ -49,7 +50,7 @@ def train_core(cargs, files_train, files_valid):
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
         yaml.dump(files_train, f)
-    with open(os.path.join(cargs.experiment_path, "test_files.yml"), "w") as f:
+    with open(os.path.join(cargs.experiment_path, "valid_files.yml"), "w") as f:
         yaml.dump(files_valid, f)
 
     train_loader = get_dataloader(cargs, files_train, phase="train")
@@ -69,7 +70,7 @@ def train_core(cargs, files_train, files_valid):
             target_is_directory=True,
         )
 
-    trainer, net, loss_fn = get_engine(cargs, train_loader, valid_loader, writer=writer)
+    trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
@@ -88,7 +89,7 @@ def train_core(cargs, files_train, files_valid):
         )
         trainer.add_event_handler(
             event_name=Events.STARTED,
-            handler=CheckpointLoader(
+            handler=CheckpointLoaderEx(
                 load_path=cargs.pretrained_model_path,
                 load_dict={"net": net},
                 strict=False,
@@ -107,9 +108,8 @@ def train_core(cargs, files_train, files_valid):
             Print("Invalid snip_percent. Skip SNIP!", color="y")
         else:
             Print("Begin SNIP pruning", color="g")
-            snip_device = torch.device(
-                "cuda"
-            )  # torch.device("cpu") #! TMP solution to solve OOM issue
+            snip_device = torch.device("cuda")
+            # snip_device = torch.device("cpu")  #! TMP solution to solve OOM issue
             original_device = (
                 torch.device("cuda") if cargs.gpus != "-1" else torch.device("cpu")
             )
@@ -169,13 +169,22 @@ def train(ctx, **args):
         Print("Use {} data".format(int(len(files_list) * cargs.partial)), color="y")
         files_list = files_list[: int(len(files_list) * cargs.partial)]
 
-    if cargs.n_fold > 1:  #! K-fold cross-validation
-        kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
+    cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
+    if cargs.n_fold > 1 or cargs.n_repeat > 1:  #! K-fold cross-validation
+        if cargs.n_fold > 1:
+            folds = cargs.n_fold
+            kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
+        elif cargs.n_repeat > 1:
+            folds = cargs.n_repeat
+            kf = ShuffleSplit(n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed)
+        else:
+            raise ValueError(f'Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})')
+
         for i, (train_index, test_index) in enumerate(kf.split(files_list)):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
-            Print(f"Processing {i+1}/{cargs.n_fold} cross-validation", color="g")
+            Print(f"Processing {i+1}/{folds} cross-validation", color="g")
             files_train = list(np.array(files_list)[train_index])
             files_valid = list(np.array(files_list)[test_index])
 
@@ -184,11 +193,16 @@ def train(ctx, **args):
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
 
+            # copy param.list to fold dir
+            with cargs.experiment_path.joinpath('param.list').open('w') as f:
+                args['n_fold'] = args['n_repeat'] = 0
+                args['experiment_path'] = str(cargs.experiment_path)
+                json.dump(args, f, indent=2)
+
             train_core(cargs, files_train, files_valid)
             Print("Cleaning CUDA cache...", color="g")
             torch.cuda.empty_cache()        
     else:  #! Plain training
-        cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
         )
@@ -222,14 +236,12 @@ def train_cfg(**args):
 @click.option("--config", type=click.Path(exists=True))
 @click.option("--test-files", type=str, default="", help="External files (.json) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
-@click.option(  #TODO: automatically decide when using patchdataset
-    "--slidingwindow",
-    is_flag=True,
-    callback=clb.input_cropsize,
-    help='Use slidingwindow sampling'
+@click.option(  # TODO: automatically decide when using patchdataset
+    "--slidingwindow", is_flag=True, callback=clb.input_cropsize, help='Use slidingwindow sampling'
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 def test_cfg(**args):
@@ -265,9 +277,12 @@ def test_cfg(**args):
         else:
             raise ValueError(f"Test file does not exists in {exp_dir}!")
 
-    configures["model_path"] = (
-        clb.get_trained_models(exp_dir) if configures.get("n_fold", 0) <= 1 else None
-    )
+    # configures["model_path"] = (
+    #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
+    # )
+    best_models = clb.get_trained_models(exp_dir, args['use_best_model']) if \
+                configures.get("n_fold", 0) <= 1 or configures.get("n_repeat", 0) <= 1 else [None]
+
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
     configures["phase"] = phase
@@ -275,7 +290,8 @@ def test_cfg(**args):
     configures["experiment_path"] = exp_dir
     configures['resample'] = True  #! departure
     configures['slidingwindow'] = args['slidingwindow']
-    configures['crop_size'] = args.get('crop_size', None)
+    if args.get('crop_size', None):
+        configures['crop_size'] = args['crop_size']
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]
@@ -285,20 +301,24 @@ def test_cfg(**args):
     Print(f"{len(test_files)} test files", color="g")
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
-    engine = get_test_engine(sn(**configures), test_loader)
-    engine.logger = setup_logger(
-        f"{configures['tensor_dim']}-Tester", level=logging.INFO
-    )  #! not work
+    for model_path in best_models:
+        configures['model_path'] = str(model_path)
 
-    if isinstance(engine, SupervisedEvaluator):
-        Print("Begin testing...", color="g")
-    elif isinstance(engine, EnsembleEvaluator):
-        Print("Begin ensemble testing...", color="g")
+        engine = get_test_engine(sn(**configures), test_loader)
+        engine.logger = setup_logger(
+            f"{configures['tensor_dim']}-Tester", level=logging.INFO
+        )  #! not work
 
-    shutil.copyfile(
-        test_fpath, os.path.join(configures["out_dir"], os.path.basename(test_fpath))
-    )
-    engine.run()
+        if isinstance(engine, SupervisedEvaluator):
+            Print("Begin testing...", color="g")
+        elif isinstance(engine, EnsembleEvaluator):
+            Print("Begin ensemble testing...", color="g")
+
+        shutil.copyfile(
+            test_fpath, check_dir(configures["out_dir"])/os.path.basename(test_fpath)
+        )
+        engine.run()
+        os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
 
 
 @click.command("unlink")

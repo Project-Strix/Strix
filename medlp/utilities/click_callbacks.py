@@ -1,4 +1,7 @@
-import os, time, click
+import os
+import time
+import click
+from pathlib import Path
 from types import SimpleNamespace as sn
 from functools import partial, wraps
 from termcolor import colored
@@ -15,13 +18,30 @@ from utils_cw import (
     )
 
 
-def get_trained_models(exp_folder):
-    model_dir = os.path.join(exp_folder, "Models")
-    assert os.path.isdir(model_dir), f"Model dir is not found! {model_dir}"
-    files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
-    prompt = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
-    selected = prompt(f"Choose model: {prompt}", type=int)
-    return str(files[selected])
+def get_trained_models(exp_folder, use_best_model=False):
+    model_dir = Path(exp_folder)/"Models"
+    assert model_dir.is_dir(), f"Model dir is not found! {model_dir}"
+
+    subcategories = list(filter(lambda x: x.is_dir(), model_dir.iterdir()))
+    if use_best_model:
+        best_models = []
+        for subdir in subcategories:
+            files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subdir.iterdir()))
+            if len(files) > 0:
+                best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
+                best_models.append(best_model)
+            else:
+                continue
+        return best_models
+    else:
+        prompt_1 = {i: f.stem for i, f in enumerate(subcategories)}
+        selected = prompt(f"Choose model dir: {prompt_1}", type=int)
+
+        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subcategories[selected].iterdir()))
+        # files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
+        prompt_2 = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
+        selected = prompt(f"Choose model: {prompt_2}", type=int)
+        return [str(files[selected])]
 
 
 def get_exp_name(ctx, param, value):
@@ -59,6 +79,8 @@ def get_exp_name(ctx, param, value):
 
     if ctx.params["n_fold"] > 0:
         exp_name = exp_name + f"-CV{ctx.params['n_fold']}"
+    elif ctx.params["n_repeat"] > 0:
+        exp_name = exp_name + f"-RE{ctx.params['n_repeat']}"
 
     # suffix = '-redo' if ctx.params.get('config') is not None else ''
 
@@ -115,6 +137,11 @@ def lr_schedule_params(ctx, param, value):
         iters = _prompt("step iter", int, 50)
         gamma = _prompt("step gamma", float, 0.1)
         ctx.params["lr_policy_params"] = {"step_size": iters, "gamma": gamma}
+    elif value == 'multistep':
+        steps = _prompt('steps', tuple, (100, 300), value_proc=lambda x: list(map(int, x.split(','))))
+        gamma = _prompt("step gamma", float, 0.1)
+        ctx.params["lr_policy_params"] = {"milestones": steps, "gamma": gamma}
+        # print("lr_policy_params", ctx.params["lr_policy_params"])
     elif value == "SGDR":
         t0 = _prompt("SGDR T-0", int, 50)
         eta = _prompt("SGDR Min LR", float, 1e-4)
@@ -194,11 +221,13 @@ def input_cropsize(ctx, param, value):
 
     if configures['tensor_dim'] == '2D':
         crop_size = _prompt(
-            "Crop size", tuple, (0, 0), partial(split_input_str_,dtype=int), color='green'
+            "Crop size", tuple, (0, 0),
+            partial(split_input_str_, dtype=int), color='green'
         )
     else:
         crop_size = _prompt(
-            "Crop size", tuple, (0, 0, 0), partial(split_input_str_,dtype=int), color='green'
+            "Crop size", tuple, (0, 0, 0),
+            partial(split_input_str_, dtype=int), color='green'
         )
     ctx.params["crop_size"] = crop_size
     return value
@@ -206,50 +235,31 @@ def input_cropsize(ctx, param, value):
 
 def common_params(func):
     @option(
-        "--tensor-dim",
-        prompt=True,
-        type=Choice(["2D", "3D"]),
-        default='2D',
-        help="2D or 3D",
+        "--tensor-dim", prompt=True, type=Choice(["2D", "3D"]),
+        default='2D', help="2D or 3D",
     )
     @option(
-        "--framework",
-        prompt=True,
-        type=Choice(FRAMEWORK_TYPES),
-        default=1,
-        help="Choose your framework type",
+        "--framework", prompt=True, type=Choice(FRAMEWORK_TYPES),
+        default=1, help="Choose your framework type",
     )
     @option(
-        "--data-list",
-        type=str,
-        callback=data_select,
-        default=None,
-        help="Data file list (json/yaml)",
+        "--data-list", type=str, callback=data_select,
+        default=None, help="Data file list (json/yaml)",
     )
     @option(
         "--preload", type=float, default=1.0, help="Ratio of preload data"
     )
     @option(
-        "--n-epoch",
-        prompt=True,
-        show_default=True,
-        type=int,
-        default=1000,
-        help="Epoch number",
+        "--n-epoch", prompt=True, show_default=True, 
+        type=int, default=1000, help="Epoch number",
     )
     @option(
-        "--n-epoch-len",
-        type=float,
-        default=1.0,
+        "--n-epoch-len", type=float, default=1.0,
         help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch",
     )
     @option(
-        "--n-batch",
-        prompt=True,
-        show_default=True,
-        type=int,
-        default=10,
-        help="Batch size",
+        "--n-batch", prompt=True, show_default=True,
+        type=int, default=10, help="Batch size",
     )
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
@@ -260,16 +270,11 @@ def common_params(func):
     @option("--valid-list", type=str, default='', help='Specified validation datalist')
     @option(
         "-W", "--pretrained-model-path",
-        type=str,
-        default="",
-        help="pretrained model path",
+        type=str, default="", help="pretrained model path",
     )
     @option(
-        "--out-dir",
-        type=str,
-        prompt=True,
-        show_default=True,
-        default=OUTPUT_DIR,
+        "--out-dir", type=str, prompt=True,
+        show_default=True, default=OUTPUT_DIR,
     )
     @option("--augment-ratio", type=float, default=0.3, help="Data aug ratio")
     @option(
@@ -286,14 +291,14 @@ def common_params(func):
         help="Interval of validation during training",
     )
     @option(
-        "--early-stop",
-        type=int, default=200,
+        "--early-stop", type=int, default=200,
         help="Patience of early stopping. default: 200epochs",
     )
     @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
     @option("--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6")
     @option("--nni", is_flag=True, help="Flag of using nni-search, you dont need to modify this")
     @option("--n-fold", type=int, default=0, help="K fold cross-validation")
+    @option("--n-repeat", type=int, default=0, help="K times random permutation cross-validator")
     @option("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
     @option("--seed", type=int, default=101, help="random seed")
     @option("--compact-log", is_flag=True, help="Output compact log info")
@@ -361,41 +366,28 @@ def network_params(func):
 # successfully loading auxilary params.
 def latent_auxilary_params(func):
     @option(
-        "--lr-policy-params",
-        type=dict,
-        default=None,
-        help="Auxilary params for lr schedule",
+        "--lr-policy-params", type=dict,
+        default=None, help="Auxilary params for lr schedule",
     )
     @option(
-        "--loss-params",
-        type=(float, float),
-        default=(0, 0),
-        help="Auxilary params for loss",
+        "--loss-params", type=(float, float),
+        default=(0, 0), help="Auxilary params for loss",
     )
     @option(
-        "--load-imagenet",
-        type=bool,
-        default=False,
-        help="Load pretrain Imagenet for some net",
+        "--load-imagenet", type=bool,
+        default=False, help="Load pretrain Imagenet for some net",
     )
     @option(
-        "--deep-supervision",
-        type=bool,
-        default=False,
-        help="Use deep supervision module",
+        "--deep-supervision", type=bool,
+        default=False, help="Use deep supervision module",
     )
     @option(
-        "--deep-supr-num",
-        type=int,
-        default=1,
-        help="Num of features will be output"
+        "--deep-supr-num", type=int,
+        default=1, help="Num of features will be output"
     )
     @option(
-        "--snip-percent",
-        type=float,
-        default=0.4,
-        callback=partial(prompt_when, keyword="snip"),
-        help="Pruning ratio of wights/channels",
+        "--snip-percent", type=float, default=0.4,
+        callback=partial(prompt_when, keyword="snip"), help="Pruning ratio of wights/channels",
     )
     @option("--n-fold", type=int, default=0)
     @option("--config", type=click.Path(exists=True))
@@ -409,16 +401,12 @@ def latent_auxilary_params(func):
 
 def rcnn_params(func):
     @option(
-        "--model-type",
-        type=Choice(RCNN_MODEL_TYPES),
-        default=1,
-        help="RCNN model type",
+        "--model-type", type=Choice(RCNN_MODEL_TYPES),
+        default=1, help="RCNN model type",
     )
     @option(
-        "--backbone",
-        type=Choice(RCNN_BACKBONE),
-        default=1,
-        help="RCNN backbone net",
+        "--backbone", type=Choice(RCNN_BACKBONE),
+        default=1, help="RCNN backbone net",
     )
     @option("--min-size", type=int, default=800)
     @option("--max-size", type=int, default=1000)

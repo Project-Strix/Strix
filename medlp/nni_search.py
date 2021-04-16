@@ -9,8 +9,8 @@ from types import SimpleNamespace as sn
 from utils_cw import Print, get_items_from_file, check_dir
 
 from medlp.models import get_engine
-from medlp.data_io.dataio import get_dataloader, get_datalist
-from medlp.utilities.utils import detect_port
+from medlp.data_io.dataio import get_dataloader, DATASET_MAPPING
+from medlp.utilities.utils import detect_port, parse_nested_data
 import medlp.utilities.click_callbacks as clb
 
 from torch.utils.tensorboard import SummaryWriter
@@ -19,9 +19,9 @@ from ignite.engine import Events
 from monai_ex.handlers import CheckpointLoader
 from monai_ex.utils import optional_import, min_version
 
-# Need NII package
-nii, has_nii = optional_import("nii", "1.8", min_version)
-if has_nii:
+# Need NNI package
+nni, has_nni = optional_import("nni", "1.8", min_version)
+if has_nni:
     from nni.utils import merge_parameter
 
 
@@ -39,17 +39,19 @@ def train_nni(**kwargs):
         tuner_params = nni.get_next_parameter()
         logger.info(f"tuner_params: {tuner_params}")
 
-        cargs = merge_parameter(cargs, tuner_params)
+        exp_id = nni.get_experiment_id()
+        trial_id = nni.get_trial_id()
+        cargs.experiment_path = os.path.join(cargs.experiment_path, exp_id, 'trials', trial_id)
+
+        nested_params = parse_nested_data(tuner_params)
+        # cargs = merge_parameter(cargs, tuner_params)
+        cargs = merge_parameter(cargs, nested_params)
         logger.info(f"Current args: {cargs}")
-
-        # logging_level = logging.DEBUG if cargs.debug else logging.INFO
-        # logging.basicConfig(stream=sys.stderr, level=logging_level)
-        # if not cargs.verbose_log and not cargs.debug:
-        #     logging.StreamHandler.terminator = "\r"
-
+        Print('Args:', cargs, color='y')
+        
         cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
-        data_list = get_datalist(cargs.data_list)
+        data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
         assert os.path.isfile(data_list), "Data list not exists!"
         files_list = get_items_from_file(data_list, format="auto")
         if cargs.partial < 1:
@@ -65,10 +67,10 @@ def train_nni(**kwargs):
         )
 
         # Save param and datalist
-        with open(os.path.join(cargs.experiment_path, "train_files"), "w") as f:
-            json.dump(files_train, f, indent=2)
-        with open(os.path.join(cargs.experiment_path, "test_files"), "w") as f:
-            json.dump(files_valid, f, indent=2)
+        with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
+            yaml.dump(files_train, f)
+        with open(os.path.join(cargs.experiment_path, "test_files.yml"), "w") as f:
+            yaml.dump(files_valid, f)
 
         train_loader = get_dataloader(cargs, files_train, phase="train")
         valid_loader = get_dataloader(cargs, files_valid, phase="valid")
@@ -82,9 +84,9 @@ def train_nni(**kwargs):
             cargs,
             train_loader,
             valid_loader,
-            writer=writer,
-            show_network=cargs.visualize,
+            writer=writer
         )
+
         trainer.add_event_handler(
             event_name=Events.EPOCH_STARTED, handler=lambda x: print("\n", "-" * 40)
         )
@@ -109,33 +111,17 @@ def train_nni(**kwargs):
 
 
 @click.command("nni-search")
-@click.option(
-    "--param-list",
-    type=click.Path(exists=True),
-    help="Base hyper-param setting (.json)",
-)
-@click.option(
-    "--search-space", type=click.Path(exists=True), help="NNI search space file (.json)"
-)
+@click.option("--param-list", type=click.Path(exists=True), help="Base hyper-param setting (.json)")
+@click.option("--search-space", type=click.Path(exists=True), help="NNI search space file (.json)")
 @click.option("--nni-config", type=str, default="", help="NNI config file (.yaml)")
 @click.option("--port", type=int, default=8080, help="Port of nni server")
-@click.option("--background", is_flag=True, help="Run nii in background")
-@click.option(
-    "--out-dir",
-    type=str,
-    prompt=True,
-    show_default=True,
-    default="/homes/clwang/Data/medlp_exp/NNI",
-)
-@click.option(
-    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
-)
-@click.option(
-    "--experiment-path", type=str, callback=clb.get_nni_exp_name, default="nni-search"
-)
+@click.option("--background", is_flag=True, help="Run nni in background")
+@click.option("--out-dir", type=str, prompt=True, show_default=True, default="/homes/clwang/Data/medlp_exp/NNI")
+@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@click.option("--experiment-path", type=str, callback=clb.get_nni_exp_name, default="nni-search")
 def nni_search(**args):
     cargs = sn(**args)
-    configures = get_items_from_file(args["param_list"], format="auto")
+    configures = get_items_from_file(args["param_list"], format="json")
     configures["out_dir"] = cargs.out_dir
     configures["gpus"] = cargs.gpus
     configures["nni"] = True
@@ -154,7 +140,7 @@ def nni_search(**args):
     searchspace_file = os.path.join(cargs.experiment_path, "search_space.json")
     nni_config["trial"]["command"] = f"""\
         CUDA_VISIBLE_DEVICES={cargs.gpus} \
-        python {str(main_file)} train-nii \
+        python {str(main_file)} train-nni \
         --config {str(paramlist_file)}"""
 
     nni_config["searchSpacePath"] = searchspace_file

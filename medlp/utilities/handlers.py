@@ -1,22 +1,34 @@
 import logging
+import bisect
 from logging import Logger
-from typing import TYPE_CHECKING, Dict, Optional, Any, Callable
+import re
+from typing import TYPE_CHECKING, Dict, Optional, Any, Callable, List, Sequence, Union
+from click.core import Option
 import numpy as np
+from sklearn.metrics import roc_curve, auc
 
 from monai_ex.utils import export, exact_version, optional_import
 from monai_ex.handlers import TensorBoardImageHandler
 from monai_ex.visualize import plot_2d_or_3d_image
+from monai_ex.handlers import CSVSaverEx
+from monai.engines.evaluator import Evaluator
 
 import torch
+from torch._C import device
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
 from medlp.utilities.utils import add_3D_overlay_to_summary
 
 Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
+Metric, _ = optional_import("ignite.metrics", "0.4.2", exact_version, "Metric")
 Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")
+reinit__is_reduced, _ = optional_import("ignite.metrics.metric", "0.4.2", exact_version, "reinit__is_reduced")
+
 if TYPE_CHECKING:
     from ignite.engine import Engine
+    from torch.utils.tensorboard import SummaryWriter
 else:
     Engine, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Engine")
+    SummaryWriter, _ = optional_import("torch.utils.tensorboard", name="SummaryWriter")
 
 NNi, _ = optional_import("nni")
 Torchviz, _ = optional_import('torchviz')
@@ -28,7 +40,8 @@ class NNIReporter:
     Args:
 
     """
-    def __init__(self, 
+    def __init__(
+        self,
         metric_name: str,
         logger_name: Optional[str] = None,
         report_final: bool = False
@@ -48,8 +61,8 @@ class NNIReporter:
         engine.add_event_handler(Events.STARTED, self)
 
     def __call__(self, engine: Engine) -> None:
-        #assert self.metric_name in engine.state.metrics.keys(), f"{self.metric_name} is not in engine's metrics: {engine.state.metrics.keys()}"
-        print('----------keys-----------',engine.state.metrics.keys())
+        # assert self.metric_name in engine.state.metrics.keys(), f"{self.metric_name} is not in engine's metrics: {engine.state.metrics.keys()}"
+        print('----------keys-----------', engine.state.metrics.keys())
         if self.metric_name in engine.state.metrics.keys():
             print('*'*10, engine.state.metrics[self.metric_name], type(engine.state.metrics[self.metric_name]))
             if not self.report_final:
@@ -64,7 +77,8 @@ class NNIReporterHandler:
     Args:
 
     """
-    def __init__(self, 
+    def __init__(
+        self,
         metric_name: str,
         max_epochs: int,
         logger_name: Optional[str] = None,
@@ -169,4 +183,3 @@ class TorchVisualizer:
                 except:
                     self.logger.error(f"""Failded to save torchviz graph to {self.outfile_path},
                                     Please make sure you have installed graphviz properly!""")
-

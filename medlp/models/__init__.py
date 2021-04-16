@@ -138,7 +138,9 @@ def get_network(opts):
                       dim=dim,
                       is_prunable=is_prunable,
                       bottleneck_size=bottleneck_size)
-    elif 'resnet' in model_name:
+    elif 'resnet' in model_name or \
+         'WRN' in model_name or \
+         'resnext' in model_name:
         model = model(pretrained=load_imagenet,
                       in_channels=in_channels,
                       num_classes=out_channels)
@@ -168,7 +170,7 @@ def get_network(opts):
         # config_content = get_items_from_file(config_file, format='yaml')
         # model = GeneralizedRCNN(config_content)
     else:
-        raise ValueError(f'Model {model_name} not available')  
+        raise ValueError(f'Model {model_name} not available')
 
     return model
 
@@ -267,15 +269,15 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     if opts.lr_policy == 'const':
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x:1)
     elif opts.lr_policy == 'poly':
-        lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=0.0001, power=0.9)
+        lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=opts.lr*0.1, power=0.9)
     elif opts.lr_policy == 'step':
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim,
-                                                       step_size=opts.lr_policy_params['step_size'],
-                                                       gamma=opts.lr_policy_params['gamma'])
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, **opts.lr_policy_params)
+    elif opts.lr_policy == 'multistep':
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,  **opts.lr_policy_params)
     elif opts.lr_policy == 'plateau':
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,
                                                                   mode='max',
-                                                                  factor=0.2,
+                                                                  factor=0.1,
                                                                   patience=opts.lr_policy_params['patience'],
                                                                   cooldown=50,
                                                                   min_lr=1e-5)
@@ -304,7 +306,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
 
     engine = TRAIN_ENGINES[framework_type](**params)
 
-    return engine, net, loss
+    return engine, net
 
 
 def get_test_engine(opts, test_loader):

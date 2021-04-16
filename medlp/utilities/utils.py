@@ -4,7 +4,7 @@ from typing import Sequence, Union
 import os, math, random, copy, pylab, torch
 from pathlib import Path
 import socket
-from medlp.utilities.enum import NETWORK_TYPES, DIMS
+from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE
 import numpy as np
 
 
@@ -144,6 +144,23 @@ def detect_port(port):
         return True
     except:
         return False
+
+def parse_nested_data(data):
+    params = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            value_ = value.copy()
+            if key == 'lr_policy':
+                policy_name = value_.get('_name', None)
+                if policy_name in LR_SCHEDULE:
+                    params[key] = policy_name
+                    value_.pop('_name')
+                    params['lr_policy_params'] = value_
+            else:
+                raise NotImplementedError(f'{key} is not supported for nested params.')
+        else:
+            params[key] = value
+    return params
 
 def get_network_type(name):
     for k, v in NETWORK_TYPES.items():

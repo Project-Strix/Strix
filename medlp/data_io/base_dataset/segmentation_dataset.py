@@ -8,6 +8,7 @@ from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
 
 
+# TODO: Need to be refactored like BasicClassificationDataset
 class BasicSegmentationDataset(object):
     def __init__(
         self,
