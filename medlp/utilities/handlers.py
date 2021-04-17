@@ -227,3 +227,5 @@ class GradCamHandler:
                 no_trans_heatmap, heatmap_on_image = apply_colormap_on_image(img_slice, cam_slice, 'hsv')
 
                 heatmap_on_image.save(self.save_dir/f'{i}_{j}_heatmap_on_img.png')
+        
+        engine.terminate()

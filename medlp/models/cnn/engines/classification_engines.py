@@ -242,13 +242,17 @@ def build_classification_test_engine(**kwargs):
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-        ClassificationSaverEx(
-            output_dir=opts.out_dir,
-            batch_transform=lambda x: x['image_meta_dict'],
-            output_transform=post_transform,
-        ),
+        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net})
     ]
+
+    if get_attr_(opts, 'save_results', True):
+        val_handlers += [
+            ClassificationSaverEx(
+                output_dir=opts.out_dir,
+                batch_transform=lambda x: x['image_meta_dict'],
+                output_transform=post_transform,
+            )
+        ]
 
     if get_attr_(opts, 'save_image', False):
         # check output filename

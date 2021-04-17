@@ -51,6 +51,7 @@ def gradcam(**args):
     configures["phase"] = phase
     configures["experiment_path"] = exp_dir
     configures["model_path"] = get_trained_models(exp_dir)
+    configures["save_results"] = False
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]
