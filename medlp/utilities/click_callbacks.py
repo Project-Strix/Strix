@@ -157,14 +157,42 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 
-def loss_params(ctx, param, value):
-    # if ctx.params.get('loss_params', (0,0)) is not (0,0): #loaded config from specified file
-    #     return value
+# def loss_params(ctx, param, value):
+#     # if ctx.params.get('loss_params', (0,0)) is not (0,0): #loaded config from specified file
+#     #     return value
 
-    if value == "WCE" or value == "WBCE":
-        weights = _prompt("Loss weights", tuple, (0.1, 0.9), split_input_str_)
-        ctx.params["loss_params"] = weights
-    return value
+#     if value == "WCE" or value == "WBCE":
+#         weights = _prompt("Loss weights", tuple, (0.1, 0.9), split_input_str_)
+#         ctx.params["loss_params"] = weights
+#     return value
+
+
+def loss_select(ctx, param, value):
+    from medlp.models.cnn.losses import LOSS_MAPPING
+
+    losslist = list(LOSS_MAPPING[ctx.params["framework"]].keys())
+
+    assert len(losslist) > 0, f"No loss available for {ctx.params['framework']}! Abort!"
+    if value is not None and value in losslist:
+        return value
+    else:
+        value = prompt_ex("Loss list", type=Choice(losslist, show_index=True))
+        # if value in ['WCE', 'WBCE', 'WCE-DCE']:
+        if 'WCE' in value:
+            weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
+            ctx.params["loss_params"] = {"weight": weights}
+        elif value == 'WBCE':
+            pos_weight = _prompt("Pos weight", float, 2.0)
+            ctx.params['loss_params'] = {'pos_weight': pos_weight}
+        elif 'FocalLoss' in value:
+            gamma = _prompt("Gamma", float, 2.0)
+            ctx.params["loss_params"] = {'gamma': gamma}
+        elif 'Contrastive' in value:
+            margin = _prompt("Margin", float, 2.0)
+            ctx.params["loss_params"] = {'margin': margin}
+        else:
+            ctx.params["loss_params"] = {}
+        return value
 
 
 def model_select(ctx, param, value):
@@ -327,25 +355,18 @@ def solver_params(func):
 def network_params(func):
     @option(
         "--model-name",
-        type=str,
-        callback=model_select,
-        default=None,
-        help="Select deeplearning model",
+        type=str, callback=model_select,
+        default=None, help="Select deeplearning model",
     )
     @option(
         "-L", "--criterion",
-        prompt=True,
-        type=Choice(LOSSES),
-        callback=loss_params,
-        default=1,
-        help="loss criterion type",
+        type=str, callback=loss_select,
+        default=None, help="loss criterion type",
     )
     @option(
         "--layer-norm",
-        prompt=True,
-        type=Choice(NORM_TYPES),
-        default=1,
-        help="Layer norm type",
+        prompt=True, type=Choice(NORM_TYPES),
+        default=1, help="Layer norm type",
     )
     @option("--n-features", type=int, default=64, help="Feature num of first layer")
     @option("--n-depth", type=int, default=-1, help="Network depth. -1: use default depth")
@@ -391,7 +412,7 @@ def latent_auxilary_params(func):
     )
     @option("--n-fold", type=int, default=0)
     @option("--config", type=click.Path(exists=True))
-    @option("--bottleneck-size", type=int, default=7, help='Size of bottleneck size of VGG net')
+    @option("--bottleneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

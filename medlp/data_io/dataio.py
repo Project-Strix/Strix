@@ -8,12 +8,14 @@ CLASSIFICATION_DATASETS = DatasetRegistry()
 SEGMENTATION_DATASETS = DatasetRegistry()
 SELFLEARNING_DATASETS = DatasetRegistry()
 MULTITASK_DATASETS = DatasetRegistry()
+SIAMESE_DATASETS = DatasetRegistry()
 
 DATASET_MAPPING = {
     "segmentation": SEGMENTATION_DATASETS,
     "classification": CLASSIFICATION_DATASETS,
     "selflearning": SELFLEARNING_DATASETS,
     "multitask": MULTITASK_DATASETS,
+    "siamese": SIAMESE_DATASETS,
 }
 
 

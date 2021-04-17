@@ -17,12 +17,11 @@ from monai_ex.transforms import *
 
 
 def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
-    spacing=opts.get('spacing', (0.66667, 0.66667, 1.34))
-    in_channels=opts.get('input_nc', 3)
-    preload=opts.get('preload', 0)
-    augment_ratio=opts.get('augment_ratio', 0.4)
-    orientation=opts.get('orientation', 'RAI')
-    cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')), 'caches')
+    spacing = opts.get('spacing', (0.66667, 0.66667, 1.34))
+    in_channels = opts.get('input_nc', 3)
+    preload = opts.get('preload', 0)
+    augment_ratio = opts.get('augment_ratio', 0.4)
+    orientation = opts.get('orientation', 'RAI')
     image_keys = opts.get('image_keys', ['image'])
 
     cropper = [
@@ -95,7 +94,7 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
         to_tensor=ToTensord(keys=image_keys+["mask"]),
         is_supervised=True,
         dataset_type=CacheDataset,
-        dataset_kwargs={'cache_rate':preload},
+        dataset_kwargs={'cache_rate': preload},
         additional_transforms=additional_transforms,
     ).get_dataset()
 
@@ -119,4 +118,3 @@ def get_oneside_dataset(files_list, phase, opts):
 def get_oneside_dataset(files_list, phase, opts):
     opts['image_keys'] = ['image1', 'image2']
     return get_basis_rjh_tswi_dataset(files_list, phase, opts, (32,32))
-

@@ -6,6 +6,7 @@ from typing import Optional, Sequence, Union
 from monai_ex.data import Dataset
 from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
+from medlp.data_io.base_dataset.utils import get_input_data
 
 
 # TODO: Need to be refactored like BasicClassificationDataset
@@ -32,7 +33,9 @@ class BasicSegmentationDataset(object):
         self.verbose = verbose
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
-        self.input_data = self.get_input_data(is_supervised)
+        self.input_data = get_input_data(
+            files_list, is_supervised, verbose, self.__class__.__name__
+        )
 
         self.transforms = ensure_list(loader)
         if channeler is not None:
@@ -56,39 +59,6 @@ class BasicSegmentationDataset(object):
             self.transforms += ensure_list(to_tensor)
 
         self.transforms = Compose(self.transforms)
-
-    def get_input_data(self, is_supervised):
-        """
-        check input file_list format and existence.
-        """
-        input_data = []
-        for f in self.files_list:
-            if is_supervised:
-                if isinstance(f, (list, tuple)):  # Recognize f as ['image','label']
-                    assert os.path.exists(f[0]), f"Image file not exists: {f[0]}"
-                    assert os.path.exists(f[1]), f"Image file not exists: {f[1]}"
-                    input_data.append({"image": f[0], "label": f[1]})
-                elif isinstance(f, dict):
-                    assert "image" in f, f"File {f} doesn't contain keyword 'image'"
-                    assert os.path.exists(f["image"]), f"File not exists: {f['image']}"
-                    input_data.append({"image": f["image"], "label": f["label"]})
-                else:
-                    raise ValueError(
-                        f"Not supported file_list format, Got {type(f)} in SupervisedDataset"
-                    )
-            else:
-                if isinstance(f, str):
-                    assert os.path.exists(f), f"Image file not exists: {f}"
-                    input_data.append({"image": f})
-                elif isinstance(f, dict):
-                    assert "image" in f, f"File {f} doesn't contain keyword 'image'"
-                    assert os.path.exists(f["image"]), f"File not exists: {f['image']}"
-                    input_data.append({"image": f["image"]})
-                else:
-                    raise ValueError(
-                        f"Not supported file_list format, Got {type(f)} in UnsupervisedDataset"
-                    )
-        return input_data
 
     def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)

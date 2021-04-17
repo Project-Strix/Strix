@@ -4,9 +4,12 @@ from medlp.configures import get_cfg
 from medlp.data_io.base_dataset.classification_dataset import *
 from medlp.data_io.base_dataset.selflearning_dataset import *
 from medlp.data_io.base_dataset.segmentation_dataset import *
+from medlp.data_io.base_dataset.siamese_dataset import *
+
 from medlp.data_io.dataio import (
     CLASSIFICATION_DATASETS,
     SEGMENTATION_DATASETS,
+    SIAMESE_DATASETS,
     SELFLEARNING_DATASETS,
     MULTITASK_DATASETS,
     DATASET_MAPPING,
