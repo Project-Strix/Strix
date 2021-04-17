@@ -17,20 +17,6 @@ DATASET_MAPPING = {
 }
 
 
-def get_datalist(dataset_name):
-    if dataset_name == "picc_h5":
-        if os.name == "nt":
-            fname = r"\\mega\clwang\Data\picc\prepared_h5\data_list.json"
-        elif os.name == "posix":
-            fname = "/homes/clwang/Data/picc/prepared_h5/data_list_linux.json"
-    elif dataset_name == "jsph_rcc":
-        fname = "/homes/clwang/Data/jsph_rcc/kidney_rcc/Train/data_list.json"
-    else:
-        raise ValueError
-
-    return fname
-
-
 def get_default_setting(phase, **kwargs):
     if phase == "train":  # Todo: move this part to each dataset
         shuffle = kwargs.get("train_shuffle", True)

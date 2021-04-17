@@ -1,7 +1,8 @@
 from __future__ import print_function
-from typing import Sequence, Union
+from typing import Union
 
-import os, math, random, copy, pylab, torch
+import pylab
+import torch
 from pathlib import Path
 import socket
 from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE

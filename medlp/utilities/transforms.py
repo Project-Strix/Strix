@@ -1,11 +1,9 @@
 from typing import Dict, List, Hashable, Mapping, Optional, Sequence, Union
 
-import random
 import torch
 import numpy as np
 from scipy import ndimage as ndi
 from skimage import exposure
-import nibabel as nib
 
 from monai_ex.config import KeysCollection
 from monai_ex.utils import ensure_tuple, ensure_list, ensure_tuple_rep
@@ -17,11 +15,9 @@ from monai_ex.transforms import (
     MapTransform,
     Randomizable,
     SpatialCrop,
-    Transpose
 )
 
 from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.utilities.utils import bbox_2D, bbox_3D
 from utils_cw import remove_outlier
 
 class CoordToBoxList(Transform):

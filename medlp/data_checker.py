@@ -4,11 +4,6 @@ from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
 from utils_cw import get_items_from_file, Print, check_dir
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
 import torch
 from torchvision.utils import make_grid, save_image
 
@@ -16,10 +11,10 @@ from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
 from medlp.data_io import DATASET_MAPPING
-from medlp.utilities.enum import FRAMEWORK_TYPES, OUTPUT_DIR
+from medlp.utilities.enum import FRAMEWORK_TYPES
+from medlp.configures import get_cfg
 from monai_ex.utils import first
 from monai_ex.data import DataLoader
-from monai_ex.utils import optional_import
 
 
 def save_2d_image_grid(images, nrow, out_dir, phase, dataset_name, batch_index):
@@ -53,7 +48,7 @@ def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_i
 @click.option("--n-batch", prompt=True, type=int, default=10, help="Batch size")
 @click.option("--split", type=float, default=0.2, help="Training/testing split ratio")
 @click.option("--seed", type=int, default=101, help="random seed")
-@click.option("--out-dir", type=str, prompt=True, default=OUTPUT_DIR)
+@click.option("--out-dir", type=str, prompt=True, default=get_cfg('MEDLP_CONFIG', "OUTPUT_DIR"))
 @click.pass_context
 def check_data(ctx, **args):
     cargs = sn(**args)

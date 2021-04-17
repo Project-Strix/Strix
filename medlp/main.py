@@ -2,7 +2,6 @@ import sys
 import click
 
 import warnings
-
 warnings.filterwarnings("ignore")
 
 

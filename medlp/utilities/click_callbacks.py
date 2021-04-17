@@ -5,7 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace as sn
 from functools import partial, wraps
 from termcolor import colored
-from click import Tuple, option, prompt
+from click import option, prompt
+from medlp.configures import get_cfg
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.enum import *
 from medlp.utilities.utils import is_avaible_size
@@ -13,7 +14,6 @@ from utils_cw import (
     Print,
     check_dir,
     prompt_when,
-    recursive_glob2,
     get_items_from_file
     )
 
@@ -274,7 +274,7 @@ def common_params(func):
     )
     @option(
         "--out-dir", type=str, prompt=True,
-        show_default=True, default=OUTPUT_DIR,
+        show_default=True, default=get_cfg('MEDLP_CONFIG', 'OUTPUT_DIR'),
     )
     @option("--augment-ratio", type=float, default=0.3, help="Data aug ratio")
     @option(
