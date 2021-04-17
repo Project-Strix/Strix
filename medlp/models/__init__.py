@@ -62,6 +62,7 @@ def get_network(opts):
     layer_norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
     bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
+    drop_out = get_attr_(opts, 'dropout', None)
     # f_maps = get_attr_(opts, 'n_features', 64)
     # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
     # n_groups = get_attr_(opts, 'n_groups', 8)
@@ -78,7 +79,7 @@ def get_network(opts):
         kernel_size = (3,)+(3,)*n_depth
         strides = (1,)+(2,)*n_depth
         upsample_kernel_size=(1,)+(2,)*n_depth
-        
+
         model = model(
             spatial_dims=dim,
             in_channels=in_channels,
@@ -89,9 +90,35 @@ def get_network(opts):
             upsample_kernel_size=upsample_kernel_size,
             deep_supervision=get_attr_(opts, 'deep_supervision', False),
             deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
-            res_block=(model_name=='res-unet'),
+            res_block=(model_name == 'res-unet'),
             last_activation=last_act,
             is_prunable=is_prunable
+        )
+    elif model_name == 'mg_unet':
+        n_depth = 5 if n_depth == -1 else n_depth
+        kernel_size = (3,)+(3,)*n_depth
+        strides = (1,)+(2,)*n_depth
+        upsample_kernel_size = (1,)+(2,)*n_depth
+        group = 4
+        filters = [
+            min(2 ** (5 + i), 320 if dim == 3 else 512)*group
+            for i in range(len(strides))
+        ]
+
+        model = model(
+            spatial_dims=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            num_groups=group,
+            kernel_size=kernel_size,
+            strides=strides,
+            upsample_kernel_size=upsample_kernel_size,
+            norm_name=layer_norm,
+            res_block=False,
+            last_activation=last_act,
+            is_prunable=is_prunable,
+            dropout=drop_out,
+            filters=filters
         )
     elif model_name == 'unetv2' or model_name == 'res-unetv2':
         init_feat = get_attr_(opts, 'n_features', 64)

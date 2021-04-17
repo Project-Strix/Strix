@@ -17,6 +17,7 @@ import torch.nn as nn
 from medlp.models.cnn import SEGMENTATION_ARCHI, SELFLEARNING_ARCHI
 from medlp.models.cnn.blocks.dynunet_block import *
 
+
 @SEGMENTATION_ARCHI.register('2D', 'unet')
 @SEGMENTATION_ARCHI.register('3D', 'unet')
 @SELFLEARNING_ARCHI.register('2D', 'unet')
@@ -78,6 +79,7 @@ class DynUNet(nn.Module):
         res_block: bool = False,
         last_activation: Optional[str] = None,
         is_prunable: bool = False,
+        filters: Optional[Sequence[int]] = None,
     ):
         super(DynUNet, self).__init__()
         self.spatial_dims = spatial_dims
@@ -90,7 +92,10 @@ class DynUNet(nn.Module):
         self.deep_supervision = deep_supervision
         self.is_prunable = is_prunable
         self.conv_block = UnetResBlock if res_block else UnetBasicBlock
-        self.filters = [min(2 ** (5 + i), 320 if spatial_dims == 3 else 512) for i in range(len(strides))]
+        if filters is None:
+            self.filters = [min(2 ** (5 + i), 320 if spatial_dims == 3 else 512) for i in range(len(strides))]
+        else:
+            self.filters = filters
         self.input_block = self.get_input_block()
         self.downsamples = self.get_downsamples()
         self.bottleneck = self.get_bottleneck()

@@ -5,7 +5,12 @@ import torch
 import torch.nn as nn
 
 from monai.networks.blocks.convolutions import Convolution
-from monai.networks.layers.factories import Act, Norm, Dropout, Norm, split_args
+from monai.networks.layers.factories import (
+    Act,
+    Norm,
+    Dropout,
+    split_args
+)
 
 
 class UnetResBlock(nn.Module):
@@ -34,7 +39,8 @@ class UnetResBlock(nn.Module):
         stride: Union[Sequence[int], int],
         num_groups: int,
         norm_name: str,
-        is_prunable: bool = False
+        is_prunable: bool = False,
+        dropout: Optional[float] = None,
     ):
         super(UnetResBlock, self).__init__()
         self.conv1 = get_conv_layer(
@@ -75,6 +81,9 @@ class UnetResBlock(nn.Module):
         stride_np = np.atleast_1d(stride)
         if not np.all(stride_np == 1):
             self.downsample = True
+        self.dropout = dropout
+        if dropout is not None:
+            self.drop = nn.Dropout(p=dropout)
 
     def forward(self, inp):
         residual = inp
@@ -88,6 +97,8 @@ class UnetResBlock(nn.Module):
             residual = self.norm3(residual)
         out += residual
         out = self.lrelu(out)
+        if self.dropout is not None:
+            out = self.drop(out)
         return out
 
 
@@ -118,6 +129,7 @@ class UnetBasicBlock(nn.Module):
         num_groups: int,
         norm_name: str,
         is_prunable: bool = False,
+        dropout: Optional[float] = None,
     ):
         super(UnetBasicBlock, self).__init__()
         self.conv1 = get_conv_layer(
@@ -143,6 +155,9 @@ class UnetBasicBlock(nn.Module):
         self.lrelu = get_acti_layer(("leakyrelu", {"inplace": True, "negative_slope": 0.01}))
         self.norm1 = get_norm_layer(spatial_dims, out_channels, norm_name)
         self.norm2 = get_norm_layer(spatial_dims, out_channels, norm_name)
+        self.dropout = dropout
+        if dropout is not None:
+            self.drop = nn.Dropout(p=dropout)
 
     def forward(self, inp):
         out = self.conv1(inp)
@@ -151,6 +166,8 @@ class UnetBasicBlock(nn.Module):
         out = self.conv2(out)
         out = self.norm2(out)
         out = self.lrelu(out)
+        if self.dropout is not None:
+            out = self.drop(out)
         return out
 
 
