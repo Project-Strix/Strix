@@ -7,9 +7,10 @@ from functools import partial
 
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.utils import assert_network_type, output_filename_check
+from medlp.utilities.utils import output_filename_check
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.utils import output_onehot_transform
+from medlp.configures import get_key
 
 from monai_ex.inferers import SimpleInferer
 from monai_ex.networks import one_hot
@@ -63,21 +64,25 @@ def build_classification_engine(**kwargs):
     device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
-    is_multilabel = opts.output_nc>1
+    is_multilabel = opts.output_nc > 1
+    image_ = get_key("image")
+    label_ = get_key("label")
+    pred_ = get_key("pred")
+    loss_ = get_key("loss")
 
     if opts.criterion in ['BCE', 'WBCE']:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            torch.as_tensor(x["label"].unsqueeze(1), dtype=torch.float32).to(device)
+            x[image_].to(device),
+            torch.as_tensor(x[label_].unsqueeze(1), dtype=torch.float32).to(device)
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x, device, nb: (
-                x["pred"],
-                one_hot(x["label"], num_classes=opts.output_nc)
+                x[pred_],
+                one_hot(x[label_], num_classes=opts.output_nc)
             )
     else:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device), x["label"].to(device)
+            x[image_].to(device), x[label_].to(device)
         )
     if is_multilabel:
         val_metric_name = 'val_acc'
@@ -90,7 +95,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x["image"],
+            output_transform=lambda x: x[image_],
             max_channels=3,
             prefix_name='Val'
         )
@@ -113,20 +118,22 @@ def build_classification_engine(**kwargs):
     if opts.nni:
         val_handlers += [
             NNIReporterHandler(
-                metric_name=val_metric_name, max_epochs=opts.n_epoch, logger_name=logger_name
+                metric_name=val_metric_name,
+                max_epochs=opts.n_epoch,
+                logger_name=logger_name
             )
         ]
 
     if opts.output_nc == 1:
         train_post_transforms = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
-            # AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+            ActivationsD(keys=pred_, sigmoid=True),
+            # AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
         ])
     else:
         train_post_transforms = Compose([
-            ActivationsD(keys="pred", softmax=True),
-            AsDiscreteD(keys="pred", argmax=True, to_onehot=False),
-            SqueezeDimD(keys='pred')
+            ActivationsD(keys=pred_, softmax=True),
+            AsDiscreteD(keys=pred_, argmax=True, to_onehot=False),
+            SqueezeDimD(keys=pred_)
         ])
 
     if is_multilabel:
@@ -164,13 +171,13 @@ def build_classification_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x["loss"],
+            output_transform=lambda x: x[loss_],
             name=logger_name
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x["loss"]
+            output_transform=lambda x: x[loss_]
         ),
         CheckpointSaverEx(
             save_dir=model_dir/"Checkpoint",
@@ -182,7 +189,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x["image"],
+            output_transform=lambda x: x[image_],
             max_channels=3,
             prefix_name='Train'
         )
@@ -226,42 +233,44 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
+    image_ = get_key("image")
+    pred_ = get_key("pred")
 
     if is_multilabel:
         post_transform = Compose([
-            ActivationsD(keys="pred", softmax=True),
-            AsDiscreteD(keys="pred", argmax=True, to_onehot=False),
-            SqueezeDimD(keys="pred"),
-            lambda x: x['pred'].cpu().numpy()
+            ActivationsD(keys=pred_, softmax=True),
+            AsDiscreteD(keys=pred_, argmax=True, to_onehot=False),
+            SqueezeDimD(keys=pred_),
+            lambda x: x[pred_].cpu().numpy()
         ])
     else:
         post_transform = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
-            AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
-            lambda x: x['pred'].cpu().numpy()
+            ActivationsD(keys=pred_, sigmoid=True),
+            AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
+            lambda x: x[pred_].cpu().numpy()
         ])
 
     if not is_multilabel:
         acc_post_transforms = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
-            AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+            ActivationsD(keys=pred_, sigmoid=True),
+            AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         auc_post_transforms = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
+            ActivationsD(keys=pred_, sigmoid=True),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
     else:
         acc_post_transforms = Compose([
-            ActivationsD(keys="pred", softmax=True),
-            AsDiscreteD(keys="pred", argmax=True, to_onehot=False),
-            SqueezeDimD(keys="pred"),
+            ActivationsD(keys=pred_, softmax=True),
+            AsDiscreteD(keys=pred_, argmax=True, to_onehot=False),
+            SqueezeDimD(keys=pred_),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         auc_post_transforms = Compose([
-            ActivationsD(keys="pred", softmax=True),
-            AsDiscreteD(keys="pred", argmax=True, to_onehot=False),
-            SqueezeDimD(keys="pred"),
+            ActivationsD(keys=pred_, softmax=True),
+            AsDiscreteD(keys=pred_, argmax=True, to_onehot=False),
+            SqueezeDimD(keys=pred_),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
 
@@ -271,15 +280,15 @@ def build_classification_test_engine(**kwargs):
         ClassificationSaverEx(
             output_dir=opts.out_dir,
             save_errors=False,  # opts.phase=='test',
-            batch_transform=lambda x: x['image_meta_dict'],  #lambda x: (x['image_meta_dict'], x['image'], x['label']) \
+            batch_transform=lambda x: x[image_+'_meta_dict'],  # lambda x: (x['image_meta_dict'], x['image'], x['label']) \
                             #if opts.phase=='test' else lambda x: x['image_meta_dict'],
             output_transform=post_transform,
         ),
         ClassificationSaverEx(
             output_dir=opts.out_dir,
             filename="logits.csv",
-            batch_transform=lambda x: x['image_meta_dict'],
-            output_transform=lambda x: x['pred'].cpu().numpy(),
+            batch_transform=lambda x: x[image_+'_meta_dict'],
+            output_transform=lambda x: x[pred_].cpu().numpy(),
         ),
     ]
 
@@ -289,12 +298,12 @@ def build_classification_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaverEx(
                 output_dir=opts.out_dir,
-                output_postfix='image',
+                output_postfix=image_,
                 output_name_uplevel=uplevel,
                 resample=False,
                 mode="bilinear",
-                batch_transform=lambda x: x["image_meta_dict"],
-                output_transform=lambda x: x["image"],#[:,0:1,:,:],
+                batch_transform=lambda x: x[image_+'_meta_dict'],
+                output_transform=lambda x: x[image_],  # [:,0:1,:,:]
             )
         ]
 
@@ -329,6 +338,8 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
+    image_ = get_key("image")
+    pred_ = get_key("pred")
 
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
@@ -364,7 +375,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     for net, m in zip(nets, best_models):
         CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
-    pred_keys = [f"pred{i}" for i in range(len(best_models))]
+    pred_keys = [f"{pred_}{i}" for i in range(len(best_models))]
 
     # if opts.phase == 'test_wo_label':
     #     output_transform = lambda x: x['pred']
@@ -378,24 +389,24 @@ def build_classification_ensemble_test_engine(**kwargs):
             w_ = None
         post_transforms = MeanEnsembleD(
                           keys=pred_keys,
-                          output_key="pred",
+                          output_key=pred_,
                           # in this particular example, we use validation metrics as weights
                           weights=w_,
                           )
 
         acc_post_transforms = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
-            AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+            ActivationsD(keys=pred_, sigmoid=True),
+            AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         auc_post_transforms = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
+            ActivationsD(keys=pred_, sigmoid=True),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         ClsSaver_transform = Compose([
-            ActivationsD(keys="pred", sigmoid=True),
-            AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
-            lambda x: x['pred'].cpu().numpy()
+            ActivationsD(keys=pred_, sigmoid=True),
+            AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
+            lambda x: x[pred_].cpu().numpy()
         ])
 
     else:  # ensemble_type is 'vote'
@@ -405,28 +416,28 @@ def build_classification_ensemble_test_engine(**kwargs):
             ActivationsD(keys=pred_keys, softmax=True),
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),
-            VoteEnsembleD(keys=pred_keys, output_key="pred", num_classes=opts.output_nc),
+            VoteEnsembleD(keys=pred_keys, output_key=pred_, num_classes=opts.output_nc),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         auc_post_transforms = Compose([
             ActivationsD(keys=pred_keys, softmax=True),
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),
-            VoteEnsembleD(keys=pred_keys, output_key="pred", num_classes=opts.output_nc),
+            VoteEnsembleD(keys=pred_keys, output_key=pred_, num_classes=opts.output_nc),
             partial(output_onehot_transform, n_classes=opts.output_nc),
         ])
         ClsSaver_transform = Compose([
             ActivationsD(keys=pred_keys, softmax=True),
             AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
             SqueezeDimD(keys=pred_keys),
-            VoteEnsembleD(keys=pred_keys, output_key="pred", num_classes=opts.output_nc),
+            VoteEnsembleD(keys=pred_keys, output_key=pred_, num_classes=opts.output_nc),
             ])
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         ClassificationSaverEx(
             output_dir=opts.out_dir,
-            batch_transform=lambda x: x['image_meta_dict'],
+            batch_transform=lambda x: x[image_+'_meta_dict'],
             output_transform=ClsSaver_transform,
         )
     ]
@@ -436,12 +447,12 @@ def build_classification_ensemble_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaverEx(
                 output_dir=opts.out_dir,
-                output_postfix='image',
+                output_postfix=image_,
                 output_name_uplevel=uplevel,
                 resample=False,
                 mode="bilinear",
-                batch_transform=lambda x: x["image_meta_dict"],
-                output_transform=lambda x: x["image"],
+                batch_transform=lambda x: x[image_+"_meta_dict"],
+                output_transform=lambda x: x[image_],
             )
         ]
 
@@ -465,5 +476,4 @@ def build_classification_ensemble_test_engine(**kwargs):
     )
 
     return evaluator
-
 

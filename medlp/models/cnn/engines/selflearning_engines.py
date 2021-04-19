@@ -4,6 +4,7 @@ import numpy as np
 from functools import partial
 
 import torch
+from medlp.configures import get_key
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
@@ -27,35 +28,40 @@ from monai_ex.handlers import (
 
 @TRAIN_ENGINES.register('selflearning')
 def build_selflearning_engine(**kwargs):
-    opts = kwargs['opts'] 
-    train_loader = kwargs['train_loader']  
-    test_loader = kwargs['test_loader'] 
+    opts = kwargs['opts']
+    train_loader = kwargs['train_loader'] 
+    test_loader = kwargs['test_loader']
     net = kwargs['net']
-    loss = kwargs['loss'] 
-    optim = kwargs['optim'] 
-    lr_scheduler = kwargs['lr_scheduler'] 
-    writer = kwargs['writer'] 
-    valid_interval = kwargs['valid_interval'] 
-    device = kwargs['device'] 
+    loss = kwargs['loss']
+    optim = kwargs['optim']
+    lr_scheduler = kwargs['lr_scheduler']
+    writer = kwargs['writer']
+    valid_interval = kwargs['valid_interval']
+    device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
+    image_ = get_key("image")
+    label_ = get_key("label")
+    pred_ = get_key("pred")
+    loss_ = get_key("loss")
+
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None),
         TensorBoardStatsHandler(summary_writer=writer, tag_name="val_loss"),
         TensorBoardImageHandlerEx(
-            summary_writer=writer, 
-            batch_transform=lambda x: (x["image"], x["label"]), 
-            output_transform=lambda x: x["pred"],
+            summary_writer=writer,
+            batch_transform=lambda x: (x[image_], x[label_]),
+            output_transform=lambda x: x[pred_],
             max_channels=opts.output_nc,
             prefix_name='Val'
         ),
         CheckpointSaver(save_dir=model_dir, save_dict={"net": net}, save_key_metric=True,
-                        key_metric_name='val_mse',key_metric_mode='min',key_metric_n_saved=2)
+                        key_metric_name='val_mse', key_metric_mode='min', key_metric_n_saved=2)
     ]
 
-    prepare_batch_fn = lambda x, device, nb : (x["image"].to(device), x["label"].to(device))
-    key_metric_transform_fn = lambda x : (x["pred"], x["label"])
+    prepare_batch_fn = lambda x, device, nb: (x[image_].to(device), x[label_].to(device))
+    key_metric_transform_fn = lambda x: (x[pred_], x[label_])
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -72,24 +78,24 @@ def build_selflearning_engine(**kwargs):
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x : evaluator.state.metrics["val_mse"]
+        lr_step_transform = lambda x: evaluator.state.metrics["val_mse"]
     else:
         lr_step_transform = lambda x: ()
 
     train_handlers = [
         LrScheduleTensorboardHandler(lr_scheduler=lr_scheduler, summary_writer=writer, step_transform=lr_step_transform),
         ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
-        StatsHandler(tag_name="train_loss", output_transform=lambda x:x["loss"]),
-        CheckpointSaver(save_dir=model_dir, save_dict={"net":net, "optim":optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x:x["loss"]),
+        StatsHandler(tag_name="train_loss", output_transform=lambda x:x[loss_]),
+        CheckpointSaver(save_dir=model_dir, save_dict={"net": net, "optim": optim}, save_interval=opts.save_epoch_freq, epoch_level=True, n_saved=5),
+        TensorBoardStatsHandler(summary_writer=writer, tag_name="train_loss", output_transform=lambda x: x[loss_]),
         TensorBoardImageHandlerEx(
-            summary_writer=writer, batch_transform=lambda x: (x["image"], x["label"]), 
-            output_transform=lambda x: x["pred"],
+            summary_writer=writer, batch_transform=lambda x: (x[image_], x[label_]),
+            output_transform=lambda x: x[pred_],
             max_channels=opts.output_nc,
             prefix_name='train'
         ),
     ]
-    
+
     trainer = SupervisedTrainer(
         device=device,
         max_epochs=opts.n_epoch,
@@ -104,4 +110,3 @@ def build_selflearning_engine(**kwargs):
         amp=opts.amp
     )
     return trainer
-

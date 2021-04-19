@@ -8,10 +8,10 @@ import torch
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import (
-    assert_network_type,
     is_avaible_size,
     output_filename_check,
 )
+from medlp.configures import get_key
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.engines.utils import get_models
 
@@ -66,6 +66,10 @@ def build_segmentation_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
+    image_ = get_key("image")
+    label_ = get_key("label")
+    pred_ = get_key("pred")
+    loss_ = get_key("loss")
 
     val_metric = "val_mean_dice"
     val_handlers = [
@@ -73,8 +77,8 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
-            batch_transform=lambda x: (x["image"], x["label"]),
-            output_transform=lambda x: x["pred"],
+            batch_transform=lambda x: (x[image_], x[label_]),
+            output_transform=lambda x: x[pred_],
             max_channels=opts.output_nc,
             prefix_name="Val",
         ),
@@ -96,57 +100,59 @@ def build_segmentation_engine(**kwargs):
     if opts.nni:
         val_handlers += [
             NNIReporterHandler(
-                metric_name=val_metric, max_epochs=opts.n_epoch, logger_name=logger_name
+                metric_name=val_metric,
+                max_epochs=opts.n_epoch,
+                logger_name=logger_name
             )
         ]
 
     if opts.output_nc == 1:
         trainval_post_transforms = Compose(
             [
-                ActivationsD(keys="pred", sigmoid=True),
-                AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys=pred_, sigmoid=True),
+                AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         trainval_post_transforms = Compose(
             [
-                ActivationsD(keys="pred", softmax=True),
+                ActivationsD(keys=pred_, softmax=True),
                 AsDiscreteD(
-                    keys="pred", to_onehot=True, argmax=True, n_classes=opts.output_nc
+                    keys=pred_, to_onehot=True, argmax=True, n_classes=opts.output_nc
                 ),
-                # KeepLargestConnectedComponentD(keys="pred", applied_labels=[1], independent=False),
+                # KeepLargestConnectedComponentD(keys=pred_, applied_labels=[1], independent=False),
             ]
         )
 
     if opts.criterion in ["CE", "WCE"]:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            x["label"].squeeze(dim=1).to(device),
+            x[image_].to(device),
+            x[label_].squeeze(dim=1).to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"].unsqueeze(dim=1), num_classes=opts.output_nc),
+                x[pred_],
+                one_hot(x[label_].unsqueeze(dim=1), num_classes=opts.output_nc),
             )
     elif opts.criterion in ["BCE", "WBCE"]:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            torch.as_tensor(x["label"], dtype=torch.float32).to(device),
+            x[image_].to(device),
+            torch.as_tensor(x[label_], dtype=torch.float32).to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"], num_classes=opts.output_nc),
+                x[pred_],
+                one_hot(x[label_], num_classes=opts.output_nc),
             )
     else:
         prepare_batch_fn = lambda x, device, nb: (
-            x["image"].to(device),
-            x["label"].to(device),
+            x[image_].to(device),
+            x[label_].to(device),
         )
         if opts.output_nc > 1:
             key_metric_transform_fn = lambda x: (
-                x["pred"],
-                one_hot(x["label"], num_classes=opts.output_nc),
+                x[pred_],
+                one_hot(x[label_], num_classes=opts.output_nc),
             )
 
     evaluator = SupervisedEvaluator(
@@ -184,7 +190,7 @@ def build_segmentation_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x["loss"],
+            output_transform=lambda x: x[loss_],
             name=logger_name,
         ),
         CheckpointSaverEx(
@@ -197,12 +203,12 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x["loss"],
+            output_transform=lambda x: x[loss_],
         ),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
-            batch_transform=lambda x: (x["image"], x["label"]),
-            output_transform=lambda x: x["pred"],
+            batch_transform=lambda x: (x[image_], x[label_]),
+            output_transform=lambda x: x[pred_],
             max_channels=opts.output_nc,
             prefix_name="train",
         ),
@@ -253,6 +259,9 @@ def build_segmentation_test_engine(**kwargs):
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
+    image_ = get_key("image")
+    pred_ = get_key("pred")
+    label_ = get_key("label")
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
@@ -263,15 +272,15 @@ def build_segmentation_test_engine(**kwargs):
     if opts.output_nc == 1:
         post_transforms = Compose(
             [
-                ActivationsD(keys="pred", sigmoid=True),
-                AsDiscreteD(keys="pred", threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys=pred_, sigmoid=True),
+                AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         post_transforms = Compose(
             [
-                ActivationsD(keys="pred", softmax=True),
-                AsDiscreteD(keys="pred", argmax=True, to_onehot=False, n_classes=opts.output_nc)
+                ActivationsD(keys=pred_, softmax=True),
+                AsDiscreteD(keys=pred_, argmax=True, to_onehot=False, n_classes=opts.output_nc)
             ]
         )
 
@@ -285,8 +294,8 @@ def build_segmentation_test_engine(**kwargs):
             output_dir=opts.out_dir,
             output_name_uplevel=uplevel,
             resample=resample,
-            batch_transform=lambda x: x["image_meta_dict"],
-            output_transform=lambda output: output["pred"],
+            batch_transform=lambda x: x[image_+"_meta_dict"],
+            output_transform=lambda output: output[pred_],
         ),
     ]
 
@@ -294,23 +303,23 @@ def build_segmentation_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaverEx(
                 output_dir=opts.out_dir,
-                output_postfix="image",
+                output_postfix=image_,
                 output_name_uplevel=uplevel,
                 resample=resample,
-                batch_transform=lambda x: x["image_meta_dict"],
-                output_transform=lambda output: output["image"],
+                batch_transform=lambda x: x[image_+"_meta_dict"],
+                output_transform=lambda output: output[image_],
             )
         ]
 
     if opts.phase == "test_wo_label":
-        prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), None)
-        key_metric_transform_fn = lambda x: (x["pred"], None)
+        prepare_batch_fn = lambda x, device, nb: (x[image_].to(device), None)
+        key_metric_transform_fn = lambda x: (x[pred_], None)
         key_val_metric = None
     elif opts.phase == "test":
-        prepare_batch_fn = lambda x, device, nb: (x["image"].to(device), x["label"].to(device))
+        prepare_batch_fn = lambda x, device, nb: (x[image_].to(device), x[label_].to(device))
         key_metric_transform_fn = lambda x: (
-            one_hot(x["pred"], num_classes=opts.output_nc),
-            one_hot(x["label"], num_classes=opts.output_nc)
+            one_hot(x[pred_], num_classes=opts.output_nc),
+            one_hot(x[label_], num_classes=opts.output_nc)
         )
         key_val_metric = {
             "val_mean_dice": MeanDice(

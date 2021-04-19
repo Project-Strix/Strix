@@ -1,6 +1,5 @@
 import os
 from functools import partial
-from typing import KeysView
 from ignite import engine
 from monai_ex import handlers
 
@@ -12,10 +11,10 @@ from medlp.models.cnn.engines import (
 )
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.losses.losses import ContrastiveLoss
+from medlp.configures import get_key
 
 from monai_ex.inferers import SimpleInferer
-from monai_ex.engines.utils import CustomKeys as Keys
-from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
+from ignite.metrics import Accuracy
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.engine import Events
 
@@ -69,16 +68,20 @@ def build_siamese_engine(**kwargs):
     logger_name = kwargs.get("logger_name", None)
     is_multilabel = opts.output_nc > 1
     single_output = isinstance(loss, ContrastiveLoss)
+    image_ = get_key("image")
+    label_ = get_key("label")
+    loss_ = get_key("loss")
+    pred_ = get_key("pred")
 
     if opts.output_nc == 1:
         prepare_batch_fn = lambda x, device, nb: (
-            x[Keys.IMAGE].to(device),
-            x[Keys.LABEL].unsqueeze(1).to(torch.float).to(device),
+            x[image_].to(device),
+            x[label_].unsqueeze(1).to(torch.float).to(device),
         )
     else:
         prepare_batch_fn = lambda x, device, nb: (
-            x[Keys.IMAGE].to(device),
-            x[Keys.LABEL].to(device),
+            x[image_].to(device),
+            x[label_].to(device),
         )
 
     if is_multilabel:
@@ -96,7 +99,7 @@ def build_siamese_engine(**kwargs):
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name='val_loss',
-            output_transform=lambda x: x[Keys.LOSS]
+            output_transform=lambda x: x[loss_]
         ),
         CheckpointSaverEx(
             save_dir=model_dir,
@@ -108,7 +111,7 @@ def build_siamese_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x[Keys.LABEL],
+            output_transform=lambda x: x[label_],
             max_channels=3,
             prefix_name='Val'
         )
@@ -116,12 +119,12 @@ def build_siamese_engine(**kwargs):
     if single_output:
         train_post_transforms = None
     elif opts.output_nc == 1:
-        train_post_transforms = ActivationsD(keys=Keys.PRED, sigmoid=True)
+        train_post_transforms = ActivationsD(keys=pred_, sigmoid=True)
     else:
         train_post_transforms = Compose([
-            ActivationsD(keys=Keys.PRED, softmax=True),
-            AsDiscreteD(keys=Keys.PRED, argmax=True, to_onehot=False),
-            SqueezeDimD(keys=Keys.PRED)
+            ActivationsD(keys=pred_, softmax=True),
+            AsDiscreteD(keys=pred_, argmax=True, to_onehot=False),
+            SqueezeDimD(keys=pred_)
         ])
 
     if is_multilabel:
@@ -152,7 +155,7 @@ def build_siamese_engine(**kwargs):
             dirname=model_dir/'Best_Models',
             filename_prefix='Best',
             n_saved=2,
-            score_function=lambda x: -x[Keys.LOSS],
+            score_function=lambda x: -x[loss_],
             score_name="val_loss"
         )
         evaluator.add_event_handler(Events.EPOCH_COMPLETED(every=1), save_handler, {'net': net})
@@ -178,13 +181,13 @@ def build_siamese_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x[Keys.LOSS],
+            output_transform=lambda x: x[loss_],
             name=logger_name
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x[Keys.LOSS]
+            output_transform=lambda x: x[loss_]
         ),
         CheckpointSaverEx(
             save_dir=os.path.join(model_dir, "Checkpoint"),
@@ -196,7 +199,7 @@ def build_siamese_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x[Keys.IMAGE],
+            output_transform=lambda x: x[image_],
             max_channels=3,
             prefix_name='Train'
         )
