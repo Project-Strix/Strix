@@ -207,7 +207,7 @@ def build_classification_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_train_metric={"train_auc": key_val_metric},
-        additional_metrics={"roccurve": add_roc_metric},
+        # additional_metrics={"roccurve": add_roc_metric},
         train_handlers=train_handlers,
         amp=opts.amp
     )

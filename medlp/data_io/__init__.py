@@ -17,7 +17,7 @@ from medlp.data_io.dataio import (
 from medlp.data_io.generate_dataset import register_dataset_from_cfg
 
 internal_dataset_dir = Path(__file__).parent.parent.joinpath("datasets")
-external_dataset_dir = Path(cfg.get_cfg('MEDLP_CONFIG', 'EXTERNAL_DATASET_DIR'))
+external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_DATASET_DIR'))
 
 dataset_dirs = [internal_dataset_dir, external_dataset_dir]
 

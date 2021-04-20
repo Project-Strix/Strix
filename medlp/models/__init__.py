@@ -1,12 +1,8 @@
-import os
-import time
 from types import SimpleNamespace as sn
 from pathlib import Path
 from utils_cw import check_dir
-import numpy as np
 
 import torch
-from utils_cw.utils import get_items_from_file
 from medlp.models.cnn.utils import (
     print_network,
     output_onehot_transform,
@@ -29,7 +25,6 @@ from medlp.models.cnn.losses import (
     ContrastiveLoss
 )
 
-from monai_ex.networks.nets import UNet, HighResNet, VNet
 from monai_ex.utils import Activation
 from monai_ex.losses import (
     DiceLoss,
@@ -222,10 +217,6 @@ def get_network(opts):
         )
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
-        # config_file = get_rcnn_config(model_name, opts.backbone)
-        # assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
-        # config_content = get_items_from_file(config_file, format='yaml')
-        # model = GeneralizedRCNN(config_content)
     else:
         raise ValueError(f'Model {model_name} not available')
 

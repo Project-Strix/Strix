@@ -3,6 +3,7 @@ from configparser import ConfigParser
 
 
 DEFAULT_MEDLP_CONFIG = {
+    "MODE": 'dev',  # release
     "CONFIG_FNAME": 'medlp_configures.cfg',
     "OUTPUT_DIR": str(Path.home()/'Data'/'medlp_exp'),
     "EXTERNAL_DATASET_DIR": str(Path.home()/'Data'/'medlp_datasets'),
@@ -34,7 +35,11 @@ def init():
 
 
 def get_cfg(section_name, keyword):
-    return _config_dict[section_name][keyword]
+    return _config_dict[section_name][keyword.upper()]
+
+
+def get_medlp_cfg(keyword):
+    return _config_dict["MEDLP_CONFIG"][keyword.upper()]
 
 
 def get_key(key_name):
@@ -42,7 +47,7 @@ def get_key(key_name):
 
 
 def set_key(key_name, value):
-    _config_dict["CUSTOM_KEYS"][key_name] = value
+    _config_dict["CUSTOM_KEYS"][key_name.upper()] = value
 
 
 def get_keys_dict():

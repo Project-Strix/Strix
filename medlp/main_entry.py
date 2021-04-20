@@ -17,6 +17,7 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import SNIP_prune_handler
 from medlp.utilities.click_ex import get_unknown_options
+from medlp.configures import config as cfg
 import medlp.utilities.click_callbacks as clb
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -140,7 +141,14 @@ def train_core(cargs, files_train, files_valid):
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=clb.get_exp_name, default="")
-@click.option("--confirm", callback=partial(confirmation, output_dir_ctx="experiment_path", save_code=True, exist_ok=False))
+@click.option(
+    "--confirm", callback=partial(
+        confirmation,
+        output_dir_ctx="experiment_path",
+        save_code=(cfg.get_medlp_cfg('mode') == 'dev'),
+        exist_ok=False
+    )
+)
 @click.pass_context
 def train(ctx, **args):
     """Entry of train command."""

@@ -290,7 +290,7 @@ def common_params(func):
     )
     @option(
         "--out-dir", type=str, prompt=True,
-        show_default=True, default=cfg.get_cfg('MEDLP_CONFIG', 'OUTPUT_DIR'),
+        show_default=True, default=cfg.get_medlp_cfg('OUTPUT_DIR'),
     )
     @option("--augment-ratio", type=float, default=0.3, help="Data aug ratio")
     @option(
@@ -302,8 +302,7 @@ def common_params(func):
         is_flag=True, help="Visualize the network architecture"
     )
     @option(
-        "--valid-interval",
-        type=int, default=4,
+        "--valid-interval", type=int, default=4,
         help="Interval of validation during training",
     )
     @option(
