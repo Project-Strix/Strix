@@ -1,0 +1,3 @@
+[submodule "MONAI_EX"]
+	path = MONAI_EX
+	url = https://gitlab.com/project-medlp/MONAI_EX.git
