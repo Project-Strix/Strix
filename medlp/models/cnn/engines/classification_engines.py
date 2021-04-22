@@ -6,8 +6,12 @@ from pathlib import Path
 from functools import partial
 
 import torch
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.utils import output_filename_check
+from medlp.models.cnn.engines import (
+    TRAIN_ENGINES,
+    TEST_ENGINES,
+    ENSEMBLE_TEST_ENGINES
+)
+from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.configures import get_key
@@ -276,23 +280,27 @@ def build_classification_test_engine(**kwargs):
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-        ClassificationSaverEx(
-            output_dir=opts.out_dir,
-            save_errors=False,  # opts.phase=='test',
-            batch_transform=lambda x: x[image_+'_meta_dict'],  # lambda x: (x['image_meta_dict'], x['image'], x['label']) \
-                            #if opts.phase=='test' else lambda x: x['image_meta_dict'],
-            output_transform=post_transform,
-        ),
-        ClassificationSaverEx(
-            output_dir=opts.out_dir,
-            filename="logits.csv",
-            batch_transform=lambda x: x[image_+'_meta_dict'],
-            output_transform=lambda x: x[pred_].cpu().numpy(),
-        ),
+        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net})
     ]
 
-    if opts.save_image:
+    if get_attr_(opts, 'save_results', True):
+        val_handlers += [
+            ClassificationSaverEx(
+                output_dir=opts.out_dir,
+                save_errors=False,  # opts.phase=='test',
+                batch_transform=lambda x: x[image_+'_meta_dict'],  # lambda x: (x['image_meta_dict'], x['image'], x['label']) \
+                                #if opts.phase=='test' else lambda x: x['image_meta_dict'],
+                output_transform=post_transform,
+            ),
+            ClassificationSaverEx(
+                output_dir=opts.out_dir,
+                filename="logits.csv",
+                batch_transform=lambda x: x[image_+'_meta_dict'],
+                output_transform=lambda x: x[pred_].cpu().numpy(),
+            ),
+        ]
+
+    if get_attr_(opts, 'save_image', False):
         # check output filename
         uplevel = output_filename_check(test_loader.dataset)
         val_handlers += [

@@ -1,27 +1,22 @@
 import logging
-import bisect
-from logging import Logger
-import re
-from typing import TYPE_CHECKING, Dict, Optional, Any, Callable, List, Sequence, Union
-from click.core import Option
+from typing import TYPE_CHECKING, Optional, Callable
 import numpy as np
-from sklearn.metrics import roc_curve, auc
 
 from monai_ex.utils import export, exact_version, optional_import
 from monai_ex.handlers import TensorBoardImageHandler
-from monai_ex.visualize import plot_2d_or_3d_image
-from monai_ex.handlers import CSVSaverEx
-from monai.engines.evaluator import Evaluator
+from monai_ex.visualize import plot_2d_or_3d_image, GradCAM
+
+from PIL import Image
+from utils_cw import Normalize2
 
 import torch
 from torch._C import device
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
-from medlp.utilities.utils import add_3D_overlay_to_summary
+from medlp.utilities.utils import add_3D_overlay_to_summary, apply_colormap_on_image
 
 Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
 Metric, _ = optional_import("ignite.metrics", "0.4.2", exact_version, "Metric")
 Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")
-reinit__is_reduced, _ = optional_import("ignite.metrics.metric", "0.4.2", exact_version, "reinit__is_reduced")
 
 if TYPE_CHECKING:
     from ignite.engine import Engine
@@ -32,6 +27,7 @@ else:
 
 NNi, _ = optional_import("nni")
 Torchviz, _ = optional_import('torchviz')
+
 
 class NNIReporter:
     """
@@ -69,6 +65,7 @@ class NNIReporter:
                 NNi.report_intermediate_result(engine.state.metrics[self.metric_name])
             else:
                 NNi.report_final_result(engine.state.metrics[self.metric_name])
+
 
 class NNIReporterHandler:
     """
@@ -146,6 +143,7 @@ class SNIP_prune_handler:
         net_ = apply_prune_mask(self.net, keep_masks, self.device, self.verbose)
         # self.net.load_state_dict(net_.state_dict())
 
+
 class TorchVisualizer:
     """
     TorchVisualizer for visualize network architecture using PyTorchViz.
@@ -167,7 +165,7 @@ class TorchVisualizer:
         if self.logger_name is None:
             self.logger = engine.logger
         engine.add_event_handler(Events.STARTED, self)
-    
+
     def __call__(self, engine: Engine) -> None:
         output = self.output_transform(engine.state.output)
         if output is not None:
@@ -183,3 +181,56 @@ class TorchVisualizer:
                 except:
                     self.logger.error(f"""Failded to save torchviz graph to {self.outfile_path},
                                     Please make sure you have installed graphviz properly!""")
+
+
+class GradCamHandler:
+    def __init__(
+        self,
+        net,
+        target_layers,
+        target_class,
+        data_loader,
+        prepare_batch_fn,
+        save_dir: Optional[str]=None,
+        device=torch.device('cpu'),
+        logger_name: Optional[str] = None
+    ) -> None:
+        self.net = net
+        self.target_layers = target_layers
+        self.target_class = target_class
+        self.data_loader = data_loader
+        self.prepare_batch_fn = prepare_batch_fn
+        self.save_dir = save_dir
+        self.device = device
+        self.logger = logging.getLogger(logger_name)
+
+    def __call__(self, engine: Engine) -> None:
+        cam = GradCAM(nn_module=self.net, target_layers=self.target_layers)
+        for i, batchdata in enumerate(self.data_loader):
+            batch = self.prepare_batch_fn(batchdata, self.device, False)
+            if len(batch) == 2:
+                inputs, targets = batch
+            else:
+                raise NotImplementedError
+
+            self.logger.debug(
+                f'Cam feature size: {cam.feature_map_size(inputs.shape, device=self.device)}'
+            )
+
+            cam_result = cam(inputs, class_idx=self.target_class)
+            cam_result = np.uint8(cam_result.squeeze(1) * 255)
+            origin_img = inputs.cpu().detach().numpy().squeeze(1)
+
+            self.logger.debug(
+                f'Image batchdata shape: {origin_img.shape}, CAM batchdata shape: {cam_result.shape}'
+            )
+
+            for j, (img_slice, cam_slice) in enumerate(zip(origin_img, cam_result)):
+                img_slice = np.uint8(Normalize2(img_slice) * 255)
+
+                img_slice = Image.fromarray(img_slice)
+                no_trans_heatmap, heatmap_on_image = apply_colormap_on_image(img_slice, cam_slice, 'hsv')
+
+                heatmap_on_image.save(self.save_dir/f'{i}_{j}_heatmap_on_img.png')
+
+        engine.terminate()
