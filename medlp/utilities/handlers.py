@@ -18,16 +18,16 @@ from torch._C import device
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
 from medlp.utilities.utils import add_3D_overlay_to_summary
 
-Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
-Metric, _ = optional_import("ignite.metrics", "0.4.2", exact_version, "Metric")
-Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")
-reinit__is_reduced, _ = optional_import("ignite.metrics.metric", "0.4.2", exact_version, "reinit__is_reduced")
+Events, _ = optional_import("ignite.engine", "0.4.4", exact_version, "Events")
+Metric, _ = optional_import("ignite.metrics", "0.4.4", exact_version, "Metric")
+Checkpoint, _ = optional_import("ignite.handlers", "0.4.4", exact_version, "Checkpoint")
+reinit__is_reduced, _ = optional_import("ignite.metrics.metric", "0.4.4", exact_version, "reinit__is_reduced")
 
 if TYPE_CHECKING:
     from ignite.engine import Engine
     from torch.utils.tensorboard import SummaryWriter
 else:
-    Engine, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Engine")
+    Engine, _ = optional_import("ignite.engine", "0.4.4", exact_version, "Engine")
     SummaryWriter, _ = optional_import("torch.utils.tensorboard", name="SummaryWriter")
 
 NNi, _ = optional_import("nni")
