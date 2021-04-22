@@ -82,8 +82,6 @@ def get_exp_name(ctx, param, value):
     elif ctx.params["n_repeat"] > 0:
         exp_name = exp_name + f"-RE{ctx.params['n_repeat']}"
 
-    # suffix = '-redo' if ctx.params.get('config') is not None else ''
-
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
@@ -157,16 +155,6 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 
-# def loss_params(ctx, param, value):
-#     # if ctx.params.get('loss_params', (0,0)) is not (0,0): #loaded config from specified file
-#     #     return value
-
-#     if value == "WCE" or value == "WBCE":
-#         weights = _prompt("Loss weights", tuple, (0.1, 0.9), split_input_str_)
-#         ctx.params["loss_params"] = weights
-#     return value
-
-
 def loss_select(ctx, param, value):
     from medlp.models.cnn.losses import LOSS_MAPPING
 
@@ -176,7 +164,7 @@ def loss_select(ctx, param, value):
     if value is not None and value in losslist:
         return value
     else:
-        value = prompt_ex("Loss list", type=Choice(losslist, show_index=True))
+        value = prompt("Loss list", type=Choice(losslist))
         # if value in ['WCE', 'WBCE', 'WCE-DCE']:
         if 'WCE' in value:
             weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
