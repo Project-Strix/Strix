@@ -154,6 +154,10 @@ def build_segmentation_engine(**kwargs):
                 x[pred_],
                 one_hot(x[label_], num_classes=opts.output_nc),
             )
+        else:
+            key_metric_transform_fn = lambda x: (
+                x[pred_], x[label_],
+            )
 
     evaluator = SupervisedEvaluator(
         device=device,

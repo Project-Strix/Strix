@@ -31,7 +31,7 @@ def PICC_dcm_seg_dataset(files_list,
 
     dataset = SegmentationDataset2D(
         files_list,
-        loader=[LoadImageD(keys='image'), LoadNiftiD(keys='label')],
+        loader=[LoadImageD(keys='image'), LoadImageD(keys='label')],
         channeler=TransposeD(keys='label'), #AsChannelFirstD(keys='label'),
         orienter=None,
         spacer=SpacingD(keys=["image","label"], pixdim=spacing),

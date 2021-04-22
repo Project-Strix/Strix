@@ -1,6 +1,6 @@
 
 #%%import nibabel as nib
-import os, math
+import os
 from pathlib import Path
 import nibabel as nib
 import numpy as np
@@ -8,19 +8,10 @@ import numpy as np
 from medlp.utilities.transforms import SeparateCropSTSdataD, ExtractSTSlicesD
 from monai_ex.data import DataLoader, Dataset
 from monai_ex.transforms import (
-    LoadNiftiD,
     Compose,
     AddChannelD,
     AsChannelFirstD,
-    CenterSpatialCrop,
-    DataStatsD,
-    generate_spatial_bounding_box,
-    ResizeD,
-    ToTensorD,
-    RandAffineD,
     MapTransform,
-    RandCropByPosNegLabelD,
-    ResizeWithPadOrCropD,
     SqueezeDimD
 )
 
@@ -57,7 +48,7 @@ class TestD(MapTransform):
 
 trans = Compose(
     [
-        LoadNiftiD(keys=["image", "mask"]),
+        LoadImageD(keys=["image", "mask"]),
         AddChannelD(keys=['image', 'mask']),
         SeparateCropSTSdataD(
             keys=["image", "mask"],

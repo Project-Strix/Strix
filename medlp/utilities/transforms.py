@@ -352,7 +352,7 @@ class RandCrop2dByPosNegLabelD(Randomizable, MapTransform):
             bg_indices_ = bg_indices
 
         self.centers = generate_pos_neg_label_crop_centers(
-            self.get_new_spatial_size(), 
+            self.get_new_spatial_size(),
             self.num_samples,
             self.pos_ratio,
             label.shape[1:],

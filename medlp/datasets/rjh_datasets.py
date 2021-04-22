@@ -79,7 +79,7 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
 
     dataset = BasicClassificationDataset(
         files_list,
-        loader=LoadNiftid(keys=image_keys+["mask"], dtype=np.float32),
+        loader=LoadImageD(keys=image_keys+["mask"], dtype=np.float32),
         channeler=AddChannelD(keys=image_keys+['mask']),
         orienter=None, #Orientationd(keys=['image','mask'], axcodes=orientation),
         spacer=SpacingD(

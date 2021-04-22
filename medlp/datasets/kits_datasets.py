@@ -21,7 +21,7 @@ def get_kits_dataset(files_list, phase, opts):
     orientation=opts.get('orientation', 'LPI')
     cache_dir=check_dir(os.path.dirname(opts.get('experiment_path')),'caches')
 
-    data_reader = LoadNiftid(keys=["image", "label"], dtype=np.float32)
+    data_reader = LoadImageD(keys=["image", "label"], dtype=np.float32)
 
     if spacing:
         spacer = Spacingd(keys=["image", "label"], pixdim=spacing)
@@ -119,7 +119,7 @@ def kits_dataset(files_list, phase, opts):
 
     dataset = BasicClassificationDataset(
         files_list,
-        loader=LoadNiftid(
+        loader=LoadImageD(
             keys=["image", "label"], dtype=np.float32
         ),
         channeler=AddChannelD(keys=['image', 'label']),

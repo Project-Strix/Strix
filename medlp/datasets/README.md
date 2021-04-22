@@ -14,7 +14,7 @@
 
         dataset = BasicClassificationDataset(
             files_list,
-            loader = LoadNiftiD(keys="image"),
+            loader = LoadImageD(keys="image"),
             channeler = AddChannelD(keys="image"),
             orienter = OrientationD(keys="image", axcodes="LPI"),
             spacer = SpacingD(keys="image", pixdim=(0.1, 0.1)),

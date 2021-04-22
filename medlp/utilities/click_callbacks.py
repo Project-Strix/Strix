@@ -311,6 +311,7 @@ def common_params(func):
         help="Patience of early stopping. default: 200epochs",
     )
     @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
+    @option("--save-n-best", type=int, default=3, help="Save best N models")
     @option("--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6")
     @option("--nni", is_flag=True, help="Flag of using nni-search, you dont need to modify this")
     @option("--n-fold", type=int, default=0, help="K fold cross-validation")

@@ -23,7 +23,7 @@ cropper = RandCrop2dByPosNegLabelD(
 
 trans = Compose(
     [
-        LoadNiftiD(keys=["image", "mask"]),
+        LoadImageD(keys=["image", "mask"]),
         AddChannelD(keys=['image', 'mask']),
         cropper,
     ]

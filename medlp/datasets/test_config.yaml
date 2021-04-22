@@ -7,7 +7,7 @@ ATTRIBUTE:
   FILES_LIST: "/homes/clwang/Data/medlp_exp/segmentation/rjh_tswi/res-unet-96,96,64-CE-DCE-BN-adamw-plateau-1123_1609-Dil-Elastic-3cls/train_files"
 PREPROCESS:
   LOADER:
-    LoadNifti:
+    LoadImage:
       keys: [image, label]
       phase: [train, valid, test]
       args: {'as_closest_canonical': True}

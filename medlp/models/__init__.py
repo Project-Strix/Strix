@@ -30,7 +30,7 @@ from medlp.models.cnn.losses import (
 )
 
 from monai_ex.networks.nets import UNet, HighResNet, VNet
-from monai_ex.utils import Activation, ChannelMatching, Normalisation
+from monai_ex.utils import Activation
 from monai_ex.losses import (
     DiceLoss,
     GeneralizedDiceLoss,
