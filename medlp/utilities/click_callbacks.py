@@ -329,7 +329,7 @@ def common_params(func):
 
 
 def solver_params(func):
-    @option("--optim", type=Choice(OPTIM_TYPES), default=1)
+    @option("--optim", type=Choice(OPTIM_TYPES), default="sgd")
     @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
     @option("-WD", "--l2-weight-decay", type=float, default=0, help="weight decay (L2 penalty)")
     @option("--lr", type=float, default=1e-3, help="learning rate")

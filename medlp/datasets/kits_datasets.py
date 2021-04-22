@@ -149,4 +149,3 @@ def kits_dataset(files_list, phase, opts):
     ).get_dataset()
 
     return dataset
-
