@@ -10,6 +10,7 @@ from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_
 from medlp.utilities.utils import (
     is_avaible_size,
     output_filename_check,
+    get_attr_
 )
 from medlp.configures import config as cfg
 from medlp.models.cnn.utils import output_onehot_transform
@@ -259,7 +260,7 @@ def build_segmentation_test_engine(**kwargs):
     net = kwargs["net"]
     device = kwargs["device"]
     logger_name = kwargs.get("logger_name", None)
-    crop_size = opts.crop_size
+    crop_size = get_attr_(opts, 'crop_size')
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
