@@ -32,11 +32,11 @@ CLASSIFICATION_LOSS.register('CE', CrossEntropyLossEx)
 CLASSIFICATION_LOSS.register('WCE', CrossEntropyLossEx)
 CLASSIFICATION_LOSS.register('BCE', torch.nn.BCEWithLogitsLoss)
 CLASSIFICATION_LOSS.register('WBCE', torch.nn.BCEWithLogitsLoss)
-CLASSIFICATION_LOSS.register('CE-DCE', CEDiceLoss)
 CLASSIFICATION_LOSS.register('FocalLoss', FocalLoss)
 
 SEGMENTATION_LOSS.register('DCE', DiceLoss)
 SEGMENTATION_LOSS.register('GDL', GeneralizedDiceLoss)
+SEGMENTATION_LOSS.register('CE-DCE', CEDiceLoss)
 SEGMENTATION_LOSS.register('FocalDiceLoss', FocalDiceLoss)
 
 SIAMESE_LOSS.register('ContrastiveLoss', ContrastiveLoss)

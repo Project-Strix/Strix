@@ -251,17 +251,23 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     loss = lr_scheduler = None
     loss_type = LOSS_MAPPING[framework_type][opts.criterion]
 
+    if opts.output_nc == 1:
+        kwargs = {"sigmoid": True, "softmax": False, "to_onehot_y": False}
+    else:
+        kwargs = {"sigmoid": False, "softmax": True, "to_onehot_y": True}
+
     if loss_type in [DiceLoss, GeneralizedDiceLoss]:
-        if opts.output_nc == 1:
-            loss = loss_type(include_background=False, to_onehot_y=False, sigmoid=True)
-        else:
-            loss = loss_type(include_background=False, to_onehot_y=True, softmax=True)
+        loss = loss_type(include_background=False, **kwargs)
     elif loss_type == CEDiceLoss:
-        loss = loss_type(CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
-                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))    
+        loss = loss_type(
+            CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
+            DiceLoss(include_background=False, **kwargs)
+        )
     elif loss_type == FocalDiceLoss:
-        loss = loss_type(FocalLoss(**opts.loss_params),
-                         DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
+        loss = loss_type(
+            FocalLoss(**opts.loss_params),
+            DiceLoss(include_background=False, **kwargs)
+        )
     else:
         loss = loss_type(**opts.loss_params)
 
