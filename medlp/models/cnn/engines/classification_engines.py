@@ -10,7 +10,7 @@ from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_
 from medlp.utilities.utils import output_filename_check
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.utils import output_onehot_transform
-from medlp.configures import get_key
+from medlp.configures import config as cfg
 
 from monai_ex.inferers import SimpleInferer
 from monai_ex.networks import one_hot
@@ -65,10 +65,10 @@ def build_classification_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    label_ = get_key("label")
-    pred_ = get_key("pred")
-    loss_ = get_key("loss")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    pred_ = cfg.get_key("pred")
+    loss_ = cfg.get_key("loss")
 
     if opts.criterion in ['BCE', 'WBCE']:
         prepare_batch_fn = lambda x, device, nb: (
@@ -233,8 +233,8 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    pred_ = get_key("pred")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
 
     if is_multilabel:
         post_transform = Compose([
@@ -338,8 +338,8 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    pred_ = get_key("pred")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
 
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)

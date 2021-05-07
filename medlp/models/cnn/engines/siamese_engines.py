@@ -11,7 +11,7 @@ from medlp.models.cnn.engines import (
 )
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.losses.losses import ContrastiveLoss
-from medlp.configures import get_key
+from medlp.configures import config as cfg
 
 from monai_ex.inferers import SimpleInferer
 from ignite.metrics import Accuracy
@@ -68,10 +68,10 @@ def build_siamese_engine(**kwargs):
     logger_name = kwargs.get("logger_name", None)
     is_multilabel = opts.output_nc > 1
     single_output = isinstance(loss, ContrastiveLoss)
-    image_ = get_key("image")
-    label_ = get_key("label")
-    loss_ = get_key("loss")
-    pred_ = get_key("pred")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    loss_ = cfg.get_key("loss")
+    pred_ = cfg.get_key("pred")
 
     if opts.output_nc == 1:
         prepare_batch_fn = lambda x, device, nb: (

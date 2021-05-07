@@ -4,7 +4,7 @@ import numpy as np
 from functools import partial
 
 import torch
-from medlp.configures import get_key
+from medlp.configures import config as cfg
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import assert_network_type, is_avaible_size, output_filename_check
@@ -40,10 +40,10 @@ def build_selflearning_engine(**kwargs):
     device = kwargs['device']
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
-    image_ = get_key("image")
-    label_ = get_key("label")
-    pred_ = get_key("pred")
-    loss_ = get_key("loss")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    pred_ = cfg.get_key("pred")
+    loss_ = cfg.get_key("loss")
 
 
     val_handlers = [

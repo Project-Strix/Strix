@@ -11,7 +11,7 @@ from medlp.utilities.utils import (
     is_avaible_size,
     output_filename_check,
 )
-from medlp.configures import get_key
+from medlp.configures import config as cfg
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.engines.utils import get_models
 
@@ -66,10 +66,10 @@ def build_segmentation_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
-    image_ = get_key("image")
-    label_ = get_key("label")
-    pred_ = get_key("pred")
-    loss_ = get_key("loss")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    pred_ = cfg.get_key("pred")
+    loss_ = cfg.get_key("loss")
 
     val_metric = "val_mean_dice"
     val_handlers = [
@@ -263,9 +263,9 @@ def build_segmentation_test_engine(**kwargs):
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
-    image_ = get_key("image")
-    pred_ = get_key("pred")
-    label_ = get_key("label")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
+    label_ = cfg.get_key("label")
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
