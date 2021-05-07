@@ -588,25 +588,17 @@ class ExtractSTSlicesD(MapTransform):
         return d
 
 
-# class RandSelectSlice(Randomizable):
-#     def __init__(self, dim: int) -> None:
-#         super().__init__()
-#         self.dim = dim
+class ConcatModalityD(MapTransform):
+    """Concat multi-modality data by given keys.
+    """
+    def __init__(self, keys, output_key, axis):
+        super().__init__(keys)
+        self.output_key = output_key
+        self.axis = axis
 
-#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
-#         d = dict(data)
-#         mask_data = d[self.mask_key]
-#         for key in self.keys:
-#             d[key] = self.converter(d[key], mask_data=mask_data)
-#         return d
+    def __call__(self, data):
+        d = dict(data)
+        concat_data = np.concatenate([d[key] for key in self.keys], axis=self.axis)
+        d[self.output_key] = concat_data
 
-# class RandSelectSliceD(Randomizable, MapTransform):
-#     def __init__(self, keys: KeysCollection, dim: int) -> None:
-#         super().__init__(keys)
-#         self.converter = RandSelectSlice(dim=dim)
-
-#     def __call__(self, data: Mapping[Hashable, np.ndarray]) -> Dict[Hashable, np.ndarray]:
-#         d = dict(data)
-#         for key in self.keys:
-#             d[key] = self.converter(d[key], mask_data=mask_data)
-#         return d
+        return d
