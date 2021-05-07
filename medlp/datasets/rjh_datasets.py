@@ -63,7 +63,9 @@ def get_basis_rjh_tswi_dataset(files_list, phase, opts, spatial_size):
         ]
 
     if phase == 'train':
-        additional_transforms = []
+        additional_transforms = [
+            RandAdjustContrastD(keys=image_keys, gamma=(0.8, 1.2))
+        ]
         # additional_transforms = [
         #     RandAffineD(
         #         keys=image_keys+['mask'],
