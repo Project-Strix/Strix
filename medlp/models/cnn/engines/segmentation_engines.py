@@ -88,11 +88,11 @@ def build_segmentation_engine(**kwargs):
     if opts.save_n_best > 0:
         val_handlers += [
             CheckpointSaverEx(
-                save_dir=model_dir,
+                save_dir=model_dir/"Best_Models",
                 save_dict={"net": net},
                 save_key_metric=True,
                 key_metric_n_saved=opts.save_n_best,
-                key_metric_save_after_epoch=10
+                key_metric_save_after_epoch=0
             )
         ]
 
@@ -198,7 +198,7 @@ def build_segmentation_engine(**kwargs):
             name=logger_name,
         ),
         CheckpointSaverEx(
-            save_dir=os.path.join(model_dir, "Checkpoint"),
+            save_dir=model_dir/"Checkpoint",
             save_dict={"net": net, "optim": optim},
             save_interval=opts.save_epoch_freq,
             epoch_level=True,
