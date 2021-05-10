@@ -45,7 +45,7 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaverEx,
+    SegmentationSaver,
     MeanDice,
     ROCAUC,
     stopping_fn_from_metric,
@@ -288,16 +288,14 @@ def build_segmentation_test_engine(**kwargs):
             ]
         )
 
-    # check output filename
-    uplevel = output_filename_check(test_loader.dataset)
-
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-        SegmentationSaverEx(
+        SegmentationSaver(
             output_dir=opts.out_dir,
-            output_name_uplevel=uplevel,
+            output_ext=".nii.gz",
             resample=resample,
+            data_root_dir=output_filename_check(test_loader.dataset),
             batch_transform=lambda x: x[image_+"_meta_dict"],
             output_transform=lambda output: output[pred_],
         ),
@@ -305,11 +303,12 @@ def build_segmentation_test_engine(**kwargs):
 
     if opts.save_image:
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                output_ext=".nii.gz",
                 resample=resample,
+                data_root_dir=uplevel,
                 batch_transform=lambda x: x[image_+"_meta_dict"],
                 output_transform=lambda output: output[image_],
             )

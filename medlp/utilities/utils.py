@@ -122,19 +122,21 @@ def add_3D_image_to_summary(manager, image, name, centers=None):
 
 
 def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
-    assert len(torch_dataset) > 1, 'dataset must have at least 2 items!'
+    if len(torch_dataset) == 1:
+        return Path(torch_dataset[0][meta_key]['filename_or_obj']).parent.parent
+
     prev_data = torch_dataset[0]
     next_data = torch_dataset[1]
 
     if Path(prev_data[meta_key]['filename_or_obj']).stem != Path(next_data[meta_key]['filename_or_obj']).stem:
-        return 0
+        return Path(prev_data[meta_key]['filename_or_obj']).parent
 
     for i, (prev_v, next_v) in enumerate(zip(Path(prev_data[meta_key]['filename_or_obj']).parents,
                                              Path(next_data[meta_key]['filename_or_obj']).parents)):
         if prev_v.stem != next_v.stem:
-            return i+1
+            return prev_v.parent
 
-    return 0
+    return ''
 
 def detect_port(port):
     '''Detect if the port is used'''

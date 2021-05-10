@@ -178,6 +178,9 @@ def loss_select(ctx, param, value):
         elif 'Contrastive' in value:
             margin = _prompt("Margin", float, 2.0)
             ctx.params["loss_params"] = {'margin': margin}
+        elif value == 'GDL':
+            w_type = _prompt("Weight type(square, simple, uniform)", str, 'square')
+            ctx.params["loss_params"] = {'w_type': w_type}
         else:
             ctx.params["loss_params"] = {}
         return value

@@ -43,7 +43,7 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaverEx,
+    SegmentationSaver,
     ClassificationSaverEx,
     ROCAUC,
     stopping_fn_from_metric
@@ -294,12 +294,12 @@ def build_classification_test_engine(**kwargs):
 
     if opts.save_image:
         # check output filename
-        uplevel = output_filename_check(test_loader.dataset)
+        root_dir = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
                 batch_transform=lambda x: x[image_+'_meta_dict'],
@@ -443,12 +443,12 @@ def build_classification_ensemble_test_engine(**kwargs):
     ]
 
     if opts.save_image:
-        uplevel = output_filename_check(test_loader.dataset)
+        root_dir = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
                 batch_transform=lambda x: x[image_+"_meta_dict"],
