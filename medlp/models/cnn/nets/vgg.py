@@ -32,6 +32,7 @@ class VGG(nn.Module):
         dim = kwargs.get('dim', 2)
         is_prunable = kwargs.get('is_prunable', False)
         bottleneck_size = kwargs.get('bottleneck_size', 7)
+        n_group = kwargs.get('n_group', 1)
 
         pool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
         fc_type: Callable = nn.Linear if not is_prunable else PrunableLinear
@@ -42,7 +43,7 @@ class VGG(nn.Module):
         self.avgpool = pool_type(output_size)
         num_ = np.prod(output_size)
         self.classifier = nn.Sequential(
-            fc_type(512 * num_, 4096),
+            fc_type(512 * num_ * n_group , 4096),
             nn.ReLU(True),
             nn.Dropout(),
             fc_type(4096, 4096),
@@ -131,7 +132,8 @@ def make_layers(
     dim,
     in_channels=3,
     batch_norm=False,
-    is_prunable=False
+    is_prunable=False,
+    n_group=1,
 ):
     layers = []
     conv_type: Callable = Conv[Conv.CONV, dim] if not is_prunable else Conv[Conv.PRUNABLE_CONV, dim]
@@ -142,7 +144,8 @@ def make_layers(
         if v == 'M':
             layers += [pool_type(kernel_size=2, stride=2)]
         else:
-            conv = conv_type(input_channels, v, kernel_size=3, padding=1)
+            v *= n_group
+            conv = conv_type(input_channels, v, kernel_size=3, padding=1, groups=n_group)
             if batch_norm:
                 layers += [conv, norm_type(v), nn.ReLU(inplace=True)]
             else:
@@ -175,7 +178,7 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
     if kwargs.get('siamese', None):
         model = VGG_MultiOut(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable), **kwargs)
     else:
-        model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable), **kwargs)
+        model = VGG(make_layers(cfgs[cfg], dim, in_channels=in_channels, batch_norm=batch_norm, is_prunable=is_prunable, n_group=kwargs.get('n_group', 1)), **kwargs)
 
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
@@ -214,6 +217,18 @@ def vgg9_bn(pretrained=False, progress=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
+    return _vgg('vgg11', 'S', True, pretrained, progress, **kwargs)
+
+
+@CLASSIFICATION_ARCHI.register('2D', 'vgg9_mg')
+@CLASSIFICATION_ARCHI.register('3D', 'vgg9_mg')
+def vgg9_bn(pretrained=False, progress=True, **kwargs):
+    r"""VGG 9-layer model (configuration "S") with batch normalization for small size dataset
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    kwargs['n_group'] = kwargs.get('n_group', 2)
     return _vgg('vgg11', 'S', True, pretrained, progress, **kwargs)
 
 

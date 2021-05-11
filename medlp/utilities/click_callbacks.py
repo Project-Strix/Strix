@@ -284,7 +284,7 @@ def common_params(func):
     @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @option("--input-nc", type=int, default=1, help="input data channels")
     @option("--output-nc", type=int, default=3, help="output channels (classes)")
-    @option("--split", type=float, default=0.1, help="Training/testing split ratio")
+    @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default='', help='Specified training datalist')
     @option("--valid-list", type=str, default='', help='Specified validation datalist')
     @option(

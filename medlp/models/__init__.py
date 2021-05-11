@@ -17,6 +17,7 @@ from medlp.models.cnn.engines import (
 from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.handlers import NNIReporterHandler
 from medlp.utilities.enum import RCNN_MODEL_TYPES
+from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import (
     LOSS_MAPPING,
     CrossEntropyLossEx,
@@ -56,8 +57,6 @@ def get_rcnn_config(archi, backbone):
         }
     }[archi][backbone]
 
-def get_attr_(obj, name, default):
-    return getattr(obj, name) if hasattr(obj, name) else default
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]

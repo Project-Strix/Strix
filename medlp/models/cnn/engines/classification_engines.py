@@ -20,8 +20,9 @@ from ignite.metrics import Accuracy, Precision, Recall
 from ignite.handlers import EarlyStopping
 
 from monai_ex.engines import (
-    SupervisedTrainer,
+    SupervisedTrainerEx,
     SupervisedEvaluator,
+    SupervisedEvaluatorEx,
     EnsembleEvaluator
 )
 
@@ -141,16 +142,18 @@ def build_classification_engine(**kwargs):
     else:
         key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
 
-    evaluator = SupervisedEvaluator(
+    evaluator = SupervisedEvaluatorEx(
         device=device,
         val_data_loader=test_loader,
         network=net,
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
+        prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_val_metric={val_metric_name: key_val_metric},
         val_handlers=val_handlers,
-        amp=opts.amp
+        amp=opts.amp,
+        custom_keys=cfg.get_keys_dict()
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -195,7 +198,7 @@ def build_classification_engine(**kwargs):
         )
     ]
 
-    trainer = SupervisedTrainer(
+    trainer = SupervisedTrainerEx(
         device=device,
         max_epochs=opts.n_epoch,
         train_data_loader=train_loader,
@@ -209,7 +212,8 @@ def build_classification_engine(**kwargs):
         key_train_metric={"train_auc": key_val_metric},
         # additional_metrics={"roccurve": add_roc_metric},
         train_handlers=train_handlers,
-        amp=opts.amp
+        amp=opts.amp,
+        custom_keys=cfg.get_keys_dict()
     )
 
     if opts.early_stop > 0:

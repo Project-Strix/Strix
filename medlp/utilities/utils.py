@@ -138,6 +138,11 @@ def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
 
     return ''
 
+
+def get_attr_(obj, name, default):
+    return getattr(obj, name) if hasattr(obj, name) else default
+
+
 def detect_port(port):
     '''Detect if the port is used'''
     socket_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
