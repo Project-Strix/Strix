@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import shutil
 import yaml
@@ -209,7 +210,8 @@ def train(ctx, **args):
 
             train_core(cargs, files_train, files_valid)
             Print("Cleaning CUDA cache...", color="g")
-            torch.cuda.empty_cache()        
+            gc.collect()
+            torch.cuda.empty_cache()
     else:  #! Plain training
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
