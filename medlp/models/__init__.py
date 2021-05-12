@@ -189,7 +189,8 @@ def get_network(opts):
         )
     elif 'resnet' in model_name or \
          'WRN' in model_name or \
-         'resnext' in model_name:
+         'resnext' in model_name or \
+         'DRN' in model_name:
         model = model(
             pretrained=load_imagenet,
             in_channels=in_channels,

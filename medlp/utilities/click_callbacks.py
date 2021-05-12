@@ -41,7 +41,7 @@ def get_trained_models(exp_folder, use_best_model=False):
         # files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
         prompt_2 = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
         selected = prompt(f"Choose model: {prompt_2}", type=int)
-        return [str(files[selected])]
+        return [files[selected]]
 
 
 def get_exp_name(ctx, param, value):

@@ -231,7 +231,6 @@ def train_cfg(**args):
         )
 
     configures = get_items_from_file(args["config"], format="json")
-    # click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
 
     configures["smi"] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
@@ -280,12 +279,12 @@ def test_cfg(**args):
             "You must provide external test file (.json/.yaml)."
         )
     else:
-        test_fpaths = list(exp_dir.glob('test_files*'))
+        test_fpaths = list(exp_dir.glob('valid_files*'))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
             test_files = get_items_from_file(test_fpath, format="auto")
         else:
-            raise ValueError(f"Test file does not exists in {exp_dir}!")
+            raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
     # configures["model_path"] = (
     #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
