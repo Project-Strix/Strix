@@ -44,6 +44,7 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
+    CheckpointLoaderEx,
     SegmentationSaver,
     ClassificationSaverEx,
     ROCAUC,
@@ -352,7 +353,8 @@ def build_classification_ensemble_test_engine(**kwargs):
     if best_model:
         best_models = []
         for folder in cv_folders:
-            models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').iterdir()]))
+            # models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').rglob('*.pt')]))
+            models = list(filter(lambda x: re.search(float_regex, x.name), [model for model in folder.joinpath('Models').rglob('*.pt')]))
             models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
             best_models.append(models[-1])
     else:  # get last
@@ -377,7 +379,7 @@ def build_classification_ensemble_test_engine(**kwargs):
 
     nets = [copy.deepcopy(net), ]*len(best_models)
     for net, m in zip(nets, best_models):
-        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
+        CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
     pred_keys = [f"{pred_}{i}" for i in range(len(best_models))]
 

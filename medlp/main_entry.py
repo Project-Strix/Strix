@@ -289,8 +289,8 @@ def test_cfg(**args):
     # configures["model_path"] = (
     #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
     # )
-    best_models = clb.get_trained_models(exp_dir, args['use_best_model']) if \
-                configures.get("n_fold", 0) <= 1 or configures.get("n_repeat", 0) <= 1 else [None]
+    best_models = [''] if configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1 \
+        else clb.get_trained_models(exp_dir, args['use_best_model'])
 
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
@@ -311,7 +311,7 @@ def test_cfg(**args):
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
     for model_path in best_models:
-        configures['model_path'] = str(model_path)
+        configures['model_path'] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
         engine.logger = setup_logger(
@@ -327,7 +327,8 @@ def test_cfg(**args):
             test_fpath, check_dir(configures["out_dir"])/os.path.basename(test_fpath)
         )
         engine.run()
-        os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
+        if isinstance(model_path, Path):
+            os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
 
 
 @click.command("unlink")
