@@ -58,9 +58,9 @@ def get_exp_name(ctx, param, value):
         )
 
     if "debug" in ctx.params and ctx.params["debug"]:
-        Print("You are in Debug mode with preload=0, out_dir=test", color="y")
+        Print("You are in Debug mode with preload=0, out_dir=debug", color="y")
         ctx.params["preload"] = 0.0  # emmm...
-        return check_dir(ctx.params["out_dir"], "test")
+        return check_dir(ctx.params["out_dir"], "debug")
 
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
     layer_norm = mapping[ctx.params["layer_norm"]]
@@ -382,8 +382,8 @@ def latent_auxilary_params(func):
         default=None, help="Auxilary params for lr schedule",
     )
     @option(
-        "--loss-params", type=(float, float),
-        default=(0, 0), help="Auxilary params for loss",
+        "--loss-params", type=dict,
+        default={}, help="Auxilary params for loss",
     )
     @option(
         "--load-imagenet", type=bool,

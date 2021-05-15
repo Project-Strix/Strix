@@ -1,11 +1,21 @@
 from __future__ import print_function
 from typing import Union
 
+import os
+import struct
 import pylab
 import torch
 from pathlib import Path
 import socket
 from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE
+from monai_ex.utils import ensure_list
+import tensorboard.compat.proto.event_pb2 as event_pb2
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.ticker import ScalarFormatter
+import matplotlib.colors as mcolors
 import numpy as np
 
 
@@ -197,29 +207,68 @@ def is_avaible_size(value):
             return True
     return False
 
-def classification_scores(gts, preds, labels):
-    accuracy        = metrics.accuracy_score(gts,  preds)
-    class_accuracies = []
-    for lab in labels: # TODO Fix
-        class_accuracies.append(metrics.accuracy_score(gts[gts == lab], preds[gts == lab]))
-    class_accuracies = np.array(class_accuracies)
 
-    f1_micro        = metrics.f1_score(gts,        preds, average='micro')
-    precision_micro = metrics.precision_score(gts, preds, average='micro')
-    recall_micro    = metrics.recall_score(gts,    preds, average='micro')
-    f1_macro        = metrics.f1_score(gts,        preds, average='macro')
-    precision_macro = metrics.precision_score(gts, preds, average='macro')
-    recall_macro    = metrics.recall_score(gts,    preds, average='macro')
+def plot_summary(summary, output_fpath):
+    try:
+        f = plt.figure(1)
+        plt.clf()
+        colors = list(mcolors.TABLEAU_COLORS.values())
 
-    # class wise score
-    f1s        = metrics.f1_score(gts,        preds, average=None)
-    precisions = metrics.precision_score(gts, preds, average=None)
-    recalls    = metrics.recall_score(gts,    preds, average=None)
+        for i, (key, step_value) in enumerate(summary.items()):
+            plt.plot(step_value['steps'], step_value['values'], label=key, color=colors[i], linewidth=2.0)
+        # plt.ylim([0., 1.])
+        ax = plt.axes()
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
+        ax.yaxis.set_major_formatter(ScalarFormatter())
+        plt.xlabel('Number of iterations per case')
+        plt.grid(True)
+        plt.legend()
+        plt.draw()
+        plt.show(block=False)
+        plt.pause(0.0001)
+        f.show()
 
-    confusion = metrics.confusion_matrix(gts,preds, labels=labels)
+        f.savefig(output_fpath)
+    except Exception as e:
+        print('Failed to do plot: ' + str(e))
 
-    #TODO confusion matrix, recall, precision
-    return accuracy, f1_micro, precision_micro, recall_micro, f1_macro, precision_macro, recall_macro, confusion, class_accuracies, f1s, precisions, recalls
+def dump_tensorboard(db_file, dump_keys=None, save_image=False, verbose=False):
+    if not os.path.isfile(db_file):
+        raise FileNotFoundError(f'db_file is not found: {db_file}')
+
+    if dump_keys is not None:
+        dump_keys = ensure_list(dump_keys)
+
+    def _read(input_data):
+        header = struct.unpack('Q', input_data[:8])
+        # crc_hdr = struct.unpack('I', input_data[:4])
+        eventstr = input_data[12:12+int(header[0])]  # 8+4
+        out_data = input_data[12+int(header[0])+4:]
+        return out_data, eventstr
+
+    with open(db_file, 'rb') as f:
+        data = f.read()
+
+    summaries = {}
+    while data:
+        data, event_str = _read(data)
+        event = event_pb2.Event()
+        event.ParseFromString(event_str)
+        if event.HasField('summary'):
+            for value in event.summary.value:
+                if value.HasField('simple_value'):
+                    if dump_keys is None or value.tag in dump_keys:
+                        if not summaries.get(value.tag, None):
+                            summaries[value.tag] = {'steps': [event.step], 'values': [value.simple_value]}
+                        else:
+                            summaries[value.tag]['steps'].append(event.step)
+                            summaries[value.tag]['values'].append(value.simple_value)
+                        if verbose:
+                            print(value.simple_value, value.tag, event.step)
+                if value.HasField('image') and save_image:
+                    img = value.image
+                    # save_img(img.encoded_image_string, event.step, save_gif=args.gif)
+    return summaries
 
 
 class Registry(dict):
@@ -259,6 +308,7 @@ class Registry(dict):
             return fn
 
         return register_fn
+
 
 class DimRegistry(dict):
     def __init__(self, *args, **kwargs):

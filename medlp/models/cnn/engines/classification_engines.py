@@ -8,7 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import output_filename_check
-from medlp.utilities.handlers import NNIReporterHandler
+from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.configures import config as cfg
 
@@ -72,7 +72,7 @@ def build_classification_engine(**kwargs):
     pred_ = cfg.get_key("pred")
     loss_ = cfg.get_key("loss")
 
-    if opts.criterion in ['BCE', 'WBCE']:
+    if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
         prepare_batch_fn = lambda x, device, nb: (
             x[image_].to(device),
             torch.as_tensor(x[label_].unsqueeze(1), dtype=torch.float32).to(device)
@@ -100,6 +100,11 @@ def build_classification_engine(**kwargs):
             output_transform=lambda x: x[image_],
             max_channels=3,
             prefix_name='Val'
+        ),
+        TensorboardDumper(
+            log_dir=writer.log_dir,
+            epoch_level=True,
+            logger_name=logger_name,
         )
     ]
 

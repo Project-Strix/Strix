@@ -13,7 +13,6 @@ from medlp.utilities.utils import (
     get_attr_
 )
 from medlp.configures import config as cfg
-from medlp.models.cnn.utils import output_onehot_transform
 from medlp.models.cnn.engines.utils import get_models
 
 from monai_ex.inferers import SimpleInferer, SlidingWindowInferer

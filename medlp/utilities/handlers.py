@@ -1,22 +1,14 @@
+import os
+from pathlib import Path
+import struct
 import logging
-import bisect
-from logging import Logger
-import re
-from typing import TYPE_CHECKING, Dict, Optional, Any, Callable, List, Sequence, Union
-from click.core import Option
-import numpy as np
-from sklearn.metrics import roc_curve, auc
+from typing import TYPE_CHECKING, Optional, Callable, Union
 
-from monai_ex.utils import export, exact_version, optional_import
-from monai_ex.handlers import TensorBoardImageHandler
-from monai_ex.visualize import plot_2d_or_3d_image
-from monai_ex.handlers import CSVSaverEx
-from monai.engines.evaluator import Evaluator
-
-import torch
-from torch._C import device
+from monai_ex.utils import exact_version, optional_import
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
-from medlp.utilities.utils import add_3D_overlay_to_summary
+from medlp.utilities.utils import dump_tensorboard, plot_summary
+# from medlp.utilities.utils import add_3D_overlay_to_summary
+
 
 Events, _ = optional_import("ignite.engine", "0.4.4", exact_version, "Events")
 Metric, _ = optional_import("ignite.metrics", "0.4.4", exact_version, "Metric")
@@ -32,6 +24,7 @@ else:
 
 NNi, _ = optional_import("nni")
 Torchviz, _ = optional_import('torchviz')
+
 
 class NNIReporter:
     """
@@ -69,6 +62,7 @@ class NNIReporter:
                 NNi.report_intermediate_result(engine.state.metrics[self.metric_name])
             else:
                 NNi.report_final_result(engine.state.metrics[self.metric_name])
+
 
 class NNIReporterHandler:
     """
@@ -146,15 +140,17 @@ class SNIP_prune_handler:
         net_ = apply_prune_mask(self.net, keep_masks, self.device, self.verbose)
         # self.net.load_state_dict(net_.state_dict())
 
+
 class TorchVisualizer:
     """
     TorchVisualizer for visualize network architecture using PyTorchViz.
     """
-    def __init__(self,
-                 net,
-                 outfile_path: str,
-                 output_transform: Callable = lambda x: x,
-                 logger_name: Optional[str] = None
+    def __init__(
+        self,
+        net,
+        outfile_path: str,
+        output_transform: Callable = lambda x: x,
+        logger_name: Optional[str] = None
     ) -> None:
         self.net = net
         assert net is not None, "Network model should be input"
@@ -167,7 +163,7 @@ class TorchVisualizer:
         if self.logger_name is None:
             self.logger = engine.logger
         engine.add_event_handler(Events.STARTED, self)
-    
+
     def __call__(self, engine: Engine) -> None:
         output = self.output_transform(engine.state.output)
         if output is not None:
@@ -183,3 +179,54 @@ class TorchVisualizer:
                 except:
                     self.logger.error(f"""Failded to save torchviz graph to {self.outfile_path},
                                     Please make sure you have installed graphviz properly!""")
+
+
+class TensorboardDumper:
+    """
+    Dumper Tensorboard content to local plot and images.
+    """
+    def __init__(
+        self,
+        log_dir: Union[Path, str],
+        epoch_level: bool = True,
+        interval: int = 1,
+        save_image: bool = False,
+        logger_name: Optional[str] = None,
+    ):
+        if save_image:
+            raise NotImplementedError("Save image not supported yet.")
+
+        if not os.path.isdir(log_dir):
+            raise FileNotFoundError(f'{log_dir} not exists!')
+
+        self.log_dir = log_dir
+        self.epoch_level = epoch_level
+        self.interval = interval
+        self.logger = logging.getLogger(logger_name)
+        self.db_file = None
+
+    def attach(self, engine: Engine) -> None:
+        """
+        Args:
+            engine: Ignite Engine, it can be a trainer, validator or evaluator.
+        """
+        if self.epoch_level:
+            engine.add_event_handler(Events.EPOCH_COMPLETED(every=self.interval), self)
+        else:
+            engine.add_event_handler(Events.ITERATION_COMPLETED(every=self.interval), self)
+
+    def __call__(self, engine: Engine) -> None:
+        if self.db_file is None:
+            files = os.listdir(self.log_dir)
+            if len(files) == 0:
+                self.logger.warn(f'No tensorboard db is found in the dir({self.log_dir})')
+                return
+            elif len(files) > 1:
+                self.logger.warn(f'Multiple tensorboard db files are found! Skip dumping.')
+                return
+            else:
+                self.db_file = os.path.join(self.log_dir, files[0])
+
+        summary = dump_tensorboard(self.db_file, dump_keys=None, save_image=False)
+        summary = dict(filter(lambda x: 'loss' not in x[0] and 'Learning_rate' not in x[0], summary.items()))
+        plot_summary(summary, output_fpath=os.path.join(self.log_dir, 'metric_summary.png'))
