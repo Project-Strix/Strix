@@ -75,9 +75,9 @@ def get_network(opts):
     is_prunable = get_attr_(opts, 'snip', False)
     bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
     drop_out = get_attr_(opts, 'dropout', None)
+    n_group = get_attr_(opts, 'n_group', 1)  # used for multi-group archi
     # f_maps = get_attr_(opts, 'n_features', 64)
     # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
-    # n_groups = get_attr_(opts, 'n_groups', 8)
     # layer_order = get_attr_(opts, 'layer_order', 'crb')
 
     model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
@@ -185,7 +185,8 @@ def get_network(opts):
             is_prunable=is_prunable,
             bottleneck_size=bottleneck_size,
             siamese=siamese,
-            latent_dim=siamese_latent_dim
+            latent_dim=siamese_latent_dim,
+            n_group=n_group,
         )
     elif 'resnet' in model_name or \
          'WRN' in model_name or \

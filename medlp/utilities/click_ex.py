@@ -58,14 +58,23 @@ class NumericChoice(Choice):
             self.fail(f'invalid choice: {value}. (choose from {self.choicemap})', param, ctx)
 
 
+def _convert_type(var, types=[float, str]):
+    for type_ in types: 
+        try:
+            return type_(var)
+        except ValueError as e:
+            pass
+    return var
+
+
 def get_unknown_options(ctx, verbose=False):
     auxilary_params = {}
 
     for i in range(0, len(ctx.args), 2):
         if str(ctx.args[i]).startswith("--"):
-            auxilary_params[ctx.args[i][2:].replace('-', '_')] = ctx.args[i + 1]
+            auxilary_params[ctx.args[i][2:].replace('-', '_')] = _convert_type(ctx.args[i + 1])
         elif str(ctx.args[i]).startswith("-"):
-            auxilary_params[ctx.args[i][1:].replace('-', '_')] = ctx.args[i + 1]
+            auxilary_params[ctx.args[i][1:].replace('-', '_')] = _convert_type(ctx.args[i + 1])
         else:
             Print("Got invalid argument:", ctx.args[i], color='y', verbose=verbose)
 

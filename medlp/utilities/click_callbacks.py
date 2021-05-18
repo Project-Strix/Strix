@@ -8,6 +8,7 @@ from termcolor import colored
 from click import option, prompt
 from medlp.configures import config as cfg
 from medlp.utilities.click_ex import NumericChoice as Choice
+from medlp.utilities.click_ex import get_unknown_options
 from medlp.utilities.enum import *
 from medlp.utilities.utils import is_avaible_size
 from utils_cw import (
@@ -81,6 +82,10 @@ def get_exp_name(ctx, param, value):
         exp_name = exp_name + f"-CV{ctx.params['n_fold']}"
     elif ctx.params["n_repeat"] > 0:
         exp_name = exp_name + f"-RE{ctx.params['n_repeat']}"
+
+    auxilary_params = get_unknown_options(ctx)
+    if len(auxilary_params) > 0:
+        exp_name = exp_name + '-' + '-'.join(auxilary_params)
 
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
@@ -401,8 +406,8 @@ def latent_auxilary_params(func):
         "--snip-percent", type=float, default=0.4,
         callback=partial(prompt_when, keyword="snip"), help="Pruning ratio of wights/channels",
     )
-    @option("--n-fold", type=int, default=0)
     @option("--config", type=click.Path(exists=True))
+    @option("--n-group", type=int, default=1, help='Num of conv groups')
     @option("--bottleneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
