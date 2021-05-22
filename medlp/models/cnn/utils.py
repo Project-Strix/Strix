@@ -165,13 +165,11 @@ def shem(roi_probs_neg, negative_count, ohem_poolsize):
     return pool_indices[rand_idx[:negative_count].cuda()]
 
 
-def initialize_weights(net):
+def initialize_weights(net, init_type='kaiming_uniform'):
     """
    Initialize model weights. Current Default in Pytorch (version 0.4.1) is initialization from a uniform distriubtion.
    Will expectably be changed to kaiming_uniform in future versions.
    """
-    init_type = net.cf.weight_init
-
     for m in [module for module in net.modules() if type(module) in [nn.Conv2d, nn.Conv3d,
                                                                      nn.ConvTranspose2d,
                                                                      nn.ConvTranspose3d,
@@ -187,14 +185,14 @@ def initialize_weights(net):
                 m.bias.data.zero_()
 
         elif init_type == "kaiming_uniform":
-            nn.init.kaiming_uniform_(m.weight.data, mode='fan_out', nonlinearity=net.cf.relu, a=0)
+            nn.init.kaiming_uniform_(m.weight.data, mode='fan_out', nonlinearity='relu', a=0)
             if m.bias is not None:
                 fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(m.weight.data)
                 bound = 1 / np.sqrt(fan_out)
                 nn.init.uniform_(m.bias, -bound, bound)
 
         elif init_type == "kaiming_normal":
-            nn.init.kaiming_normal_(m.weight.data, mode='fan_out', nonlinearity=net.cf.relu, a=0)
+            nn.init.kaiming_normal_(m.weight.data, mode='fan_out', nonlinearity='relu', a=0)
             if m.bias is not None:
                 fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(m.weight.data)
                 bound = 1 / np.sqrt(fan_out)

@@ -6,8 +6,9 @@ from types import SimpleNamespace as sn
 from functools import partial, wraps
 from termcolor import colored
 from click import option, prompt
-from medlp.configures import get_cfg
+from medlp.configures import config as cfg
 from medlp.utilities.click_ex import NumericChoice as Choice
+from medlp.utilities.click_ex import get_unknown_options
 from medlp.utilities.enum import *
 from medlp.utilities.utils import is_avaible_size
 from utils_cw import (
@@ -41,7 +42,7 @@ def get_trained_models(exp_folder, use_best_model=False):
         # files = recursive_glob2(model_dir, "*.pt", "*.pth", logic="or")
         prompt_2 = {i: f.stem.split("=")[-1] for i, f in enumerate(files)}
         selected = prompt(f"Choose model: {prompt_2}", type=int)
-        return [str(files[selected])]
+        return [files[selected]]
 
 
 def get_exp_name(ctx, param, value):
@@ -58,9 +59,9 @@ def get_exp_name(ctx, param, value):
         )
 
     if "debug" in ctx.params and ctx.params["debug"]:
-        Print("You are in Debug mode with preload=0, out_dir=test", color="y")
+        Print("You are in Debug mode with preload=0, out_dir=debug", color="y")
         ctx.params["preload"] = 0.0  # emmm...
-        return check_dir(ctx.params["out_dir"], "test")
+        return check_dir(ctx.params["out_dir"], "debug")
 
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
     layer_norm = mapping[ctx.params["layer_norm"]]
@@ -81,6 +82,10 @@ def get_exp_name(ctx, param, value):
         exp_name = exp_name + f"-CV{ctx.params['n_fold']}"
     elif ctx.params["n_repeat"] > 0:
         exp_name = exp_name + f"-RE{ctx.params['n_repeat']}"
+
+    auxilary_params = get_unknown_options(ctx)
+    if len(auxilary_params) > 0:
+        exp_name = exp_name + '-' + '-'.join(auxilary_params)
 
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
@@ -178,6 +183,9 @@ def loss_select(ctx, param, value):
         elif 'Contrastive' in value:
             margin = _prompt("Margin", float, 2.0)
             ctx.params["loss_params"] = {'margin': margin}
+        elif value == 'GDL':
+            w_type = _prompt("Weight type(square, simple, uniform)", str, 'square')
+            ctx.params["loss_params"] = {'w_type': w_type}
         else:
             ctx.params["loss_params"] = {}
         return value
@@ -281,7 +289,7 @@ def common_params(func):
     @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @option("--input-nc", type=int, default=1, help="input data channels")
     @option("--output-nc", type=int, default=3, help="output channels (classes)")
-    @option("--split", type=float, default=0.1, help="Training/testing split ratio")
+    @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default='', help='Specified training datalist')
     @option("--valid-list", type=str, default='', help='Specified validation datalist')
     @option(
@@ -290,7 +298,7 @@ def common_params(func):
     )
     @option(
         "--out-dir", type=str, prompt=True,
-        show_default=True, default=get_cfg('MEDLP_CONFIG', 'OUTPUT_DIR'),
+        show_default=True, default=cfg.get_medlp_cfg('OUTPUT_DIR'),
     )
     @option("--augment-ratio", type=float, default=0.3, help="Data aug ratio")
     @option(
@@ -302,8 +310,7 @@ def common_params(func):
         is_flag=True, help="Visualize the network architecture"
     )
     @option(
-        "--valid-interval",
-        type=int, default=4,
+        "--valid-interval", type=int, default=4,
         help="Interval of validation during training",
     )
     @option(
@@ -380,8 +387,8 @@ def latent_auxilary_params(func):
         default=None, help="Auxilary params for lr schedule",
     )
     @option(
-        "--loss-params", type=(float, float),
-        default=(0, 0), help="Auxilary params for loss",
+        "--loss-params", type=dict,
+        default={}, help="Auxilary params for loss",
     )
     @option(
         "--load-imagenet", type=bool,
@@ -399,8 +406,8 @@ def latent_auxilary_params(func):
         "--snip-percent", type=float, default=0.4,
         callback=partial(prompt_when, keyword="snip"), help="Pruning ratio of wights/channels",
     )
-    @option("--n-fold", type=int, default=0)
     @option("--config", type=click.Path(exists=True))
+    @option("--n-group", type=int, default=1, help='Num of conv groups')
     @option("--bottleneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):

@@ -12,8 +12,7 @@ from medlp.utilities.utils import (
     output_filename_check,
     get_attr_
 )
-from medlp.configures import get_key
-from medlp.models.cnn.utils import output_onehot_transform
+from medlp.configures import config as cfg
 from medlp.models.cnn.engines.utils import get_models
 
 from monai_ex.inferers import SimpleInferer, SlidingWindowInferer
@@ -46,7 +45,7 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaverEx,
+    SegmentationSaver,
     MeanDice,
     ROCAUC,
     stopping_fn_from_metric,
@@ -67,10 +66,10 @@ def build_segmentation_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
-    image_ = get_key("image")
-    label_ = get_key("label")
-    pred_ = get_key("pred")
-    loss_ = get_key("loss")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    pred_ = cfg.get_key("pred")
+    loss_ = cfg.get_key("loss")
 
     val_metric = "val_mean_dice"
     val_handlers = [
@@ -89,7 +88,7 @@ def build_segmentation_engine(**kwargs):
     if opts.save_n_best > 0:
         val_handlers += [
             CheckpointSaverEx(
-                save_dir=model_dir/'Best_Models',
+                save_dir=model_dir/"Best_Models",
                 save_dict={"net": net},
                 file_prefix=val_metric,
                 save_key_metric=True,
@@ -265,9 +264,9 @@ def build_segmentation_test_engine(**kwargs):
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
-    image_ = get_key("image")
-    pred_ = get_key("pred")
-    label_ = get_key("label")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
+    label_ = cfg.get_key("label")
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
@@ -290,16 +289,14 @@ def build_segmentation_test_engine(**kwargs):
             ]
         )
 
-    # check output filename
-    uplevel = output_filename_check(test_loader.dataset)
-
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
-        SegmentationSaverEx(
+        SegmentationSaver(
             output_dir=opts.out_dir,
-            output_name_uplevel=uplevel,
+            output_ext=".nii.gz",
             resample=resample,
+            data_root_dir=output_filename_check(test_loader.dataset),
             batch_transform=lambda x: x[image_+"_meta_dict"],
             output_transform=lambda output: output[pred_],
         ),
@@ -307,11 +304,12 @@ def build_segmentation_test_engine(**kwargs):
 
     if opts.save_image:
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                output_ext=".nii.gz",
                 resample=resample,
+                data_root_dir=uplevel,
                 batch_transform=lambda x: x[image_+"_meta_dict"],
                 output_transform=lambda output: output[image_],
             )

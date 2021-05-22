@@ -18,6 +18,7 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import SNIP_prune_handler
 from medlp.utilities.click_ex import get_unknown_options
+from medlp.configures import config as cfg
 import medlp.utilities.click_callbacks as clb
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -141,7 +142,14 @@ def train_core(cargs, files_train, files_valid):
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=clb.get_exp_name, default="")
-@click.option("--confirm", callback=partial(confirmation, output_dir_ctx="experiment_path", save_code=True, exist_ok=False))
+@click.option(
+    "--confirm", callback=partial(
+        confirmation,
+        output_dir_ctx="experiment_path",
+        save_code=(cfg.get_medlp_cfg('mode') == 'dev'),
+        save_dir=cfg.get_medlp_cfg('external_dataset_dir'),
+    )
+)
 @click.pass_context
 def train(ctx, **args):
     """Entry of train command."""
@@ -203,7 +211,7 @@ def train(ctx, **args):
             train_core(cargs, files_train, files_valid)
             Print("Cleaning CUDA cache...", color="g")
             gc.collect()
-            torch.cuda.empty_cache()        
+            torch.cuda.empty_cache()
     else:  #! Plain training
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
@@ -223,7 +231,6 @@ def train_cfg(**args):
         )
 
     configures = get_items_from_file(args["config"], format="json")
-    # click.confirm(f"Loading configures: {configures}", default=True, abort=True, show_default=True)
 
     configures["smi"] = False
     gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
@@ -272,18 +279,18 @@ def test_cfg(**args):
             "You must provide external test file (.json/.yaml)."
         )
     else:
-        test_fpaths = list(exp_dir.glob('test_files*'))
+        test_fpaths = list(exp_dir.glob('valid_files*'))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
             test_files = get_items_from_file(test_fpath, format="auto")
         else:
-            raise ValueError(f"Test file does not exists in {exp_dir}!")
+            raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
     # configures["model_path"] = (
     #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
     # )
-    best_models = clb.get_trained_models(exp_dir, args['use_best_model']) if \
-                configures.get("n_fold", 0) <= 1 or configures.get("n_repeat", 0) <= 1 else [None]
+    best_models = [''] if configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1 \
+        else clb.get_trained_models(exp_dir, args['use_best_model'])
 
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
@@ -304,7 +311,7 @@ def test_cfg(**args):
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
     for model_path in best_models:
-        configures['model_path'] = str(model_path)
+        configures['model_path'] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
         engine.logger = setup_logger(
@@ -320,7 +327,8 @@ def test_cfg(**args):
             test_fpath, check_dir(configures["out_dir"])/os.path.basename(test_fpath)
         )
         engine.run()
-        os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
+        if isinstance(model_path, Path):
+            os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
 
 
 @click.command("unlink")

@@ -1,12 +1,8 @@
-import os
-import time
 from types import SimpleNamespace as sn
 from pathlib import Path
 from utils_cw import check_dir
-import numpy as np
 
 import torch
-from utils_cw.utils import get_items_from_file
 from medlp.models.cnn.utils import (
     print_network,
     output_onehot_transform,
@@ -29,7 +25,6 @@ from medlp.models.cnn.losses import (
     ContrastiveLoss
 )
 
-from monai_ex.networks.nets import UNet, HighResNet, VNet
 from monai_ex.utils import Activation
 from monai_ex.losses import (
     DiceLoss,
@@ -79,9 +74,9 @@ def get_network(opts):
     is_prunable = get_attr_(opts, 'snip', False)
     bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
     drop_out = get_attr_(opts, 'dropout', None)
+    n_group = get_attr_(opts, 'n_group', 1)  # used for multi-group archi
     # f_maps = get_attr_(opts, 'n_features', 64)
     # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
-    # n_groups = get_attr_(opts, 'n_groups', 8)
     # layer_order = get_attr_(opts, 'layer_order', 'crb')
 
     model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
@@ -189,11 +184,13 @@ def get_network(opts):
             is_prunable=is_prunable,
             bottleneck_size=bottleneck_size,
             siamese=siamese,
-            latent_dim=siamese_latent_dim
+            latent_dim=siamese_latent_dim,
+            n_group=n_group,
         )
     elif 'resnet' in model_name or \
          'WRN' in model_name or \
-         'resnext' in model_name:
+         'resnext' in model_name or \
+         'DRN' in model_name:
         model = model(
             pretrained=load_imagenet,
             in_channels=in_channels,
@@ -220,10 +217,6 @@ def get_network(opts):
         )
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
-        # config_file = get_rcnn_config(model_name, opts.backbone)
-        # assert config_file.is_file(), f'RCNN config file not exists! {config_file}'
-        # config_content = get_items_from_file(config_file, format='yaml')
-        # model = GeneralizedRCNN(config_content)
     else:
         raise ValueError(f'Model {model_name} not available')
 
@@ -258,17 +251,23 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     loss = lr_scheduler = None
     loss_type = LOSS_MAPPING[framework_type][opts.criterion]
 
+    if opts.output_nc == 1:
+        kwargs = {"sigmoid": True, "softmax": False, "to_onehot_y": False}
+    else:
+        kwargs = {"sigmoid": False, "softmax": True, "to_onehot_y": True}
+
     if loss_type in [DiceLoss, GeneralizedDiceLoss]:
-        if opts.output_nc == 1:
-            loss = loss_type(include_background=False, to_onehot_y=False, sigmoid=True)
-        else:
-            loss = loss_type(include_background=False, to_onehot_y=True, softmax=True)
+        loss = loss_type(include_background=False, **kwargs)
     elif loss_type == CEDiceLoss:
-        loss = loss_type(CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
-                          DiceLoss(include_background=False, to_onehot_y=True, softmax=True))    
+        loss = loss_type(
+            CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
+            DiceLoss(include_background=False, **kwargs)
+        )
     elif loss_type == FocalDiceLoss:
-        loss = loss_type(FocalLoss(**opts.loss_params),
-                         DiceLoss(include_background=False, to_onehot_y=True, softmax=True))
+        loss = loss_type(
+            FocalLoss(**opts.loss_params),
+            DiceLoss(include_background=False, **kwargs)
+        )
     else:
         loss = loss_type(**opts.loss_params)
 

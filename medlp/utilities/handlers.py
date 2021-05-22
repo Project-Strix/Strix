@@ -1,5 +1,7 @@
+import os
+from pathlib import Path
 import logging
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import TYPE_CHECKING, Optional, Callable, Union
 import numpy as np
 
 from monai_ex.utils import export, exact_version, optional_import
@@ -10,20 +12,24 @@ from PIL import Image
 from utils_cw import Normalize2
 
 import torch
-from torch._C import device
 from medlp.models.cnn.layers.snip import SNIP, apply_prune_mask
-from medlp.utilities.utils import add_3D_overlay_to_summary, apply_colormap_on_image
-
-Events, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Events")
-Metric, _ = optional_import("ignite.metrics", "0.4.2", exact_version, "Metric")
-Checkpoint, _ = optional_import("ignite.handlers", "0.4.2", exact_version, "Checkpoint")
+from medlp.utilities.utils import (
+    apply_colormap_on_image,
+    dump_tensorboard,
+    plot_summary
+)
 
 if TYPE_CHECKING:
-    from ignite.engine import Engine
+    from ignite.engine import Engine, Events
+    from ignite.metrics import Metric
+    from ignite.handlers import Checkpoint
     from torch.utils.tensorboard import SummaryWriter
 else:
-    Engine, _ = optional_import("ignite.engine", "0.4.2", exact_version, "Engine")
+    Engine, _ = optional_import("ignite.engine", "0.4.4", exact_version, "Engine")
     SummaryWriter, _ = optional_import("torch.utils.tensorboard", name="SummaryWriter")
+    Events, _ = optional_import("ignite.engine", "0.4.4", exact_version, "Events")
+    Metric, _ = optional_import("ignite.metrics", "0.4.4", exact_version, "Metric")
+    Checkpoint, _ = optional_import("ignite.handlers", "0.4.4", exact_version, "Checkpoint")
 
 NNi, _ = optional_import("nni")
 Torchviz, _ = optional_import('torchviz')
@@ -148,11 +154,12 @@ class TorchVisualizer:
     """
     TorchVisualizer for visualize network architecture using PyTorchViz.
     """
-    def __init__(self,
-                 net,
-                 outfile_path: str,
-                 output_transform: Callable = lambda x: x,
-                 logger_name: Optional[str] = None
+    def __init__(
+        self,
+        net,
+        outfile_path: str,
+        output_transform: Callable = lambda x: x,
+        logger_name: Optional[str] = None
     ) -> None:
         self.net = net
         assert net is not None, "Network model should be input"
@@ -234,3 +241,54 @@ class GradCamHandler:
                 heatmap_on_image.save(self.save_dir/f'{i}_{j}_heatmap_on_img.png')
 
         engine.terminate()
+
+
+class TensorboardDumper:
+    """
+    Dumper Tensorboard content to local plot and images.
+    """
+    def __init__(
+        self,
+        log_dir: Union[Path, str],
+        epoch_level: bool = True,
+        interval: int = 1,
+        save_image: bool = False,
+        logger_name: Optional[str] = None,
+    ):
+        if save_image:
+            raise NotImplementedError("Save image not supported yet.")
+
+        if not os.path.isdir(log_dir):
+            raise FileNotFoundError(f'{log_dir} not exists!')
+
+        self.log_dir = log_dir
+        self.epoch_level = epoch_level
+        self.interval = interval
+        self.logger = logging.getLogger(logger_name)
+        self.db_file = None
+
+    def attach(self, engine: Engine) -> None:
+        """
+        Args:
+            engine: Ignite Engine, it can be a trainer, validator or evaluator.
+        """
+        if self.epoch_level:
+            engine.add_event_handler(Events.EPOCH_COMPLETED(every=self.interval), self)
+        else:
+            engine.add_event_handler(Events.ITERATION_COMPLETED(every=self.interval), self)
+
+    def __call__(self, engine: Engine) -> None:
+        if self.db_file is None:
+            files = os.listdir(self.log_dir)
+            if len(files) == 0:
+                self.logger.warn(f'No tensorboard db is found in the dir({self.log_dir})')
+                return
+            elif len(files) > 1:
+                self.logger.warn(f'Multiple tensorboard db files are found! Skip dumping.')
+                return
+            else:
+                self.db_file = os.path.join(self.log_dir, files[0])
+
+        summary = dump_tensorboard(self.db_file, dump_keys=None, save_image=False)
+        summary = dict(filter(lambda x: 'loss' not in x[0] and 'Learning_rate' not in x[0], summary.items()))
+        plot_summary(summary, output_fpath=os.path.join(self.log_dir, 'metric_summary.png'))

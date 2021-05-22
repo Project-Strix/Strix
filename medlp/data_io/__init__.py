@@ -1,6 +1,6 @@
 from pathlib import Path
 from medlp.utilities.imports import import_file
-from medlp.configures import get_cfg
+from medlp.configures import config as cfg
 from medlp.data_io.base_dataset.classification_dataset import *
 from medlp.data_io.base_dataset.selflearning_dataset import *
 from medlp.data_io.base_dataset.segmentation_dataset import *
@@ -17,7 +17,7 @@ from medlp.data_io.dataio import (
 from medlp.data_io.generate_dataset import register_dataset_from_cfg
 
 internal_dataset_dir = Path(__file__).parent.parent.joinpath("datasets")
-external_dataset_dir = Path(get_cfg('MEDLP_CONFIG', 'EXTERNAL_DATASET_DIR'))
+external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_DATASET_DIR'))
 
 dataset_dirs = [internal_dataset_dir, external_dataset_dir]
 

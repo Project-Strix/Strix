@@ -1,6 +1,7 @@
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
+from medlp.models.cnn import CLASSIFICATION_ARCHI
 
 BatchNorm = nn.BatchNorm2d
 
@@ -267,10 +268,9 @@ class DRN_A(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
-                                       dilation=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
-                                       dilation=4)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)
+
         # self.avgpool = nn.AvgPool2d(28, stride=1)
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Linear(512 * block.expansion, num_classes)
@@ -326,6 +326,8 @@ class DRN_A(nn.Module):
         return x
 
 
+@CLASSIFICATION_ARCHI.register('2D', 'DRN_a50')
+@CLASSIFICATION_ARCHI.register('3D', 'DRN_a50')
 def drn_a_50(pretrained=False, **kwargs):
     model = DRN_A(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:

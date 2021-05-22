@@ -12,9 +12,9 @@ from medlp.models.cnn.engines import (
     ENSEMBLE_TEST_ENGINES
 )
 from medlp.utilities.utils import output_filename_check, get_attr_
-from medlp.utilities.handlers import NNIReporterHandler
+from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
 from medlp.models.cnn.utils import output_onehot_transform
-from medlp.configures import get_key
+from medlp.configures import config as cfg
 
 from monai_ex.inferers import SimpleInferer
 from monai_ex.networks import one_hot
@@ -24,8 +24,9 @@ from ignite.metrics import Accuracy, Precision, Recall
 from ignite.handlers import EarlyStopping
 
 from monai_ex.engines import (
-    SupervisedTrainer,
+    SupervisedTrainerEx,
     SupervisedEvaluator,
+    SupervisedEvaluatorEx,
     EnsembleEvaluator
 )
 
@@ -47,7 +48,8 @@ from monai_ex.handlers import (
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaverEx,
+    CheckpointLoaderEx,
+    SegmentationSaver,
     ClassificationSaverEx,
     ROCAUC,
     stopping_fn_from_metric
@@ -69,12 +71,12 @@ def build_classification_engine(**kwargs):
     model_dir = kwargs['model_dir']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    label_ = get_key("label")
-    pred_ = get_key("pred")
-    loss_ = get_key("loss")
+    image_ = cfg.get_key("image")
+    label_ = cfg.get_key("label")
+    pred_ = cfg.get_key("pred")
+    loss_ = cfg.get_key("loss")
 
-    if opts.criterion in ['BCE', 'WBCE']:
+    if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
         prepare_batch_fn = lambda x, device, nb: (
             x[image_].to(device),
             torch.as_tensor(x[label_].unsqueeze(1), dtype=torch.float32).to(device)
@@ -102,6 +104,11 @@ def build_classification_engine(**kwargs):
             output_transform=lambda x: x[image_],
             max_channels=3,
             prefix_name='Val'
+        ),
+        TensorboardDumper(
+            log_dir=writer.log_dir,
+            epoch_level=True,
+            logger_name=logger_name,
         )
     ]
 
@@ -145,16 +152,18 @@ def build_classification_engine(**kwargs):
     else:
         key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
 
-    evaluator = SupervisedEvaluator(
+    evaluator = SupervisedEvaluatorEx(
         device=device,
         val_data_loader=test_loader,
         network=net,
         epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len*len(test_loader)),
+        prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_val_metric={val_metric_name: key_val_metric},
         val_handlers=val_handlers,
-        amp=opts.amp
+        amp=opts.amp,
+        custom_keys=cfg.get_keys_dict()
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -199,7 +208,7 @@ def build_classification_engine(**kwargs):
         )
     ]
 
-    trainer = SupervisedTrainer(
+    trainer = SupervisedTrainerEx(
         device=device,
         max_epochs=opts.n_epoch,
         train_data_loader=train_loader,
@@ -211,9 +220,10 @@ def build_classification_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=train_post_transforms,
         key_train_metric={"train_auc": key_val_metric},
-        additional_metrics={"roccurve": add_roc_metric},
+        # additional_metrics={"roccurve": add_roc_metric},
         train_handlers=train_handlers,
-        amp=opts.amp
+        amp=opts.amp,
+        custom_keys=cfg.get_keys_dict()
     )
 
     if opts.early_stop > 0:
@@ -237,8 +247,8 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    pred_ = get_key("pred")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
 
     if is_multilabel:
         post_transform = Compose([
@@ -302,12 +312,12 @@ def build_classification_test_engine(**kwargs):
 
     if get_attr_(opts, 'save_image', False):
         # check output filename
-        uplevel = output_filename_check(test_loader.dataset)
+        root_dir = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
                 batch_transform=lambda x: x[image_+'_meta_dict'],
@@ -346,8 +356,8 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
-    image_ = get_key("image")
-    pred_ = get_key("pred")
+    image_ = cfg.get_key("image")
+    pred_ = cfg.get_key("pred")
 
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
@@ -356,7 +366,8 @@ def build_classification_ensemble_test_engine(**kwargs):
     if best_model:
         best_models = []
         for folder in cv_folders:
-            models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').iterdir()]))
+            # models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').rglob('*.pt')]))
+            models = list(filter(lambda x: re.search(float_regex, x.name), [model for model in folder.joinpath('Models').rglob('*.pt')]))
             models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
             best_models.append(models[-1])
     else:  # get last
@@ -381,7 +392,7 @@ def build_classification_ensemble_test_engine(**kwargs):
 
     nets = [copy.deepcopy(net), ]*len(best_models)
     for net, m in zip(nets, best_models):
-        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
+        CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
     pred_keys = [f"{pred_}{i}" for i in range(len(best_models))]
 
@@ -451,12 +462,12 @@ def build_classification_ensemble_test_engine(**kwargs):
     ]
 
     if opts.save_image:
-        uplevel = output_filename_check(test_loader.dataset)
+        root_dir = output_filename_check(test_loader.dataset)
         val_handlers += [
-            SegmentationSaverEx(
+            SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=image_,
-                output_name_uplevel=uplevel,
+                data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
                 batch_transform=lambda x: x[image_+"_meta_dict"],
