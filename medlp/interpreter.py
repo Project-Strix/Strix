@@ -11,7 +11,6 @@ from ignite.engine import Events
 from medlp.models import get_test_engine
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.click_ex import NumericChoice as Choice
-from medlp.utilities.enum import FRAMEWORK_TYPES, OUTPUT_DIR
 from medlp.utilities.click_callbacks import get_trained_models
 from medlp.utilities.handlers import GradCamHandler
 
