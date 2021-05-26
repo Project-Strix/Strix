@@ -16,7 +16,7 @@ from medlp.utilities.handlers import GradCamHandler
 
 
 @click.command('gradcam-from-cfg')
-@click.option("--config", type=click.Path(exists=True))
+@click.option("--config", type=click.Path(exists=True), default="", help='Specify config file')
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @click.option('--target-layer', type=str, prompt=True, )
 @click.option('--target-class', type=int, prompt=True, default=1, help='GradCAM target class')

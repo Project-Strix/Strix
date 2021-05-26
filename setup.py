@@ -66,11 +66,21 @@ setup(name='medlp',
             "nibabel",
             "pytorch-ignite==0.4.4",
             # "nni",
-            "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex",
+            # "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex>=0.0.3",
             "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
       ],
+      entry_points={
+          'console_scripts': [
+              'medlp-train = medlp.main_entry:train',
+              'medlp-train-from-cfg = medlp.main_entry:train_cfg',
+              'medlp-test-from-cfg = medlp.main_entry:test_cfg',
+              'medlp-nni-search = medlp.nni_search:nni_search',
+              'medlp-check-data = medlp.data_checker:check_data',
+              'medlp-gradcam-from-cfg = medlp.interpreter:gradcam',
+          ],
+      },
       # ext_modules=get_extensions(),
       # cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
-      keywords=['deep learning', 'image segmentation', 'medical image analysis',
-                'medical image segmentation']
+      keywords=['deep learning', 'medical image classification',
+                'medical image analysis', 'medical image segmentation']
       )

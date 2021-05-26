@@ -333,7 +333,8 @@ def test_cfg(**args):
 
 @click.command("unlink")
 @click.option(
-    "--root-dir", type=click.Path(exists=True), help="Root dir contains symbolic dirs"
+    "--root-dir", type=click.Path(exists=True),
+    help="Root dir contains symbolic dirs"
 )
 @click.option(
     "-a",
