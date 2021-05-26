@@ -38,7 +38,7 @@ def gradcam(**args):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
     else:
-        test_fpaths = list(exp_dir.glob('test_files*'))
+        test_fpaths = list(exp_dir.glob('valid_files*'))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
             test_files = get_items_from_file(test_fpath, format="auto")
@@ -49,7 +49,7 @@ def gradcam(**args):
     configures["preload"] = 0.0
     configures["phase"] = phase
     configures["experiment_path"] = exp_dir
-    configures["model_path"] = get_trained_models(exp_dir)
+    configures["model_path"] = get_trained_models(exp_dir)[0]  # Get the first model
     configures["save_results"] = False
     configures["out_dir"] = (
         check_dir(args["out_dir"])
