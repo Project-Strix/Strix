@@ -215,6 +215,24 @@ def get_network(opts):
             dim=dim,
             is_prunable=is_prunable,
         )
+    elif 'HESAM' in model_name:
+        if 'nnHESAM' in model_name:
+            model = model(
+                dimensions=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                last_feature=64,
+                sam_size=6,
+            )
+        else:
+            model = model(
+                dimensions=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                features=(64, 128, 256, 256),
+                last_feature=64,
+                sam_size=6,
+            )
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
     else:
@@ -365,7 +383,7 @@ def get_test_engine(opts, test_loader):
         'logger_name': f'{opts.tensor_dim}-Tester'
     }
 
-    if get_attr_(opts, 'n_fold', 0) > 1:
+    if get_attr_(opts, 'n_fold', 0) > 1 or get_attr_(opts, 'n_repeat', 0) > 1:
         return ENSEMBLE_TEST_ENGINES[framework_type](**params)
     else:
         return TEST_ENGINES[framework_type](**params)

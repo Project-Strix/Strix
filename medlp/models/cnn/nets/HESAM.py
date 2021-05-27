@@ -8,8 +8,9 @@ import torch.nn.functional as F
 from torch.nn import init
 import numpy as np
 
-# from monai_ex.networks.nets import UNet
 from monai.networks.nets.basic_unet import TwoConv, Down, UpCat
+from monai.networks.blocks import Convolution, UpSample
+from monai.networks.nets import DynUNet
 from monai_ex.networks.layers import Act, Norm, Conv, Pool
 from monai_ex.networks.blocks import ResidualUnit
 from torch.nn.modules.activation import ReLU
@@ -56,12 +57,9 @@ class HESAM(nn.Module):
         dimensions: int,
         in_channels: int,
         out_channels: int,
-        features: Sequence[int] = (32, 32, 64, 128, 256),
-        last_feature: int = 32,
+        features: Sequence[int] = (64, 128, 256, 256),
+        last_feature: int = 64,
         sam_size: int = 6,
-        # strides: Sequence[int],
-        # kernel_size: Union[Sequence[int], int] = 3,
-        # up_kernel_size: Union[Sequence[int], int] = 3,
         act=Act.PRELU,
         norm=Norm.INSTANCE,
         dropout=0.0,
@@ -72,8 +70,8 @@ class HESAM(nn.Module):
             dimensions: number of spatial dimensions.
             in_channels: number of input channels.
             out_channels: number of output channels.
-            features: six integers as numbers of features.
-                Defaults to ``(32, 32, 64, 128, 256)``,
+            features: 4 integers as numbers of features.
+                Defaults to ``(32, 64, 128, 256)``,
                 - the first five values correspond to the five-level encoder feature sizes.
             last_feature: number of feature corresponds to the feature size after the last upsampling.
             act: activation type and arguments. Defaults to LeakyReLU.
@@ -83,24 +81,18 @@ class HESAM(nn.Module):
                 ``"deconv"``, ``"pixelshuffle"``, ``"nontrainable"``.
         """
         super().__init__()
-        print(f"BasicUNet features: {features}.")
+        print(f"HESAM features: {features}.")
         globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
         globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
 
         self.conv_0 = TwoConv(dimensions, in_channels, features[0], act, norm, dropout)
-        self.down_convs = [
-            Down(dimensions, features[i], features[i+1], act, norm, dropout)
-            for i in range(len(features)-1)
-        ]
+        self.down_1 = Down(dimensions, features[0], features[1], act, norm, dropout)
+        self.down_2 = Down(dimensions, features[1], features[2], act, norm, dropout)
+        self.down_3 = Down(dimensions, features[2], features[3], act, norm, dropout)
 
-        self.up_convs = [
-            UpCat(dimensions, features[i+1], features[i], features[i], act, norm, dropout, upsample)
-            for i in range(1, len(features)-1)
-        ]
-        self.up_convs.reverse()
-        self.up_convs.append(
-            UpCat(dimensions, features[1], features[0], last_feature, act, norm, dropout, upsample, halves=False)
-        )
+        self.upcat_3 = UpCat(dimensions, features[3], features[2], features[1], act, norm, dropout, upsample, halves=False)
+        self.upcat_2 = UpCat(dimensions, features[1], features[1], features[0], act, norm, dropout, upsample, halves=False)
+        self.upcat_1 = UpCat(dimensions, features[0], features[0], last_feature, act, norm, dropout, upsample, halves=False)
 
         self.final_conv = Conv["conv", dimensions](last_feature, last_feature, kernel_size=1)
         self.gmp = globalmaxpool(((1,)*dimensions))
@@ -130,24 +122,118 @@ class HESAM(nn.Module):
         self.final_fc = nn.Linear(features[-1], out_channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv_0(x)
-        Xs = [x]
-        for conv in self.down_convs:
-            x = conv(x)
-            Xs.append(x)
-        Xs.reverse()
+        x0 = self.conv_0(x)
 
-        u = x.clone()
-        for i, upconv in enumerate(self.up_convs, start=1):
-            u = upconv(u, Xs[i])
+        x1 = self.down_1(x0)
+        x2 = self.down_2(x1)
+        x3 = self.down_3(x2)
 
-        out = self.final_conv(u)
+        u3 = self.upcat_3(x3, x2)
+        u2 = self.upcat_2(u3, x1)
+        u1 = self.upcat_1(u2, x0)
+
+        out = self.final_conv(u1)
         out = self.residuals(out)
         out = self.sam(out)
 
         # high-level feature
-        he = self.gmp(x)
+        he = self.gmp(x3)
         hesam = torch.add(out, he.squeeze(dim=-1))
         logits = self.final_fc(hesam.squeeze())
 
         return logits
+
+@CLASSIFICATION_ARCHI.register('2D', 'nnHESAM')
+@CLASSIFICATION_ARCHI.register('3D', 'nnHESAM')
+class HESAM2(nn.Module):
+    def __init__(
+        self,
+        dimensions: int,
+        in_channels: int,
+        out_channels: int,
+        last_feature: int = 64,
+        sam_size: int = 6,
+        act=Act.PRELU,
+        norm="instance",
+        dropout=0.0,
+        upsample: str = "deconv",
+    ) -> None:
+        """
+        Args:
+            dimensions: number of spatial dimensions.
+            in_channels: number of input channels.
+            out_channels: number of output channels.
+            last_feature: number of feature corresponds to the feature size after the last upsampling.
+            act: activation type and arguments. Defaults to LeakyReLU.
+            norm: feature normalization type and arguments. Defaults to instance norm.
+            dropout: dropout ratio. Defaults to no dropout.
+            upsample: upsampling mode, available options are
+                ``"deconv"``, ``"pixelshuffle"``, ``"nontrainable"``.
+        """
+        super().__init__()
+        globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
+        globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
+        n_depth = 3
+        self.backbone = DynUNet(
+            spatial_dims=dimensions,
+            in_channels=in_channels,
+            out_channels=last_feature,
+            kernel_size=(3,)+(3,)*n_depth,
+            strides=(1,)+(2,)*n_depth,
+            upsample_kernel_size=(1,)+(2,)*n_depth,
+            norm_name=norm,
+            deep_supervision=False,
+            deep_supr_num=1,
+            res_block=False,
+        )
+        self.latent_code = None
+        self.backbone.bottleneck.register_forward_hook(
+            hook=self.get_latent()
+        )
+        features = self.backbone.filters
+        print(f"nnHESAM features: {features}.")
+
+        self.gmp = globalmaxpool(((1,)*dimensions))
+        self.residuals = nn.Sequential(
+            ResidualUnit(
+                dimensions=dimensions,
+                in_channels=last_feature,
+                out_channels=features[-1],
+                strides=2,
+                act="relu",
+                norm="batch"
+                ),
+            ResidualUnit(
+                dimensions=dimensions,
+                in_channels=features[-1],
+                out_channels=features[-1],
+                strides=1,
+                act="relu",
+                norm="batch"
+            )
+        )
+        self.sam = nn.Sequential(
+            globalavgpool((sam_size,)*dimensions),
+            nn.Flatten(start_dim=2),
+            MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
+        )
+        self.final_fc = nn.Linear(features[-1], out_channels)
+
+    def get_latent(self):
+        def hook(model, input, output):
+            self.latent_code = output
+        return hook
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.backbone(x)
+
+        out = self.residuals(out)
+        out = self.sam(out)
+
+        # high-level feature
+        he = self.gmp(self.latent_code)
+        hesam = torch.add(out, he.squeeze(dim=-1))
+        logits = self.final_fc(hesam.squeeze())
+
+        return logits
+
