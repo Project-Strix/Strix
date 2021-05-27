@@ -117,8 +117,9 @@ class HESAM(nn.Module):
         )
         self.sam = nn.Sequential(
             globalavgpool((sam_size,)*dimensions),
+            nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
             nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
+            # MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
         )
         self.final_fc = nn.Linear(features[-1], out_channels)
 
@@ -217,8 +218,9 @@ class HESAM2(nn.Module):
         )
         self.sam = nn.Sequential(
             globalavgpool((sam_size,)*dimensions),
+            nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
             nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
+            # MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
         )
         self.final_fc = nn.Linear(features[-1], out_channels)
 
