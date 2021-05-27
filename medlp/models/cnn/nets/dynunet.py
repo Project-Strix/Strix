@@ -80,6 +80,7 @@ class DynUNet(nn.Module):
         last_activation: Optional[str] = None,
         is_prunable: bool = False,
         filters: Optional[Sequence[int]] = None,
+        output_bottleneck: bool = False,
     ):
         super(DynUNet, self).__init__()
         self.spatial_dims = spatial_dims
@@ -103,6 +104,7 @@ class DynUNet(nn.Module):
         self.output_block = self.get_output_block(0, last_activation=last_activation)
         self.deep_supervision_heads = self.get_deep_supervision_heads() if deep_supervision else None
         self.deep_supr_num = deep_supr_num
+        self.output_bottleneck = output_bottleneck
         self.apply(self.initialize_weights)
         self.check_kernel_stride()
         self.check_deep_supr_num()
@@ -132,7 +134,8 @@ class DynUNet(nn.Module):
         for downsample in self.downsamples:
             out = downsample(out)
             outputs.append(out)
-        out = self.bottleneck(out)
+        code = self.bottleneck(out)
+        out = code.clone()
         upsample_outs = []
         for upsample, skip in zip(self.upsamples, reversed(outputs)):
             out = upsample(out, skip)
@@ -143,6 +146,8 @@ class DynUNet(nn.Module):
             upsample_outs = upsample_outs[start_output_idx:-1][::-1]
             preds = [self.deep_supervision_heads[i](out) for i, out in enumerate(upsample_outs)]
             return [out] + preds
+        if self.output_bottleneck:
+            return out, code
         return out
 
     def get_input_block(self):

@@ -21,4 +21,4 @@ from medlp.models.cnn.nets.vgg import *
 from medlp.models.cnn.nets.ild_cnn import ILD_Net
 from medlp.models.cnn.nets.multihead_net import MultiOutputNet
 from medlp.models.cnn.nets.DRN import *
-from medlp.models.cnn.nets.hesam import HESAM
+from medlp.models.cnn.nets.hesam import HESAM, HESAM2

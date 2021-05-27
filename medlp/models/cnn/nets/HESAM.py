@@ -10,7 +10,8 @@ import numpy as np
 
 from monai.networks.nets.basic_unet import TwoConv, Down, UpCat
 from monai.networks.blocks import Convolution, UpSample
-from monai.networks.nets import DynUNet
+# from monai.networks.nets import DynUNet
+from medlp.models.cnn import DynUNet
 from monai_ex.networks.layers import Act, Norm, Conv, Pool
 from monai_ex.networks.blocks import ResidualUnit
 from torch.nn.modules.activation import ReLU
@@ -143,6 +144,7 @@ class HESAM(nn.Module):
 
         return logits
 
+
 @CLASSIFICATION_ARCHI.register('2D', 'nnHESAM')
 @CLASSIFICATION_ARCHI.register('3D', 'nnHESAM')
 class HESAM2(nn.Module):
@@ -185,11 +187,12 @@ class HESAM2(nn.Module):
             deep_supervision=False,
             deep_supr_num=1,
             res_block=False,
+            output_bottleneck=True
         )
-        self.latent_code = None
-        self.backbone.bottleneck.register_forward_hook(
-            hook=self.get_latent()
-        )
+        # self.latent_code = None
+        # self.backbone.bottleneck.register_forward_hook(
+        #     hook=self.get_latent()
+        # )
         features = self.backbone.filters
         print(f"nnHESAM features: {features}.")
 
@@ -225,13 +228,13 @@ class HESAM2(nn.Module):
         return hook
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.backbone(x)
+        out, latent_code = self.backbone(x)
 
         out = self.residuals(out)
         out = self.sam(out)
 
         # high-level feature
-        he = self.gmp(self.latent_code)
+        he = self.gmp(latent_code)
         hesam = torch.add(out, he.squeeze(dim=-1))
         logits = self.final_fc(hesam.squeeze())
 
