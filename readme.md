@@ -79,22 +79,34 @@
 <!-- GETTING STARTED -->
 ## Getting Started
 
-To get a local copy up and running follow these simple steps.
+
 
 ### Prerequisites
 
-You will need following packages to make our platform work:
-
-*
-*
-*
-
+MeDLP heavily depend on following packages to make it work. Theoretically, these packages will be automatically installed via pip installation.
+* pytorch
+* tb-nightly
+* click
+* tqdm
+* numpy
+* scipy
+* scikit-image
+* scikit-learn
+* nibabel
+* pytorch-ignite
+* monai_ex
+* utils_cw
 
 
 ### Installation
 
+For developers, we suggest you to get a local copy up and install.
+```
+git clone https://gitlab.com/ChingRyu/MeDLP.git
+pip install -e ./MeDLP
+```
 
-Via pip:
+For users, you can just install via pip.
 ```
 pip install git+https://gitlab.com/ChingRyu/MeDLP.git
 ```
@@ -104,10 +116,9 @@ pip install git+https://gitlab.com/ChingRyu/MeDLP.git
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
 _For more examples, please refer to the [Documentation](https://example.com)_
 
+Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
 
 
 <!-- ROADMAP -->
@@ -168,6 +179,4 @@ Project Link: [https://gitlab.com/ChingRyu/MeDLP](https://gitlab.com/ChingRyu/Me
 [issues-url]: https://gitlab.com/ChingRyu/medlp/-/issues
 [license-shield]: https://img.shields.io/github/license/ChingRyu/repo.svg?style=flat-square
 [license-url]: https://gitlab.com/ChingRyu/medlp/-/blob/master/LICENSE
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/ChingRyu
 [product-screenshot]: images/screenshot.png
