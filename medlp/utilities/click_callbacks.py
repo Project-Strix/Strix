@@ -1,6 +1,7 @@
 import os
 import time
 import click
+import inspect
 from pathlib import Path
 from types import SimpleNamespace as sn
 from functools import partial, wraps
@@ -118,7 +119,7 @@ def split_input_str_(value, dtype=float):
 
 
 def _prompt(prompt_str, data_type, default_value, value_proc=None, color=None):
-    prompt_str = f"\tInput {prompt_str}"
+    prompt_str = f"\tInput {prompt_str} ({data_type})"
     if color is not None:
         prompt_str = colored(prompt_str, color=color)
 
@@ -152,7 +153,7 @@ def lr_schedule_params(ctx, param, value):
         # dcay = _prompt('SGDR decay', float, 1)
         ctx.params["lr_policy_params"] = {"T_0": t0, "eta_min": eta, "T_mult": tmul}
     elif value == "plateau":
-        patience = _prompt("patience", int, 80)
+        patience = _prompt("patience", int, 50)
         ctx.params["lr_policy_params"] = {"patience": patience}
     elif value == "CLR":
         raise NotImplementedError
@@ -160,7 +161,7 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 
-def loss_select(ctx, param, value):
+def loss_select(ctx, param, value, prompt_all_args=False):
     from medlp.models.cnn.losses import LOSS_MAPPING
 
     losslist = list(LOSS_MAPPING[ctx.params["framework"]].keys())
@@ -170,7 +171,7 @@ def loss_select(ctx, param, value):
         return value
     else:
         value = prompt("Loss list", type=Choice(losslist))
-        # if value in ['WCE', 'WBCE', 'WCE-DCE']:
+
         if 'WCE' in value:
             weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
             ctx.params["loss_params"] = {"weight": weights}
@@ -186,8 +187,25 @@ def loss_select(ctx, param, value):
         elif value == 'GDL':
             w_type = _prompt("Weight type(square, simple, uniform)", str, 'square')
             ctx.params["loss_params"] = {'w_type': w_type}
-        else:
-            ctx.params["loss_params"] = {}
+        else:  #! custom loss
+            func = LOSS_MAPPING[ctx.params["framework"]][value]
+            sig = inspect.signature(func)
+            anno = inspect.getfullargspec(func).annotations
+            if not prompt_all_args:
+                cond = lambda x: x[1].default is x[1].empty
+            else:
+                cond = lambda x: True
+
+            loss_params = {}
+            for k, v in filter(cond, sig.parameters.items()):
+                if anno.get(k) in BUILTIN_TYPES:
+                    default_value = None if v.default is v.empty else v.default
+                    loss_params[k] = _prompt(f"Loss argument '{k}'", anno[k], default_value)
+                else:
+                    print(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
+                    # raise ValueError(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
+            ctx.params["loss_params"] = loss_params
+
         return value
 
 
@@ -338,6 +356,7 @@ def common_params(func):
 def solver_params(func):
     @option("--optim", type=Choice(OPTIM_TYPES), default="sgd")
     @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
+    @option("--nesterov", type=bool, default=False, help="Nesterov for SGD")
     @option("-WD", "--l2-weight-decay", type=float, default=0, help="weight decay (L2 penalty)")
     @option("--lr", type=float, default=1e-3, help="learning rate")
     @option("--lr-policy", prompt=True, type=Choice(LR_SCHEDULE), callback=lr_schedule_params, default="plateau", help="learning rate strategy")

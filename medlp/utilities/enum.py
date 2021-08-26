@@ -1,5 +1,7 @@
 # All enum variables
 
+BUILTIN_TYPES = [dict, list, tuple, str, int, float, bool]
+
 DIMS = ["2D", "3D", "2", "3", 2, 3]
 PHASES = ["train", "valid", "test"]
 NORM_TYPES = ["batch", "instance", "group"]
@@ -14,7 +16,7 @@ LOSSES = [
     "CE-DCE",
     "WCE-DCE",
     "FocalLoss",
-    "FocalDiceLoss",
+    "DiceFocalLoss",
 ]
 LR_SCHEDULE = ["const", "poly", "step", 'multistep', "SGDR", "plateau"]
 FRAMEWORK_TYPES = [

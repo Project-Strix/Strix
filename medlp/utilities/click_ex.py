@@ -1,7 +1,7 @@
 from click import Choice, ParamType
 from click.types import convert_type
 from utils_cw.utils import Print
-
+from types import SimpleNamespace
 
 class DynamicTuple(ParamType):
 
@@ -23,7 +23,7 @@ class DynamicTuple(ParamType):
                 sep = ' '
 
             value = value.strip().split(sep)
-            value = list(filter(lambda x : x is not ' ', value))
+            value = list(filter(lambda x : x != ' ', value))
         elif value is None or value == '':
             return None
 
@@ -69,6 +69,9 @@ def _convert_type(var, types=[float, str]):
 
 def get_unknown_options(ctx, verbose=False):
     auxilary_params = {}
+
+    if isinstance(ctx, SimpleNamespace): #! temp solution
+        return auxilary_params
 
     for i in range(0, len(ctx.args), 2):
         if str(ctx.args[i]).startswith("--"):

@@ -3,15 +3,17 @@ from medlp.utilities.utils import Registry
 from monai_ex.losses import (
     DiceLoss,
     GeneralizedDiceLoss,
-    FocalLoss
+    FocalLoss,
+    DiceFocalLoss,
+    DiceCELoss,
+    DiceTopKLoss
 )
 from .losses import (
-    CEDiceLoss,
-    FocalDiceLoss,
     ContrastiveLoss,
     ContrastiveCELoss,
     ContrastiveBCELoss,
     CrossEntropyLossEx,
+    BCEWithLogitsLossEx,
 )
 
 CLASSIFICATION_LOSS = Registry()
@@ -30,14 +32,15 @@ LOSS_MAPPING = {
 
 CLASSIFICATION_LOSS.register('CE', CrossEntropyLossEx)
 CLASSIFICATION_LOSS.register('WCE', CrossEntropyLossEx)
-CLASSIFICATION_LOSS.register('BCE', torch.nn.BCEWithLogitsLoss)
-CLASSIFICATION_LOSS.register('WBCE', torch.nn.BCEWithLogitsLoss)
-CLASSIFICATION_LOSS.register('FocalLoss', FocalLoss)
+CLASSIFICATION_LOSS.register('BCE', BCEWithLogitsLossEx)
+CLASSIFICATION_LOSS.register('WBCE', BCEWithLogitsLossEx)
+# CLASSIFICATION_LOSS.register('FocalLoss', FocalLoss)
 
 SEGMENTATION_LOSS.register('DCE', DiceLoss)
 SEGMENTATION_LOSS.register('GDL', GeneralizedDiceLoss)
-SEGMENTATION_LOSS.register('CE-DCE', CEDiceLoss)
-SEGMENTATION_LOSS.register('FocalDiceLoss', FocalDiceLoss)
+SEGMENTATION_LOSS.register('CE-DCE', DiceCELoss)
+SEGMENTATION_LOSS.register('DiceFocalLoss', DiceFocalLoss)
+SEGMENTATION_LOSS.register('DiceTopKLoss', DiceTopKLoss)
 
 SIAMESE_LOSS.register('ContrastiveLoss', ContrastiveLoss)
 SIAMESE_LOSS.register('ContrastiveCELoss', ContrastiveCELoss)
