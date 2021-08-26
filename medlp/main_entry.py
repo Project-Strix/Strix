@@ -94,8 +94,8 @@ def train_core(cargs, files_train, files_valid):
             handler=CheckpointLoaderEx(
                 load_path=cargs.pretrained_model_path,
                 load_dict={"net": net},
-                strict=False,
-                skip_mismatch=True,
+                strict=True,
+                strict_shape=True,
             ),
         )
     if cargs.visualize:

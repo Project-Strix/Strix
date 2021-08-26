@@ -9,7 +9,6 @@ from medlp.utilities.transforms import (
     RandLabelToMaskD,
     SeparateCropSTSdataD,
     ExtractSTSlicesD,
-    RandCrop2dByPosNegLabelD,
 )
 
 from monai_ex.data import CacheDataset, PersistentDataset

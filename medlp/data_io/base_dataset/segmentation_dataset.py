@@ -27,15 +27,19 @@ class BasicSegmentationDataset(object):
         dataset_type: Dataset,
         dataset_kwargs: dict,
         additional_transforms: Optional[Sequence[MapTransform]] = None,
+        check_data: bool = True,
         verbose: Optional[bool] = False,
     ):
         self.files_list = files_list
         self.verbose = verbose
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
-        self.input_data = get_input_data(
-            files_list, is_supervised, verbose, self.__class__.__name__
-        )
+        if check_data:
+            self.input_data = get_input_data(
+                files_list, is_supervised, verbose, self.__class__.__name__
+            )
+        else:
+            self.input_data = files_list
 
         self.transforms = ensure_list(loader)
         if channeler is not None:

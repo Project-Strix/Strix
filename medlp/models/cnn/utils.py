@@ -355,3 +355,21 @@ def batch_dice_mask(pred, y, mask, false_positive_weight=1.0, smooth=1e-6):
     else:
         raise ValueError('wrong input dimension in dice loss')
 
+
+def set_trainable_attr(m, b):
+    m.trainable = b
+    for p in m.parameters():
+        p.requires_grad = b
+
+
+def apply_leaf(m, f):
+    c = m if isinstance(m, (list, tuple)) else list(m.children())
+    if isinstance(m, nn.Module):
+        f(m)
+    if len(c) > 0:
+        for layer in c:
+            apply_leaf(layer, f)
+
+
+def set_trainable(module, b):
+    apply_leaf(module, lambda m: set_trainable_attr(m, b))

@@ -84,6 +84,7 @@ def check_data(ctx, **args):
     cargs = sn(**args)
     auxilary_params = get_unknown_options(ctx, verbose=True)
     cargs.out_dir = check_dir(cargs.out_dir, 'data checking')
+    auxilary_params.update({'experiment_path': str(cargs.out_dir)})
 
     dataset_type = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
     dataset_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]

@@ -15,7 +15,11 @@ from medlp.utilities.utils import (
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.utils import get_models
 
-from monai_ex.inferers import SimpleInferer, SlidingWindowInferer
+from monai_ex.inferers import (
+    SimpleInferer,
+    SlidingWindowInferer,
+    SlidingWindowInferer2Dfor3D
+)
 from monai_ex.networks import one_hot
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping
@@ -260,7 +264,7 @@ def build_segmentation_test_engine(**kwargs):
     net = kwargs["net"]
     device = kwargs["device"]
     logger_name = kwargs.get("logger_name", None)
-    crop_size = get_attr_(opts, 'crop_size')
+    crop_size = get_attr_(opts, 'crop_size', None)
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
@@ -309,7 +313,7 @@ def build_segmentation_test_engine(**kwargs):
                 output_postfix=image_,
                 output_ext=".nii.gz",
                 resample=resample,
-                data_root_dir=uplevel,
+                data_root_dir=output_filename_check(test_loader.dataset),
                 batch_transform=lambda x: x[image_+"_meta_dict"],
                 output_transform=lambda output: output[image_],
             )
@@ -331,11 +335,13 @@ def build_segmentation_test_engine(**kwargs):
             )
         }
 
-    inferer = (
-        SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
-        if use_slidingwindow
-        else SimpleInferer()
-    )
+    if use_slidingwindow:
+        if opts.tensor_dim == '2D':
+            inferer = SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
+        elif opts.tensor_dim == '3D':
+            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5)
+    else:
+        SimpleInferer()
 
     evaluator = SupervisedEvaluator(
         device=device,

@@ -23,15 +23,19 @@ class BasicClassificationDataset(object):
         dataset_type: Dataset,
         dataset_kwargs: Optional[dict] = {},
         additional_transforms: Optional[Sequence[MapTransform]] = None,
-        verbose: Optional[bool] = False,
+        check_data: bool = True,
+        verbose: bool = False,
     ):
         self.files_list = files_list
         self.verbose = verbose
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
-        self.input_data = get_input_data(
-            files_list, is_supervised, verbose, self.__class__.__name__
-        )
+        if check_data:
+            self.input_data = get_input_data(
+                files_list, is_supervised, verbose, self.__class__.__name__
+            )
+        else:
+            self.input_data = files_list
 
         self.transforms = ensure_list(loader)
         if channeler is not None:

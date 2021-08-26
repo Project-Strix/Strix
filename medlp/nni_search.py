@@ -49,7 +49,11 @@ def train_nni(**kwargs):
         logger.info(f"Current args: {cargs}")
         Print('Args:', cargs, color='y')
         
-        cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
+        try:
+            cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
+        except ValueError as e:
+            # temp solution for MIG env
+            cargs.gpu_ids = list(range(len(list(map(str, cargs.gpus.split(","))))))
 
         data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
         assert os.path.isfile(data_list), "Data list not exists!"
@@ -121,11 +125,18 @@ def train_nni(**kwargs):
 @click.option("--experiment-path", type=str, callback=clb.get_nni_exp_name, default="nni-search")
 def nni_search(**args):
     cargs = sn(**args)
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        Print(f"CUDA_VISIBLE_DEVICES specified: {os.environ['CUDA_VISIBLE_DEVICES']}, ignoring --gpu flag", color='y')
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
+    gpus_ = os.environ["CUDA_VISIBLE_DEVICES"]
+
     configures = get_items_from_file(args["param_list"], format="json")
     configures["out_dir"] = cargs.out_dir
-    configures["gpus"] = cargs.gpus
+    configures["gpus"] = gpus_
     configures["nni"] = True
     configures["experiment_path"] = cargs.experiment_path
+    os.environ['MKL_THREADING_LAYER'] = 'GNU'
     # os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
 
     if not os.path.isfile(cargs.nni_config):
@@ -139,7 +150,7 @@ def nni_search(**args):
     nniconfig_file = os.path.join(cargs.experiment_path, "nni_config.yml")
     searchspace_file = os.path.join(cargs.experiment_path, "search_space.json")
     nni_config["trial"]["command"] = f"""\
-        CUDA_VISIBLE_DEVICES={cargs.gpus} \
+        CUDA_VISIBLE_DEVICES={gpus_} \
         python {str(main_file)} train-nni \
         --config {str(paramlist_file)}"""
 

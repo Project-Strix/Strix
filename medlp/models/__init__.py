@@ -1,8 +1,9 @@
 from types import SimpleNamespace as sn
 from pathlib import Path
 from utils_cw import check_dir
-
 import torch
+import numpy as np
+
 from medlp.models.cnn.utils import (
     print_network,
     output_onehot_transform,
@@ -20,8 +21,7 @@ from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import (
     LOSS_MAPPING,
     CrossEntropyLossEx,
-    FocalDiceLoss,
-    CEDiceLoss,
+    DiceFocalLoss,
     ContrastiveLoss
 )
 
@@ -216,13 +216,23 @@ def get_network(opts):
             is_prunable=is_prunable,
         )
     elif 'HESAM' in model_name:
-        if 'nnHESAM' in model_name:
+        if model_name == 'nnHESAM':
             model = model(
                 dimensions=dim,
                 in_channels=in_channels,
                 out_channels=out_channels,
                 last_feature=64,
                 sam_size=6,
+            )
+        elif model_name == 'segHESAM':
+            model = model(
+                dimensions=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                last_feature=64,
+                sam_size=6,
+                act='relu',
+                norm='batch',
             )
         else:
             model = model(
@@ -231,7 +241,10 @@ def get_network(opts):
                 out_channels=out_channels,
                 features=(64, 128, 256, 256),
                 last_feature=64,
-                sam_size=6,
+                # sam_size=6,
+                act='relu',
+                norm='batch',
+                groups=n_group,
             )
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
@@ -260,6 +273,8 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     # Print the model type
     print('\nInitialising model {}'.format(opts.model_name))
     weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
+    nesterov = get_attr_(opts, 'nesterov', False)
+    momentum = get_attr_(opts, 'momentum', 0.0)
     valid_interval = get_attr_(opts, 'valid_interval', 5)
 
     framework_type = opts.framework
@@ -270,22 +285,15 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     loss_type = LOSS_MAPPING[framework_type][opts.criterion]
 
     if opts.output_nc == 1:
-        kwargs = {"sigmoid": True, "softmax": False, "to_onehot_y": False}
+        kwargs = {"include_background": False, "sigmoid": True, "softmax": False, "to_onehot_y": False}
     else:
-        kwargs = {"sigmoid": False, "softmax": True, "to_onehot_y": True}
+        kwargs = {"include_background": False, "sigmoid": False, "softmax": True, "to_onehot_y": True}
 
-    if loss_type in [DiceLoss, GeneralizedDiceLoss]:
-        loss = loss_type(include_background=False, **kwargs)
-    elif loss_type == CEDiceLoss:
-        loss = loss_type(
-            CrossEntropyLossEx(**dict(opts.loss_params, **{'device': device})),
-            DiceLoss(include_background=False, **kwargs)
-        )
-    elif loss_type == FocalDiceLoss:
-        loss = loss_type(
-            FocalLoss(**opts.loss_params),
-            DiceLoss(include_background=False, **kwargs)
-        )
+    # if loss_type in [DiceLoss, GeneralizedDiceLoss, DiceFocalLoss]:
+    #     loss = loss_type(**kwargs)
+    if 'Dice' in loss_type.__name__:
+        kwargs.update(opts.loss_params)
+        loss = loss_type(**kwargs)
     else:
         loss = loss_type(**opts.loss_params)
 
@@ -306,7 +314,10 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     if opts.optim == 'adam':
         optim = torch.optim.Adam(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == 'sgd':
-        optim = torch.optim.SGD(net.parameters(), opts.lr, weight_decay=weight_decay)
+        optim = torch.optim.SGD(
+            net.parameters(), opts.lr,
+            weight_decay=weight_decay, momentum=momentum, nesterov=nesterov
+        )
     elif opts.optim == 'adamw':
         optim = torch.optim.AdamW(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == 'adagrad':

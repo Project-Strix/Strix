@@ -102,7 +102,7 @@ def build_classification_engine(**kwargs):
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
             output_transform=lambda x: x[image_],
-            max_channels=3,
+            max_channels=1,
             prefix_name='Val'
         ),
         TensorboardDumper(
@@ -203,7 +203,7 @@ def build_classification_engine(**kwargs):
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
             output_transform=lambda x: x[image_],
-            max_channels=3,
+            max_channels=1,
             prefix_name='Train'
         )
     ]

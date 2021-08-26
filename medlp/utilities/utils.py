@@ -248,14 +248,14 @@ def plot_summary(summary, output_fpath):
         colors = list(mcolors.TABLEAU_COLORS.values())
 
         for i, (key, step_value) in enumerate(summary.items()):
-            plt.plot(step_value['steps'], step_value['values'], label=key, color=colors[i], linewidth=2.0)
+            plt.plot(step_value['steps'], step_value['values'], label=str(key), color=colors[i], linewidth=2.0)
         # plt.ylim([0., 1.])
         ax = plt.axes()
         ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
         ax.yaxis.set_major_formatter(ScalarFormatter())
         plt.xlabel('Number of iterations per case')
         plt.grid(True)
-        plt.legend()
+        ax.legend()
         plt.draw()
         plt.show(block=False)
         plt.pause(0.0001)
