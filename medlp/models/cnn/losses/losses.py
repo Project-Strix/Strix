@@ -3,6 +3,7 @@ from torch.nn import Module
 import torch.nn.functional as F
 from torch import Tensor
 from typing import Optional, Sequence, Union
+from monai_ex.losses import DiceLoss
 
 
 # class ContrastiveLoss(Module):
@@ -22,7 +23,7 @@ from typing import Optional, Sequence, Union
 
 class CrossEntropyLossEx(torch.nn.CrossEntropyLoss):
     """Extension of pytorch's CrossEntropyLoss
-       Enable passing float type weight argument. 
+       Enable passing float type weight argument.
     """
     def __init__(
         self,
@@ -44,6 +45,40 @@ class CrossEntropyLossEx(torch.nn.CrossEntropyLoss):
             ignore_index=ignore_index,
             reduce=reduce,
             reduction=reduction
+        )
+
+
+class BCEWithLogitsLossEx(torch.nn.BCEWithLogitsLoss):
+    """Extension of pytorch's BCEWithLogitsLoss
+       Enable passing float type weight&pos_weight argument
+
+    Args:
+        torch ([type]): [description]
+    """
+    def __init__(
+        self,
+        weight: Optional[Union[torch.Tensor, float]] = None,
+        size_average=None,
+        reduce=None,
+        reduction: str = 'mean',
+        pos_weight: Optional[Union[torch.Tensor, float]] = None,
+        device: Optional[torch.device] = None
+    ) -> None:
+        if weight is not None:
+            weight = torch.tensor(weight)
+            if device is not None:
+                weight = weight.to(device)
+        if pos_weight is not None:
+            pos_weight = torch.tensor(pos_weight)
+            if device is not None:
+                pos_weight = pos_weight.to(device)
+
+        super().__init__(
+            weight=weight,
+            size_average=size_average,
+            reduce=reduce,
+            reduction=reduction,
+            pos_weight=pos_weight,
         )
 
 
@@ -109,36 +144,3 @@ class DeepSupervisionLoss(Module):
             losses.append(w*self.base_loss(ret, gt))
         return torch.mean(torch.stack(losses))
 
-
-class CEDiceLoss(Module):
-    def __init__(self, ce_loss, dice_loss, aggregate="sum"):
-        super(CEDiceLoss, self).__init__()
-        self.aggregate = aggregate
-        self.ce = ce_loss
-        self.dc = dice_loss
-
-    def forward(self, net_output, target):
-        dc_loss = self.dc(net_output, target)
-        ce_loss = self.ce(net_output, target.squeeze(dim=1))
-        if self.aggregate == "sum":
-            result = ce_loss + dc_loss
-        else:
-            raise NotImplementedError
-        return result
-
-
-class FocalDiceLoss(Module):
-    def __init__(self, focal_loss, dice_loss, aggregate="sum"):
-        super(FocalDiceLoss, self).__init__()
-        self.aggregate = aggregate
-        self.fc = focal_loss
-        self.dc = dice_loss
-
-    def forward(self, net_output, target):
-        dc_loss = self.dc(net_output, target)
-        fc_loss = self.fc(net_output, target)
-        if self.aggregate == "sum":
-            result = fc_loss + dc_loss
-        else:
-            raise NotImplementedError
-        return result
