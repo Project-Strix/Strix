@@ -1,21 +1,16 @@
-from typing import List, Optional, Sequence, Union, Callable
+from typing import Sequence, Union, Callable, Optional, Tuple
 
 import math
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
-import torch.nn.functional as F
 from torch.nn import init
 import numpy as np
 
 from monai.networks.blocks import Convolution, UpSample
-# from monai.networks.nets import DynUNet
-from medlp.models.cnn import DynUNet
-from medlp.models.cnn import SegNet
-from monai_ex.networks.layers import Act, Norm, Conv, Pool
-from monai_ex.networks.blocks import ResidualUnitEx as ResidualUnit
-from torch.nn.modules.activation import ReLU
-from medlp.models.cnn import CLASSIFICATION_ARCHI
+from monai.networks.layers import Act, Norm, Conv, Pool
+from monai.networks.layers.convutils import same_padding
+from monai.utils import ensure_tuple_rep
 
 
 class TwoConv(nn.Sequential):
@@ -123,6 +118,150 @@ class UpCat(nn.Module):
         return x
 
 
+class ResidualUnit(nn.Module):
+    """
+    Residual module with multiple convolutions and a residual connection.
+
+    For example:
+
+    .. code-block:: python
+
+        from monai.networks.blocks import ResidualUnit
+
+        convs = ResidualUnit(
+            dimensions=3,
+            in_channels=1,
+            out_channels=1,
+            adn_ordering="AN",
+            act=("prelu", {"init": 0.2}),
+            norm=("layer", {"normalized_shape": (10, 10, 10)}),
+        )
+        print(convs)
+
+    output::
+
+        ResidualUnit(
+          (conv): Sequential(
+            (unit0): Convolution(
+              (conv): Conv3d(1, 1, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
+              (adn): ADN(
+                (A): PReLU(num_parameters=1)
+                (N): LayerNorm((10, 10, 10), eps=1e-05, elementwise_affine=True)
+              )
+            )
+            (unit1): Convolution(
+              (conv): Conv3d(1, 1, kernel_size=(3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))
+              (adn): ADN(
+                (A): PReLU(num_parameters=1)
+                (N): LayerNorm((10, 10, 10), eps=1e-05, elementwise_affine=True)
+              )
+            )
+          )
+          (residual): Identity()
+        )
+
+    Args:
+        dimensions: number of spatial dimensions.
+        in_channels: number of input channels.
+        out_channels: number of output channels.
+        strides: convolution stride. Defaults to 1.
+        kernel_size: convolution kernel size. Defaults to 3.
+        subunits: number of convolutions. Defaults to 2.
+        adn_ordering: a string representing the ordering of activation, normalization, and dropout.
+            Defaults to "NDA".
+        act: activation type and arguments. Defaults to PReLU.
+        norm: feature normalization type and arguments. Defaults to instance norm.
+        dropout: dropout ratio. Defaults to no dropout.
+        dropout_dim: determine the dimensions of dropout. Defaults to 1.
+
+            - When dropout_dim = 1, randomly zeroes some of the elements for each channel.
+            - When dropout_dim = 2, Randomly zero out entire channels (a channel is a 2D feature map).
+            - When dropout_dim = 3, Randomly zero out entire channels (a channel is a 3D feature map).
+
+            The value of dropout_dim should be no no larger than the value of `dimensions`.
+        dilation: dilation rate. Defaults to 1.
+        bias: whether to have a bias term. Defaults to True.
+        last_conv_only: for the last subunit, whether to use the convolutional layer only.
+            Defaults to False.
+        padding: controls the amount of implicit zero-paddings on both sides for padding number of points
+            for each dimension. Defaults to None.
+
+    """
+
+    def __init__(
+        self,
+        dimensions: int,
+        in_channels: int,
+        out_channels: int,
+        strides: Union[Sequence[int], int] = 1,
+        kernel_size: Union[Sequence[int], int] = 3,
+        subunits: int = 2,
+        adn_ordering: Union[Sequence[str], str] = ["NDA", "NDA"],
+        act: Optional[Union[Tuple, str]] = "PRELU",
+        norm: Optional[Union[Tuple, str]] = "INSTANCE",
+        dropout: Optional[Union[Tuple, str, float]] = None,
+        dropout_dim: Optional[int] = 1,
+        dilation: Union[Sequence[int], int] = 1,
+        bias: bool = True,
+        last_conv_only: bool = False,
+        padding: Optional[Union[Sequence[int], int]] = None,
+    ) -> None:
+        super().__init__()
+        self.dimensions = dimensions
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.conv = nn.Sequential()
+        self.residual = nn.Identity()
+        self.adn_ordering = ensure_tuple_rep(adn_ordering, subunits)
+        if not padding:
+            padding = same_padding(kernel_size, dilation)
+        schannels = in_channels
+        sstrides = strides
+        subunits = max(1, subunits)
+
+        for su in range(subunits):
+            conv_only = last_conv_only and su == (subunits - 1)
+            unit = Convolution(
+                dimensions,
+                schannels,
+                out_channels,
+                strides=sstrides,
+                kernel_size=kernel_size,
+                adn_ordering=self.adn_ordering[su],
+                act=act,
+                norm=norm,
+                dropout=dropout,
+                dropout_dim=dropout_dim,
+                dilation=dilation,
+                bias=bias,
+                conv_only=conv_only,
+                padding=padding,
+            )
+
+            self.conv.add_module(f"unit{su:d}", unit)
+
+            # after first loop set channels and strides to what they should be for subsequent units
+            schannels = out_channels
+            sstrides = 1
+
+        # apply convolution to input to change number of output channels and size to match that coming from self.conv
+        if np.prod(strides) != 1 or in_channels != out_channels:
+            rkernel_size = kernel_size
+            rpadding = padding
+
+            if np.prod(strides) == 1:  # if only adapting number of channels a 1x1 kernel is used with no padding
+                rkernel_size = 1
+                rpadding = 0
+
+            conv_type = Conv[Conv.CONV, dimensions]
+            self.residual = conv_type(in_channels, out_channels, rkernel_size, strides, rpadding, bias=bias)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        res: torch.Tensor = self.residual(x)  # create the additive residual from x
+        cx: torch.Tensor = self.conv(x)  # apply x to sequence of operations
+        return cx + res  # add the residual to the output
+
+
 class MultiChannelLinear(nn.Module):
     def __init__(self, in_features: int, n_channels: int, bias: bool = True):
         super().__init__()
@@ -173,9 +312,6 @@ class MultiChannelLinear2(nn.Module):
         return z
 
 
-
-@CLASSIFICATION_ARCHI.register('2D', 'HESAM')
-@CLASSIFICATION_ARCHI.register('3D', 'HESAM')
 class HESAM(nn.Module):
     def __init__(
         self,
@@ -281,176 +417,6 @@ class HESAM(nn.Module):
 
         # high-level feature
         he = self.gmp(x3)
-        hesam = torch.add(out, he.squeeze(dim=-1))
-        logits = self.final_fc(hesam.squeeze())
-
-        return logits
-
-
-# @CLASSIFICATION_ARCHI.register('2D', 'nnHESAM')
-# @CLASSIFICATION_ARCHI.register('3D', 'nnHESAM')
-class HESAM2(nn.Module):
-    def __init__(
-        self,
-        dimensions: int,
-        in_channels: int,
-        out_channels: int,
-        last_feature: int = 64,
-        sam_size: int = 6,
-        act=Act.PRELU,
-        norm="instance",
-        dropout=0.0,
-        upsample: str = "deconv",
-    ) -> None:
-        """
-        Args:
-            dimensions: number of spatial dimensions.
-            in_channels: number of input channels.
-            out_channels: number of output channels.
-            last_feature: number of feature corresponds to the feature size after the last upsampling.
-            act: activation type and arguments. Defaults to LeakyReLU.
-            norm: feature normalization type and arguments. Defaults to instance norm.
-            dropout: dropout ratio. Defaults to no dropout.
-            upsample: upsampling mode, available options are
-                ``"deconv"``, ``"pixelshuffle"``, ``"nontrainable"``.
-        """
-        super().__init__()
-        globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
-        globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
-        n_depth = 3
-        self.backbone = DynUNet(
-            spatial_dims=dimensions,
-            in_channels=in_channels,
-            out_channels=last_feature,
-            kernel_size=(3,)+(3,)*n_depth,
-            strides=(1,)+(2,)*n_depth,
-            upsample_kernel_size=(1,)+(2,)*n_depth,
-            norm_name=norm,
-            deep_supervision=False,
-            deep_supr_num=1,
-            res_block=False,
-            output_bottleneck=True
-        )
-        # self.latent_code = None
-        # self.backbone.bottleneck.register_forward_hook(
-        #     hook=self.get_latent()
-        # )
-        features = self.backbone.filters
-        print(f"nnHESAM features: {features}.")
-
-        self.gmp = globalmaxpool(((1,)*dimensions))
-        self.residuals = nn.Sequential(
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=last_feature,
-                out_channels=features[-1],
-                strides=2,
-                act="relu",
-                norm="batch"
-                ),
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=features[-1],
-                out_channels=features[-1],
-                strides=1,
-                act="relu",
-                norm="batch"
-            )
-        )
-        self.sam = nn.Sequential(
-            globalavgpool((sam_size,)*dimensions),
-            # nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
-            nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
-        )
-        self.final_fc = nn.Linear(features[-1], out_channels)
-
-    def get_latent(self):
-        def hook(model, input, output):
-            self.latent_code = output
-        return hook
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, latent_code = self.backbone(x)
-
-        out = self.residuals(out)
-        out = self.sam(out)
-
-        # high-level feature
-        he = self.gmp(latent_code)
-        hesam = torch.add(out, he.squeeze(dim=-1))
-        logits = self.final_fc(hesam.squeeze())
-
-        return logits
-
-
-# @CLASSIFICATION_ARCHI.register('2D', 'segHESAM')
-# @CLASSIFICATION_ARCHI.register('3D', 'segHESAM')
-class HESAM3(nn.Module):
-    def __init__(
-        self,
-        dimensions: int,
-        in_channels: int,
-        out_channels: int,
-        last_feature: int = 64,
-        sam_size: int = 6,
-        act=Act.PRELU,
-        norm="instance",
-        dropout=0.0,
-        upsample: str = "deconv",
-    ) -> None:
-        super().__init__()
-        globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
-        globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
-        n_depth = 3
-
-        self.backbone = SegNet(
-            dim=dimensions,
-            in_channels=in_channels,
-            out_channels=last_feature,
-            pretrained=True,
-            n_depth=n_depth,
-            output_bottleneck=True
-        )
-
-        bot_feature = self.backbone.bottleneck_feat_chns
-        print(f"segHESAM bottleneck feature: {bot_feature}.")
-
-        self.gmp = globalmaxpool(((1,)*dimensions))
-        self.residuals = nn.Sequential(
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=last_feature,
-                out_channels=bot_feature,
-                strides=2,
-                act="relu",
-                norm="batch"
-                ),
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=bot_feature,
-                out_channels=bot_feature,
-                strides=1,
-                act="relu",
-                norm="batch"
-            )
-        )
-        self.sam = nn.Sequential(
-            globalavgpool((sam_size,)*dimensions),
-            # nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
-            nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), bot_feature)
-        )
-        self.final_fc = nn.Linear(bot_feature, out_channels)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, latent_code = self.backbone(x)
-
-        out = self.residuals(out)
-        out = self.sam(out)
-
-        # high-level feature
-        he = self.gmp(latent_code)
         hesam = torch.add(out, he.squeeze(dim=-1))
         logits = self.final_fc(hesam.squeeze())
 
