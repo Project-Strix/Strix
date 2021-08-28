@@ -303,6 +303,7 @@ def common_params(func):
         "--n-batch", prompt=True, show_default=True,
         type=int, default=10, help="Batch size",
     )
+    @option("-IS", "--imbalance-sample", is_flag=True, help="Use imbalanced dataset sampling")
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
     @option("--input-nc", type=int, default=1, help="input data channels")

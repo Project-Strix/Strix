@@ -1,8 +1,10 @@
-import os
-
+import torch
 from torch.utils.data import DataLoader as _TorchDataLoader
+from torch.utils.data.sampler import WeightedRandomSampler
 from medlp.utilities.utils import DatasetRegistry
 from monai_ex.data import DataLoader
+from medlp.configures import config as cfg
+import pandas as pd
 
 CLASSIFICATION_DATASETS = DatasetRegistry()
 SEGMENTATION_DATASETS = DatasetRegistry()
@@ -60,7 +62,29 @@ def get_dataloader(args, files_list, phase="train"):
         **arguments
     )
 
+    label_key = cfg.get_key("LABEL")
     if isinstance(dataset_, _TorchDataLoader):
         return dataset_
+    elif phase=="train" and args.imbalance_sample and files_list[0].get(label_key) is not None:
+        if isinstance(files_list[0][label_key], (list, tuple)):
+            raise NotImplementedError('Imbalanced dataset sampling cannot handle list&tuple label')
+
+        print("Using imbalanced dataset sampling!")
+        params.update({"shuffle": False})
+        labels = [l[label_key] for l in files_list]
+
+        df = pd.DataFrame()
+        df["label"] = labels
+        df = df.sort_index()
+
+        label_to_count = df["label"].value_counts()
+        weights = 1.0 / label_to_count[df["label"]]
+        weights = torch.DoubleTensor(weights.to_list())
+
+        return DataLoader(
+            dataset_,
+            sampler=WeightedRandomSampler(weights=weights, num_samples=len(dataset_)),
+            **params
+        )
     else:
         return DataLoader(dataset_, **params)
