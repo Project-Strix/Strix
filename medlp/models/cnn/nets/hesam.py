@@ -231,7 +231,7 @@ class HESAM(nn.Module):
                 strides=2,
                 act=Act.RELU,
                 norm=Norm.BATCH,
-                ),
+            ),
             nn.ReLU(),
             ResidualUnit(
                 dimensions=dimensions,
@@ -347,7 +347,7 @@ class HESAM2(nn.Module):
                 strides=2,
                 act="relu",
                 norm="batch"
-                ),
+            ),
             ResidualUnit(
                 dimensions=dimensions,
                 in_channels=features[-1],

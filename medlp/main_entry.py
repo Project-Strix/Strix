@@ -80,7 +80,8 @@ def train_core(cargs, files_train, files_valid):
         logging.StreamHandler.terminator = "\r"
 
     trainer.add_event_handler(
-        event_name=Events.EPOCH_STARTED, handler=lambda x: print("\n", "-" * 40)
+        event_name=Events.EPOCH_STARTED, handler=
+        lambda x: print("\n", "-"*15, os.path.basename(cargs.experiment_path), "-"*15)
     )
 
     if os.path.isfile(cargs.pretrained_model_path):
