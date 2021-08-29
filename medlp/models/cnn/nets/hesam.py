@@ -173,9 +173,8 @@ class MultiChannelLinear2(nn.Module):
         return z
 
 
-
-@CLASSIFICATION_ARCHI.register('2D', 'HESAM')
-@CLASSIFICATION_ARCHI.register('3D', 'HESAM')
+# @CLASSIFICATION_ARCHI.register('2D', 'HESAM')
+# @CLASSIFICATION_ARCHI.register('3D', 'HESAM')
 class HESAM(nn.Module):
     def __init__(
         self,
@@ -251,7 +250,7 @@ class HESAM(nn.Module):
             MultiChannelLinear(np.prod((6,)*dimensions), features[-1])
         )
         self.final_fc = nn.Linear(features[-1], out_channels)
-        # self.apply(self.initialize_weights)
+        self.apply(self.initialize_weights)
 
     @staticmethod
     def initialize_weights(module):
@@ -384,74 +383,41 @@ class HESAM2(nn.Module):
         return logits
 
 
-# @CLASSIFICATION_ARCHI.register('2D', 'segHESAM')
-# @CLASSIFICATION_ARCHI.register('3D', 'segHESAM')
-class HESAM3(nn.Module):
-    def __init__(
-        self,
-        dimensions: int,
-        in_channels: int,
-        out_channels: int,
-        last_feature: int = 64,
-        sam_size: int = 6,
-        act=Act.PRELU,
-        norm="instance",
-        dropout=0.0,
-        upsample: str = "deconv",
-    ) -> None:
-        super().__init__()
-        globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
-        globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
-        n_depth = 3
+@CLASSIFICATION_ARCHI.register('2D', 'HESAM')
+@CLASSIFICATION_ARCHI.register('3D', 'HESAM')
+def create_hesam(
+    dimensions: int,
+    in_channels: int,
+    out_channels: int,
+    features: Sequence[int] = (64, 128, 256, 256),
+    last_feature: int = 64,
+    # sam_size: int = 6,
+    act=Act.PRELU,
+    norm=Norm.INSTANCE,
+    dropout=0.0,
+    upsample: str = "deconv",
+    groups: int = 1,
+    pretrained_model_path: str = ''
+):
+    net = HESAM(
+        dimensions,
+        in_channels,
+        out_channels,
+        features,
+        last_feature,
+        sam_size,
+        act,
+        norm,
+        dropout,
+        upsample,
+        groups,
+    )
 
-        self.backbone = SegNet(
-            dim=dimensions,
-            in_channels=in_channels,
-            out_channels=last_feature,
-            pretrained=True,
-            n_depth=n_depth,
-            output_bottleneck=True
-        )
+    if os.path.isfile(pretrained_model_path):
+        print("Load pretrained model for contiune training:\n")
+        net.load_state_dict(torch.load(pretrained_model_path))
+    
+    fc = nn.Linear(features[-1], out_channels)
+    net.final_fc = fc
 
-        bot_feature = self.backbone.bottleneck_feat_chns
-        print(f"segHESAM bottleneck feature: {bot_feature}.")
-
-        self.gmp = globalmaxpool(((1,)*dimensions))
-        self.residuals = nn.Sequential(
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=last_feature,
-                out_channels=bot_feature,
-                strides=2,
-                act="relu",
-                norm="batch"
-                ),
-            ResidualUnit(
-                dimensions=dimensions,
-                in_channels=bot_feature,
-                out_channels=bot_feature,
-                strides=1,
-                act="relu",
-                norm="batch"
-            )
-        )
-        self.sam = nn.Sequential(
-            globalavgpool((sam_size,)*dimensions),
-            # nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
-            nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), bot_feature)
-        )
-        self.final_fc = nn.Linear(bot_feature, out_channels)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, latent_code = self.backbone(x)
-
-        out = self.residuals(out)
-        out = self.sam(out)
-
-        # high-level feature
-        he = self.gmp(latent_code)
-        hesam = torch.add(out, he.squeeze(dim=-1))
-        logits = self.final_fc(hesam.squeeze())
-
-        return logits
+    return net

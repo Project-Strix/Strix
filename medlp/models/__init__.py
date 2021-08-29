@@ -245,6 +245,7 @@ def get_network(opts):
                 act='relu',
                 norm='batch',
                 groups=n_group,
+                pretrained_model_path=get_attr_(opts, 'pretrained_model_path', -1)
             )
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
