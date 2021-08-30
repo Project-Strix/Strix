@@ -86,15 +86,15 @@ def check_data(ctx, **args):
     cargs.out_dir = check_dir(cargs.out_dir, 'data checking')
     auxilary_params.update({'experiment_path': str(cargs.out_dir)})
 
-    dataset_type = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
-    dataset_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
+    data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
+    dataset_fn, dataset_list = data_attr['FN'], data_attr['PATH']
     files_list = get_items_from_file(dataset_list, format="auto")
 
     files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
 
     try:
-        train_ds = dataset_type(files_train, 'train', auxilary_params)
-        valid_ds = dataset_type(files_valid, 'valid', auxilary_params)
+        train_ds = dataset_fn(files_train, 'train', auxilary_params)
+        valid_ds = dataset_fn(files_valid, 'valid', auxilary_params)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]

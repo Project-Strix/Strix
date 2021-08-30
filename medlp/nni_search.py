@@ -55,7 +55,7 @@ def train_nni(**kwargs):
             # temp solution for MIG env
             cargs.gpu_ids = list(range(len(list(map(str, cargs.gpus.split(","))))))
 
-        data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
+        data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["PATH"]
         assert os.path.isfile(data_list), "Data list not exists!"
         files_list = get_items_from_file(data_list, format="auto")
         if cargs.partial < 1:

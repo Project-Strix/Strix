@@ -20,8 +20,7 @@ MP指的是微乳头型肺腺癌，S指的是实体型肺腺癌
 """
 
 
-@CLASSIFICATION_DATASETS.register('2D', 'jsph_mps_192',
-    "/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/data_crops/datalist-train-yyq.json")
+@CLASSIFICATION_DATASETS.register('2D', 'jsph_mps_192', "/homes/clwang/Data/jsph_lung/YHBLXA_YXJB/data_crops/datalist-train-yyq.json")
 def get_25d_dataset(files_list, phase, opts):
     return get_lung_mps_dataset(files_list, phase, opts, (64, 64))
 

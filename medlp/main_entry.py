@@ -171,7 +171,7 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
         os.sys.exit()
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list + "_fpath"]
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["PATH"]
     assert os.path.isfile(data_list), "Data list not exists!"
     files_list = get_items_from_file(data_list, format="auto")
 

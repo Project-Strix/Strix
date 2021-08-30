@@ -245,7 +245,7 @@ def data_select(ctx, param, value):
     datalist = list(
         DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
     )
-    datalist = list(filter(lambda x: "fpath" not in x, datalist))  #! Not good
+
     assert (
         len(datalist) > 0
     ), f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"

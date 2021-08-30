@@ -17,6 +17,7 @@ from medlp.models.cnn.engines import (
 )
 from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.enum import RCNN_MODEL_TYPES
+from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import (
     LOSS_MAPPING,
@@ -278,6 +279,10 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     momentum = get_attr_(opts, 'momentum', 0.0)
     valid_interval = get_attr_(opts, 'valid_interval', 5)
 
+    frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
+    multi_input_keys  = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
+    multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
+
     framework_type = opts.framework
     device = torch.device("cuda") if opts.gpus != '-1' else torch.device("cpu")
     model_dir = check_dir(opts.experiment_path, 'Models')
@@ -363,7 +368,10 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         'valid_interval': valid_interval,
         'device': device,
         'model_dir': model_dir,
-        'logger_name': f'{opts.tensor_dim}-Trainer'
+        'logger_name': f'{opts.tensor_dim}-Trainer',
+        'multi_input_keys': multi_input_keys,
+        'multi_output_keys': multi_output_keys
+
     }
 
     engine = TRAIN_ENGINES[framework_type](**params)

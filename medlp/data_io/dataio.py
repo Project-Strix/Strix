@@ -58,7 +58,7 @@ def get_dataloader(args, files_list, phase="train"):
     )  #! How to customize?
     arguments = {"files_list": files_list, "phase": phase, "opts": vars(args)}
 
-    dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list](
+    dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]['FN'](
         **arguments
     )
 

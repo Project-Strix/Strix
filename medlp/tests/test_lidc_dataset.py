@@ -7,7 +7,7 @@ with open(json_file) as f:
     files_list = json.load(f)
 
 opts = {}
-dataset = DATASET_MAPPING['classification']['2D']['lidc-73'](
+dataset = DATASET_MAPPING['classification']['2D']['lidc-73']["FN"](
     files_list, "train", opts
 )
 

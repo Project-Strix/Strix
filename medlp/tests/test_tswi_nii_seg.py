@@ -38,7 +38,7 @@ arguments = {
     'opts': opts
 }
 
-dataset_ = DATASET_MAPPING['segmentation']['3D']['rjh_tswi_v2'](**arguments)
+dataset_ = DATASET_MAPPING['segmentation']['3D']['rjh_tswi_v2']["FN"](**arguments)
 
 print("Len:", len(dataset_))
 for i, data in enumerate(dataset_):
