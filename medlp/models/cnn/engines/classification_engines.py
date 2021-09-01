@@ -57,21 +57,30 @@ from monai_ex.handlers import (
 
 
 def get_prepare_batch_fn(opts, image_key, label_key, multi_input_keys, multi_output_keys):
-    if multi_input_keys is None:
-        multi_input_keys = [image_key]
-
-    if multi_output_keys is None:
-        multi_output_keys = [label_key]
-
-    if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
-        prepare_batch_fn = lambda x, device, nb: (
-            tuple(x[key].to(device) for key in multi_input_keys),
-            tuple(torch.as_tensor(x[key].unsqueeze(1), dtype=torch.float32).to(device) for key in multi_output_keys)
-        )
-    else:
+    # if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
+    #     prepare_batch_fn = lambda x, device, nb: (
+    #         tuple(x[key].to(device) for key in multi_input_keys),
+    #         tuple(torch.as_tensor(x[key].unsqueeze(1), dtype=torch.float32).to(device) for key in multi_output_keys)
+    #     )
+    # else:
+    if multi_input_keys is not None and multi_output_keys is not None:
         prepare_batch_fn = lambda x, device, nb: (
             tuple(x[key].to(device) for key in multi_input_keys),
             tuple(x[key].to(device) for key in multi_output_keys)
+        )
+    elif multi_input_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            tuple(x[key].to(device) for key in multi_input_keys),
+            x[label_key].to(device),
+        )
+    elif multi_output_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device),
+            tuple(x[key].to(device) for key in multi_output_keys)
+        )
+    else:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device), x[label_key].to(device)
         )
 
     return prepare_batch_fn
