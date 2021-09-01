@@ -1,7 +1,6 @@
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
-from medlp.models.cnn import CLASSIFICATION_ARCHI
 
 BatchNorm = nn.BatchNorm2d
 
@@ -326,8 +325,6 @@ class DRN_A(nn.Module):
         return x
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'DRN_a50')
-@CLASSIFICATION_ARCHI.register('3D', 'DRN_a50')
 def drn_a_50(pretrained=False, **kwargs):
     model = DRN_A(Bottleneck, [3, 4, 6, 3], **kwargs)
     if pretrained:

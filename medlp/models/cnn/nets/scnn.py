@@ -6,7 +6,6 @@ from .vgg import vgg16_bn
 from medlp.models.cnn import SEGMENTATION_ARCHI
 
 
-@SEGMENTATION_ARCHI.register('2D', 'scnn')
 class SCNN(nn.Module):
     def __init__(
             self,

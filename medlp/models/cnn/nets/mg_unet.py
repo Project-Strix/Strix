@@ -2,14 +2,12 @@ from typing import List, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
-import numpy as np
-from medlp.models.cnn import SEGMENTATION_ARCHI
-from medlp.models.cnn.nets import DynUNet
+from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.blocks.dynunet_block_ex import *
 
 
-@SEGMENTATION_ARCHI.register('2D', 'mg_unet')
-@SEGMENTATION_ARCHI.register('3D', 'mg_unet')
+# @SEGMENTATION_ARCHI.register('2D', 'mg_unet')
+# @SEGMENTATION_ARCHI.register('3D', 'mg_unet')
 class MG_Unet(DynUNet):
     def __init__(
         self,

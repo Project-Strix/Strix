@@ -1,10 +1,10 @@
-from medlp.utilities.utils import DimRegistry
+from medlp.utilities.utils import NetworkRegistry
 
-CLASSIFICATION_ARCHI = DimRegistry()
-SEGMENTATION_ARCHI = DimRegistry()
-SELFLEARNING_ARCHI = DimRegistry()
-MULTITASK_ARCHI = DimRegistry()
-SIAMESE_ARCHI = DimRegistry()
+CLASSIFICATION_ARCHI = NetworkRegistry()
+SEGMENTATION_ARCHI = NetworkRegistry()
+SELFLEARNING_ARCHI = NetworkRegistry()
+MULTITASK_ARCHI = NetworkRegistry()
+SIAMESE_ARCHI = NetworkRegistry()
 
 ARCHI_MAPPING = {
     "segmentation": SEGMENTATION_ARCHI,
@@ -14,13 +14,4 @@ ARCHI_MAPPING = {
     "siamese": SIAMESE_ARCHI,
 }
 
-from medlp.models.cnn.nets.dynunet import DynUNet
-from medlp.models.cnn.nets.resnet import *
-from medlp.models.cnn.nets.scnn import SCNN
-from medlp.models.cnn.nets.vgg import *
-from medlp.models.cnn.nets.ild_cnn import ILD_Net
-from medlp.models.cnn.nets.multihead_net import MultiOutputNet
-from medlp.models.cnn.nets.drn import *
-from medlp.models.cnn.nets.segnet import SegNet
-from medlp.models.cnn.nets.hesam import HESAM, HESAM2
-# from medlp.models.cnn.nets.resnet_aag import resnet_aag_34
+from medlp.models.cnn.medlp_nets import *

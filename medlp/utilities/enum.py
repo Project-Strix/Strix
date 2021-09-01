@@ -5,6 +5,20 @@ BUILTIN_TYPES = [dict, list, tuple, str, int, float, bool]
 DIMS = ["2D", "3D", "2", "3", 2, 3]
 PHASES = ["train", "valid", "test"]
 NORM_TYPES = ["batch", "instance", "group"]
+ACT_TYPES = [
+    "relu",
+    "leakyrelu",
+    "prelu",
+    "selu",
+    "celu",
+    "gelu",
+    "sigmoid",
+    "tanh",
+    "softmax",
+    "logsoftmax",
+    "swish",
+    "mish"
+]
 LOSSES = [
     "CE",
     "WCE",
@@ -27,6 +41,21 @@ FRAMEWORK_TYPES = [
     "detection",
     "multitask",
 ]
+
+NETWORK_ARGS = [
+    "spatial_dims",
+    "in_channels",
+    "out_channels",
+    "act",
+    "norm",
+    "n_depth",
+    "n_group",
+    "drop_out",
+    "is_prunable",
+    "pretrained",
+    "pretrained_model_path"
+]
+
 LAYER_ORDERS = ["crb", "cbr", "cgr", "cbe", "abn"]
 OPTIM_TYPES = ["sgd", "adam", "adamw", "radam"]
 

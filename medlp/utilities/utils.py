@@ -2,12 +2,13 @@ from __future__ import print_function
 from typing import Union
 
 import os
+import inspect
 import struct
 import pylab
 import torch
 from pathlib import Path
 import socket
-from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE
+from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE, NETWORK_ARGS
 from monai_ex.utils import ensure_list
 import tensorboard.compat.proto.event_pb2 as event_pb2
 import matplotlib
@@ -19,8 +20,6 @@ import matplotlib.colors as mcolors
 import numpy as np
 
 from PIL import Image
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.cm as mpl_color_map
 
 
@@ -364,6 +363,36 @@ class DimRegistry(dict):
         def register_fn(fn):
             _register_generic_dim(self, dim, module_name, fn)
             return fn 
+        return register_fn
+
+
+class NetworkRegistry(DimRegistry):
+    def __init__(self, *args, **kwargs):
+        super(NetworkRegistry, self).__init__(*args, **kwargs)
+
+    def check_args(self, func, module_name):
+        sig = inspect.signature(func)
+        func_args = list(sig.parameters.keys())
+        for arg in NETWORK_ARGS:
+            if arg not in func_args:
+                raise ValueError(
+                    f"Missing argument {arg} in your {module_name} network API funcion"
+                )
+
+    def register(self, dim, module_name, module=None):
+        assert dim in DIMS, "Only support 2D&3D dataset now"
+        dim = self.dim_mapping[dim]
+        # used as function call
+        if module is not None:
+            self.check_args(module, module_name)
+            _register_generic_dim(self, dim, module_name, module)
+            return
+
+        # used as decorator
+        def register_fn(fn):
+            self.check_args(fn, module_name)
+            _register_generic_dim(self, dim, module_name, fn)
+            return fn
         return register_fn
 
 

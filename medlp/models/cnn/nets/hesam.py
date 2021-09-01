@@ -9,13 +9,10 @@ from torch.nn import init
 import numpy as np
 
 from monai.networks.blocks import Convolution, UpSample
-# from monai.networks.nets import DynUNet
-from medlp.models.cnn import DynUNet
-from medlp.models.cnn import SegNet
+from medlp.models.cnn.nets.dynunet import DynUNet
 from monai_ex.networks.layers import Act, Norm, Conv, Pool
 from monai_ex.networks.blocks import ResidualUnitEx as ResidualUnit
 from torch.nn.modules.activation import ReLU
-from medlp.models.cnn import CLASSIFICATION_ARCHI
 
 
 class TwoConv(nn.Sequential):
@@ -173,8 +170,6 @@ class MultiChannelLinear2(nn.Module):
         return z
 
 
-# @CLASSIFICATION_ARCHI.register('2D', 'HESAM')
-# @CLASSIFICATION_ARCHI.register('3D', 'HESAM')
 class HESAM(nn.Module):
     def __init__(
         self,
@@ -183,7 +178,6 @@ class HESAM(nn.Module):
         out_channels: int,
         features: Sequence[int] = (64, 128, 256, 256),
         last_feature: int = 64,
-        # sam_size: int = 6,
         act=Act.PRELU,
         norm=Norm.INSTANCE,
         dropout=0.0,
@@ -381,43 +375,3 @@ class HESAM2(nn.Module):
         logits = self.final_fc(hesam.squeeze())
 
         return logits
-
-
-@CLASSIFICATION_ARCHI.register('2D', 'HESAM')
-@CLASSIFICATION_ARCHI.register('3D', 'HESAM')
-def create_hesam(
-    dimensions: int,
-    in_channels: int,
-    out_channels: int,
-    features: Sequence[int] = (64, 128, 256, 256),
-    last_feature: int = 64,
-    # sam_size: int = 6,
-    act=Act.PRELU,
-    norm=Norm.INSTANCE,
-    dropout=0.0,
-    upsample: str = "deconv",
-    groups: int = 1,
-    pretrained_model_path: str = ''
-):
-    net = HESAM(
-        dimensions,
-        in_channels,
-        out_channels,
-        features,
-        last_feature,
-        sam_size,
-        act,
-        norm,
-        dropout,
-        upsample,
-        groups,
-    )
-
-    if os.path.isfile(pretrained_model_path):
-        print("Load pretrained model for contiune training:\n")
-        net.load_state_dict(torch.load(pretrained_model_path))
-    
-    fc = nn.Linear(features[-1], out_channels)
-    net.final_fc = fc
-
-    return net

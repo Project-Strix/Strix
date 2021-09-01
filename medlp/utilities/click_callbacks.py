@@ -384,9 +384,12 @@ def network_params(func):
         prompt=True, type=Choice(NORM_TYPES),
         default=1, help="Layer norm type",
     )
+    @option(
+        "--layer-act", type=Choice(ACT_TYPES),
+        default='relu', help="Layer activation type",
+    )
     @option("--n-features", type=int, default=64, help="Feature num of first layer")
     @option("--n-depth", type=int, default=-1, help="Network depth. -1: use default depth")
-    @option("--is-deconv", type=bool, default=False, help="use deconv or interplate")
     @option("--feature-scale", type=int, default=4, help="not used")
     @option("--snip", is_flag=True)
     # @optionex('--layer-order', prompt=True, type=Choice(LAYER_ORDERS), default=1, help='conv layer order')
@@ -411,8 +414,8 @@ def latent_auxilary_params(func):
         default={}, help="Auxilary params for loss",
     )
     @option(
-        "--load-imagenet", type=bool,
-        default=False, help="Load pretrain Imagenet for some net",
+        "--pretrained", type=bool,
+        default=False, help="Load pretrained model for networks which have hard-coded pretrained model",
     )
     @option(
         "--deep-supervision", type=bool,
@@ -428,7 +431,7 @@ def latent_auxilary_params(func):
     )
     @option("--config", type=click.Path(exists=True))
     @option("--n-group", type=int, default=1, help='Num of conv groups')
-    @option("--bottleneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
+    # @option("--bott leneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

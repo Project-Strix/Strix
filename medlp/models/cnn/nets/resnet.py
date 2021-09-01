@@ -1,9 +1,9 @@
+from typing import Callable
+
 import torch
 import torch.nn as nn
-from typing import Callable
 from torchvision.models.utils import load_state_dict_from_url
-from medlp.models.cnn import CLASSIFICATION_ARCHI
-from monai.networks.layers.factories import Conv, Dropout, Norm, Pool
+from monai.networks.layers.factories import Conv, Norm, Pool
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -260,8 +260,6 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     return model
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet18')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet18')
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -274,8 +272,6 @@ def resnet18(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet34')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet34')
 def resnet34(pretrained=False, progress=True, **kwargs):
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -288,8 +284,6 @@ def resnet34(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet50')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet50')
 def resnet50(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -326,7 +320,6 @@ def resnet152(pretrained=False, progress=True, **kwargs):
                    **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnext50')
 def resnext50_32x4d(pretrained=False, progress=True, **kwargs):
     r"""ResNeXt-50 32x4d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_
@@ -355,8 +348,6 @@ def resnext101_32x8d(pretrained=False, progress=True, **kwargs):
                    pretrained, progress, **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'WRN50')
-@CLASSIFICATION_ARCHI.register('3D', 'WRN50')
 def wide_resnet50_2(pretrained=False, progress=True, **kwargs):
     r"""Wide ResNet-50-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_
@@ -375,8 +366,6 @@ def wide_resnet50_2(pretrained=False, progress=True, **kwargs):
                    pretrained, progress, **kwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'WRN101')
-@CLASSIFICATION_ARCHI.register('3D', 'WRN101')
 def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
     r"""Wide ResNet-101-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_

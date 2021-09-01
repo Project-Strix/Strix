@@ -67,193 +67,46 @@ def get_network(opts):
 
     model_name = opts.model_name
     in_channels, out_channels = opts.input_nc, opts.output_nc
-    is_deconv = get_attr_(opts, 'is_deconv', False)
     n_depth = get_attr_(opts, 'n_depth', -1)
-    load_imagenet = get_attr_(opts, 'load_imagenet', False)
-    crop_size = get_attr_(opts, 'crop_size', None)
-    layer_norm = get_attr_(opts, 'layer_norm', 'batch')
+    pretrained = get_attr_(opts, 'pretrained', False)
+    act = get_attr_(opts, 'layer_act', 'relu')
+    norm = get_attr_(opts, 'layer_norm', 'batch')
     is_prunable = get_attr_(opts, 'snip', False)
-    bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
+    # crop_size = get_attr_(opts, 'crop_size', None)
+    # bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
     drop_out = get_attr_(opts, 'dropout', None)
     n_group = get_attr_(opts, 'n_group', 1)  # used for multi-group archi
-    # f_maps = get_attr_(opts, 'n_features', 64)
-    # skip_conn  = get_attr_(opts, 'skip_conn', 'concat')
-    # layer_order = get_attr_(opts, 'layer_order', 'crb')
-
-    model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
+    pretrained_model_path = get_attr_(opts, 'pretrained_model_path', None)
 
     dim = 2 if opts.tensor_dim == '2D' else 3
-    input_size = crop_size
 
     siamese = None
     siamese_latent_dim = get_attr_(opts, 'latent_dim', 512)
     if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
         loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
         siamese = 'single' if loss_type == ContrastiveLoss else 'multi'
-
-    if model_name == 'unet' or model_name == 'res-unet':
-        last_act = 'sigmoid' if opts.framework == 'selflearning' else None
-        n_depth = 5 if n_depth == -1 else n_depth
-        kernel_size = (3,)+(3,)*n_depth
-        strides = (1,)+(2,)*n_depth
-        upsample_kernel_size=(1,)+(2,)*n_depth
-
-        model = model(
-            spatial_dims=dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            norm_name=layer_norm,
-            kernel_size=kernel_size,
-            strides=strides,
-            upsample_kernel_size=upsample_kernel_size,
-            deep_supervision=get_attr_(opts, 'deep_supervision', False),
-            deep_supr_num=get_attr_(opts, 'deep_supr_num', 1),
-            res_block=(model_name == 'res-unet'),
-            last_activation=last_act,
-            is_prunable=is_prunable
-        )
-    elif model_name == 'mg_unet':
-        n_depth = 5 if n_depth == -1 else n_depth
-        kernel_size = (3,)+(3,)*n_depth
-        strides = (1,)+(2,)*n_depth
-        upsample_kernel_size = (1,)+(2,)*n_depth
-        group = 4
-        filters = [
-            min(2 ** (5 + i), 320 if dim == 3 else 512)*group
-            for i in range(len(strides))
-        ]
-
-        model = model(
-            spatial_dims=dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            num_groups=group,
-            kernel_size=kernel_size,
-            strides=strides,
-            upsample_kernel_size=upsample_kernel_size,
-            norm_name=layer_norm,
-            res_block=False,
-            last_activation=last_act,
-            is_prunable=is_prunable,
-            dropout=drop_out,
-            filters=filters
-        )
-    elif model_name == 'unetv2' or model_name == 'res-unetv2':
-        init_feat = get_attr_(opts, 'n_features', 64)
-        n_depth = 5 if n_depth == -1 else n_depth
-        strides = (2,)*(n_depth-1)
-        upsample_kernel_size=(1,)+(2,)*n_depth
-        channels = create_feature_maps(init_feat, n_depth)
-
-        model = model(
-            dimensions=dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            channels=channels,
-            strides=strides,
-            kernel_size=3,
-            up_kernel_size=3,
-            num_res_units=2 if model_name=='res-unet' else 0,
-            act='prelu',
-            norm=layer_norm,
-            dropout=0,
-        )
-    elif model_name == 'highresnet':
-        model = model(
-            spatial_dims=dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            norm_type=layer_norm,
-            acti_type=Activation.RELU,
-            dropout_prob=0.5,
-        )
-    elif model_name == 'scnn':
-        model = model(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            input_size=input_size,
-            ms_ks=9,
-            is_deconv=is_deconv,
-            use_dilated_conv=True,
-            pretrained=load_imagenet)
-    elif 'vgg' in model_name:
-        model = model(
-            pretrained=load_imagenet,
-            in_channels=in_channels,
-            num_classes=out_channels,
-            dim=dim,
-            is_prunable=is_prunable,
-            bottleneck_size=bottleneck_size,
-            siamese=siamese,
-            latent_dim=siamese_latent_dim,
-            n_group=n_group,
-        )
-    elif 'resnet' in model_name or \
-         'WRN' in model_name or \
-         'resnext' in model_name or \
-         'DRN' in model_name:
-        model = model(
-            pretrained=load_imagenet,
-            in_channels=in_channels,
-            num_classes=out_channels
-        )
-    elif model_name == 'vnet':
-        model = model(
-            spatial_dims=dim,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            act=("leakyrelu", {"inplace": True}),
-            dropout_prob=0.5,
-            dropout_dim=dim,
-        )
-    elif model_name == 'ild_net':
-        model = model(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            n_depth=5,
-            k=4,
-            feature_policy='proportional',
-            dim=dim,
-            is_prunable=is_prunable,
-        )
-    elif 'HESAM' in model_name:
-        if model_name == 'nnHESAM':
-            model = model(
-                dimensions=dim,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                last_feature=64,
-                sam_size=6,
-            )
-        elif model_name == 'segHESAM':
-            model = model(
-                dimensions=dim,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                last_feature=64,
-                sam_size=6,
-                act='relu',
-                norm='batch',
-            )
-        else:
-            model = model(
-                dimensions=dim,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                features=(64, 128, 256, 256),
-                last_feature=64,
-                # sam_size=6,
-                act='relu',
-                norm='batch',
-                groups=n_group,
-                pretrained_model_path=get_attr_(opts, 'pretrained_model_path', -1)
-            )
+        raise NotImplementedError
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
-    else:
-        raise ValueError(f'Model {model_name} not available')
 
-    return model
+    try:
+        model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
+    except:
+        raise ValueError(f"Cannot find registered model: {opts.model_name}")
+    else:
+        return model(
+            dim,
+            in_channels,
+            out_channels,
+            act,
+            norm,
+            n_depth,
+            n_group,
+            drop_out,
+            is_prunable,
+            pretrained,
+            pretrained_model_path
+        )
 
 
 def get_engine(opts, train_loader, test_loader, writer=None):

@@ -76,6 +76,7 @@ def get_prepare_batch_fn(opts, image_key, label_key, multi_input_keys, multi_out
 
     return prepare_batch_fn
 
+
 @TRAIN_ENGINES.register('classification')
 def build_classification_engine(**kwargs):
     opts = kwargs['opts']

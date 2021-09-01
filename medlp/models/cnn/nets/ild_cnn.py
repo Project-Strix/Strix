@@ -13,8 +13,6 @@ def get_FeatureMaps(L, policy, constant=17):
     }[policy]
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'ild_net')
-@CLASSIFICATION_ARCHI.register('3D', 'ild_net')
 class ILD_Net(nn.Module):
     def __init__(
         self,
