@@ -4,36 +4,12 @@ import os
 import torch
 
 from medlp.models.cnn import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
-from medlp.models.cnn.nets.resnet import resnet18, resnet50
+from medlp.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from medlp.models.cnn.nets.vgg import vgg9_bn
 from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
-from medlp.models.cnn.nets.resnet_aag import resnet34_agg
-
-
-@CLASSIFICATION_ARCHI.register('2D', 'resnet50')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet50')
-def medlp_resnet50(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['groups'] = n_group
-
-    return resnet50(pretrained=False, progress=True, **kwargs)
+from medlp.models.cnn.nets.resnet_aag import resnet34_aag
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'resnet18')
@@ -58,6 +34,54 @@ def medlp_resnet18(
     kwargs['groups'] = n_group
 
     return resnet18(pretrained=False, progress=True, **kwargs)
+
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet34')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet34')
+def medlp_resnet50(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    kwargs['dim'] = spatial_dims
+    kwargs['in_channels'] = in_channels
+    kwargs['num_classes'] = out_channels
+    kwargs['groups'] = n_group
+
+    return resnet34(pretrained=False, progress=True, **kwargs)
+
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet50')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet50')
+def medlp_resnet50(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    kwargs['dim'] = spatial_dims
+    kwargs['in_channels'] = in_channels
+    kwargs['num_classes'] = out_channels
+    kwargs['groups'] = n_group
+
+    return resnet50(pretrained=False, progress=True, **kwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'vgg9_bn')
@@ -269,4 +293,4 @@ def medlp_resnetaag_34(
     kwargs['groups'] = n_group
     kwargs["roi_classes"] = kwargs.get("roi_classes", 1)
 
-    return resnet34_agg(pretrained, **kwargs)
+    return resnet34_aag(pretrained, **kwargs)
