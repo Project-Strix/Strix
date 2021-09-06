@@ -287,10 +287,11 @@ def medlp_resnetaag_34(
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['groups'] = n_group
-    kwargs["roi_classes"] = kwargs.get("roi_classes", 1)
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['groups'] = n_group
+    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
 
-    return resnet34_aag(pretrained, **kwargs)
+    return resnet34_aag(pretrained, **inkwargs)

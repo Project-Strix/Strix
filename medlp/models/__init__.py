@@ -1,4 +1,3 @@
-from types import SimpleNamespace as sn
 from pathlib import Path
 from utils_cw import check_dir
 import torch
@@ -61,27 +60,30 @@ def get_rcnn_config(archi, backbone):
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
 
+
 def get_network(opts):
     assert hasattr(opts, 'model_name') and hasattr(opts, 'input_nc') and \
            hasattr(opts, 'tensor_dim') and hasattr(opts, 'output_nc')
 
-    model_name = opts.model_name
-    in_channels, out_channels = opts.input_nc, opts.output_nc
-    n_depth = get_attr_(opts, 'n_depth', -1)
-    pretrained = get_attr_(opts, 'pretrained', False)
-    act = get_attr_(opts, 'layer_act', 'relu')
-    norm = get_attr_(opts, 'layer_norm', 'batch')
-    is_prunable = get_attr_(opts, 'snip', False)
+    options = vars(opts).copy()
+    model_name = options.get('model_name')
+    dim = 2 if options.pop('tensor_dim') == '2D' else 3
+    in_channels = options.pop('input_nc')
+    out_channels = options.pop('output_nc')
+
+    n_depth = options.pop('n_depth', -1)
+    pretrained = options.pop('pretrained', False)
+    act = options.pop('layer_act', 'relu')
+    norm = options.pop('layer_norm', 'batch')
+    is_prunable = options.pop('snip', False)
     # crop_size = get_attr_(opts, 'crop_size', None)
     # bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
-    drop_out = get_attr_(opts, 'dropout', None)
-    n_group = get_attr_(opts, 'n_group', 1)  # used for multi-group archi
-    pretrained_model_path = get_attr_(opts, 'pretrained_model_path', None)
-
-    dim = 2 if opts.tensor_dim == '2D' else 3
+    drop_out = options.pop('dropout', None)
+    n_group = options.pop('n_group', 1)  # used for multi-group archi
+    pretrained_model_path = options.pop('pretrained_model_path', None)
 
     siamese = None
-    siamese_latent_dim = get_attr_(opts, 'latent_dim', 512)
+    siamese_latent_dim = options.pop('latent_dim', 512)
     if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
         loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
         siamese = 'single' if loss_type == ContrastiveLoss else 'multi'
@@ -105,7 +107,8 @@ def get_network(opts):
             drop_out,
             is_prunable,
             pretrained,
-            pretrained_model_path
+            pretrained_model_path,
+            **options,  #Todo: Only pass network-related kwargs instead of all
         )
 
 
