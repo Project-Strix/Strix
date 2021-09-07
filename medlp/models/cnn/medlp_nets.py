@@ -292,6 +292,10 @@ def medlp_resnetaag_34(
     inkwargs['in_channels'] = in_channels
     inkwargs['num_classes'] = out_channels
     inkwargs['groups'] = n_group
+    # inkwargs["pretrained_model_path"] = pretrained_model_path
     inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
+    inkwargs["freeze_backbone"] = kwargs.get("freeze_backbone", False)
+    if inkwargs["freeze_backbone"]:
+        print("Freeze backbone for fine-tune!")
 
-    return resnet34_aag(pretrained, **inkwargs)
+    return resnet34_aag(pretrained_model_path, **inkwargs)

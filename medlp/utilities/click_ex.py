@@ -73,7 +73,7 @@ def get_unknown_options(ctx, verbose=False):
     if isinstance(ctx, SimpleNamespace): #! temp solution
         return auxilary_params
 
-    for i in range(0, len(ctx.args), 2):
+    for i in range(0, len(ctx.args), 2):  #Todo: how to handle flag auxilary params?
         if str(ctx.args[i]).startswith("--"):
             auxilary_params[ctx.args[i][2:].replace('-', '_')] = _convert_type(ctx.args[i + 1])
         elif str(ctx.args[i]).startswith("-"):
