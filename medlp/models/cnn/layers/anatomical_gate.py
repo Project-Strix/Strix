@@ -1,7 +1,6 @@
-import torch 
-import torch.nn as nn 
+import torch
+import torch.nn as nn
 from monai.networks.blocks.dynunet_block import get_conv_layer
-from monai.networks.layers.factories import Act
 
 class AnatomicalAttentionGate(nn.Module):
     def __init__(
@@ -40,4 +39,3 @@ class AnatomicalAttentionGate(nn.Module):
         weighted_featmap1 = self.conv1(concat_featmap) * x1
         weighted_featmap2 = self.conv2(concat_featmap) * x2
         return torch.add(weighted_featmap1, weighted_featmap2)
-

@@ -10,6 +10,7 @@ from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
 from medlp.models.cnn.nets.resnet_aag import resnet34_aag
+from medlp.models.cnn.nets.vgg_aag import vgg9_aag
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'resnet18')
@@ -299,3 +300,25 @@ def medlp_resnetaag_34(
         print("Freeze backbone for fine-tune!")
 
     return resnet34_aag(pretrained_model_path, **inkwargs)
+
+
+@CLASSIFICATION_ARCHI.register('2D', 'vgg9_aag')
+@CLASSIFICATION_ARCHI.register('3D', 'vgg9_aag')
+def medlp_vggaag_34(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    inkwargs = {}
+    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
+
+    return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)

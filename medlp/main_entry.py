@@ -84,21 +84,6 @@ def train_core(cargs, files_train, files_valid):
         lambda x: print("\n", "-"*15, os.path.basename(cargs.experiment_path), "-"*15)
     )
 
-    # if os.path.isfile(cargs.pretrained_model_path):
-    #     Print(
-    #         "Load pretrained model for contiune training:\n\t",
-    #         cargs.pretrained_model_path,
-    #         color="g",
-    #     )
-    #     trainer.add_event_handler(
-    #         event_name=Events.STARTED,
-    #         handler=CheckpointLoaderEx(
-    #             load_path=cargs.pretrained_model_path,
-    #             load_dict={"net": net},
-    #             strict=True,
-    #             strict_shape=True,
-    #         ),
-    #     )
     if cargs.visualize:
         Print("Visualize the architecture to tensorboard", color="g")
         trainer.add_event_handler(

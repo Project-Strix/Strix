@@ -2,7 +2,6 @@ import os
 
 import torch
 import torch.nn as nn
-from medlp.models.cnn import CLASSIFICATION_ARCHI
 from medlp.models.cnn.nets.resnet import ResNet, BasicBlock
 from medlp.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate as AAG
 from medlp.models.cnn.utils import set_trainable
@@ -12,7 +11,7 @@ from monai.networks.blocks.dynunet_block import get_conv_layer
 class ResNetAAG(ResNet):
     def __init__(
         self, block, layers, dim=2, in_channels=3, roi_classes=1,
-        num_classes=1000, zero_init_residual=False, groups=1, width_per_group=64, 
+        num_classes=1000, zero_init_residual=False, groups=1, width_per_group=64,
         replace_stride_with_dilation=None, norm_layer=None, freeze_backbone=False
     ):
         super().__init__(
