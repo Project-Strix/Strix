@@ -1,16 +1,14 @@
 from __future__ import print_function
-from typing import Union
+from typing import Union, Optional, List, Tuple
 
 import os
-import inspect
 import struct
 import pylab
 import torch
 from pathlib import Path
+from PIL import Image, ImageColor
 import socket
-from medlp.utilities.enum import NETWORK_TYPES, DIMS, LR_SCHEDULE, NETWORK_ARGS
-from monai_ex.utils import ensure_list
-import tensorboard.compat.proto.event_pb2 as event_pb2
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,8 +17,11 @@ from matplotlib.ticker import ScalarFormatter
 import matplotlib.colors as mcolors
 import numpy as np
 
-from PIL import Image
 import matplotlib.cm as mpl_color_map
+
+from medlp.utilities.enum import LR_SCHEDULE
+from monai_ex.utils import ensure_list
+import tensorboard.compat.proto.event_pb2 as event_pb2
 
 
 def get_attr_(obj, name, default):
@@ -37,6 +38,7 @@ def bbox_3D(img):
     zmin, zmax = np.where(z)[0][[0, -1]]
 
     return rmin, rmax, cmin, cmax, zmin, zmax
+
 
 def bbox_2D(img):
     rows = np.any(img, axis=1)
@@ -86,6 +88,7 @@ def create_rgb_summary(label):
 
     return new_label
 
+
 def add_3D_overlay_to_summary(
     data: Union[torch.Tensor, np.ndarray],
     mask: Union[torch.Tensor, np.ndarray],
@@ -130,6 +133,7 @@ def add_3D_overlay_to_summary(
     writer.add_image(tag + '_x', segmentation_overlay_x)
     writer.add_image(tag + '_y', segmentation_overlay_y)
     writer.add_image(tag + '_z', segmentation_overlay_z)
+
 
 def add_3D_image_to_summary(manager, image, name, centers=None):
     image = np.squeeze(image)
@@ -181,10 +185,6 @@ def output_filename_check(torch_dataset, meta_key='image_meta_dict'):
     return ''
 
 
-def get_attr_(obj, name, default):
-    return getattr(obj, name) if hasattr(obj, name) else default
-
-
 def detect_port(port):
     '''Detect if the port is used'''
     socket_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -194,6 +194,7 @@ def detect_port(port):
         return True
     except:
         return False
+
 
 def parse_nested_data(data):
     params = {}
@@ -212,28 +213,6 @@ def parse_nested_data(data):
             params[key] = value
     return params
 
-def get_network_type(name):
-    for k, v in NETWORK_TYPES.items():
-        if name in v:
-            return k
-
-def assert_network_type(model_name, target_type):
-    assert get_network_type(model_name) == target_type, f"Only accept {target_type} arch: {NETWORK_TYPES[target_type]}"
-
-def _register_generic(module_dict, module_name, module):
-    assert module_name not in module_dict
-    module_dict[module_name] = module
-
-def _register_generic_dim(module_dict, dim, module_name, module):
-    assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
-    module_dict[dim].update({module_name: module})
-
-def _register_generic_data(module_dict, dim, module_name, fpath, module):
-    assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
-    attr = {
-        module_name: {'FN': module, 'PATH': fpath}
-    }
-    module_dict[dim].update(attr)
 
 def is_avaible_size(value):
     if isinstance(value, (list, tuple)):
@@ -265,6 +244,7 @@ def plot_summary(summary, output_fpath):
         f.savefig(output_fpath)
     except Exception as e:
         print('Failed to do plot: ' + str(e))
+
 
 def dump_tensorboard(db_file, dump_keys=None, save_image=False, verbose=False):
     if not os.path.isfile(db_file):
@@ -305,136 +285,82 @@ def dump_tensorboard(db_file, dump_keys=None, save_image=False, verbose=False):
     return summaries
 
 
-class Registry(dict):
-    '''
-    A helper class for managing registering modules, it extends a dictionary
-    and provides a register functions.
-
-    Eg. creeting a registry:
-        some_registry = Registry({"default": default_module})
-
-    There're two ways of registering new modules:
-    1): normal way is just calling register function:
-        def foo():
-            ...
-        some_registry.register("foo_module", foo)
-    2): used as decorator when declaring the module:
-        @some_registry.register("foo_module")
-        @some_registry.register("foo_modeul_nickname")
-        def foo():
-            ...
-
-    Access of module is just like using a dictionary, eg:
-        f = some_registry["foo_modeul"]
-    '''
-    def __init__(self, *args, **kwargs):
-        super(Registry, self).__init__(*args, **kwargs)
-
-    def register(self, module_name, module=None):
-        # used as function call
-        if module is not None:
-            _register_generic(self, module_name, module)
-            return
-
-        # used as decorator
-        def register_fn(fn):
-            _register_generic(self, module_name, fn)
-            return fn
-
-        return register_fn
+def _generate_color_palette(num_masks):
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    return [tuple((i * palette) % 255) for i in range(num_masks)]
 
 
-class DimRegistry(dict):
-    def __init__(self, *args, **kwargs):
-        super(DimRegistry, self).__init__(*args, **kwargs)
-        self.dim_mapping = {'2': '2D', '3': '3D', 2: '2D', 3: '3D', '2D': '2D', '3D': '3D'}
-        self['2D'] = {}
-        self['3D'] = {}
+def draw_segmentation_masks(
+    image: torch.Tensor,
+    masks: torch.Tensor,
+    alpha: float = 0.8,
+    colors: Optional[List[Union[str, Tuple[int, int, int]]]] = None,
+) -> torch.Tensor:
 
-    def register(self, dim, module_name, module=None):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
-        dim = self.dim_mapping[dim]
-        # used as function call
-        if module is not None:
-            _register_generic_dim(self, dim, module_name, module)
-            return
+    """
+    Draws segmentation masks on given RGB image.
+    The values of the input image should be uint8 between 0 and 255.
 
-        # used as decorator
-        def register_fn(fn):
-            _register_generic_dim(self, dim, module_name, fn)
-            return fn 
-        return register_fn
+    Args:
+        image (Tensor): Tensor of shape (3, H, W) and dtype uint8.
+        masks (Tensor): Tensor of shape (num_masks, H, W) or (H, W) and dtype bool.
+        alpha (float): Float number between 0 and 1 denoting the transparency of the masks.
+            0 means full transparency, 1 means no transparency.
+        colors (list or None): List containing the colors of the masks. The colors can
+            be represented as PIL strings e.g. "red" or "#FF00FF", or as RGB tuples e.g. ``(240, 10, 157)``.
+            When ``masks`` has a single entry of shape (H, W), you can pass a single color instead of a list
+            with one element. By default, random colors are generated for each mask.
+
+    Returns:
+        img (Tensor[C, H, W]): Image Tensor, with segmentation masks drawn on top.
+    """
+
+    if not isinstance(image, torch.Tensor):
+        raise TypeError(f"The image must be a tensor, got {type(image)}")
+    elif image.dtype != torch.uint8:
+        raise ValueError(f"The image dtype must be uint8, got {image.dtype}")
+    elif image.dim() != 3:
+        raise ValueError("Pass individual images, not batches")
+    elif image.size()[0] != 3:
+        raise ValueError("Pass an RGB image. Other Image formats are not supported")
+    if masks.ndim == 2:
+        masks = masks[None, :, :]
+    if masks.ndim != 3:
+        raise ValueError("masks must be of shape (H, W) or (batch_size, H, W)")
+    if masks.dtype != torch.bool:
+        raise ValueError(f"The masks must be of dtype bool. Got {masks.dtype}")
+    if masks.shape[-2:] != image.shape[-2:]:
+        raise ValueError("The image and the masks must have the same height and width")
+
+    num_masks = masks.size()[0]
+    if colors is not None and num_masks > len(colors):
+        raise ValueError(f"There are more masks ({num_masks}) than colors ({len(colors)})")
+
+    if colors is None:
+        colors = _generate_color_palette(num_masks)
+
+    if not isinstance(colors, list):
+        colors = [colors]
+    if not isinstance(colors[0], (tuple, str)):
+        raise ValueError("colors must be a tuple or a string, or a list thereof")
+    if isinstance(colors[0], tuple) and len(colors[0]) != 3:
+        raise ValueError("It seems that you passed a tuple of colors instead of a list of colors")
+
+    out_dtype = torch.uint8
+
+    colors_ = []
+    for color in colors:
+        if isinstance(color, str):
+            color = ImageColor.getrgb(color)
+        color = torch.tensor(color, dtype=out_dtype)
+        colors_.append(color)
+
+    img_to_draw = image.detach().clone()
+    # TODO: There might be a way to vectorize this
+    for mask, color in zip(masks, colors_):
+        img_to_draw[:, mask] = color[:, None]
+
+    out = image * (1 - alpha) + img_to_draw * alpha
+    return out.to(out_dtype)
 
 
-class NetworkRegistry(DimRegistry):
-    def __init__(self, *args, **kwargs):
-        super(NetworkRegistry, self).__init__(*args, **kwargs)
-
-    def check_args(self, func, module_name):
-        sig = inspect.signature(func)
-        func_args = list(sig.parameters.keys())
-        for arg in NETWORK_ARGS:
-            if arg not in func_args:
-                raise ValueError(
-                    f"Missing argument {arg} in your {module_name} network API funcion"
-                )
-
-    def register(self, dim, module_name, module=None):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
-        dim = self.dim_mapping[dim]
-        # used as function call
-        if module is not None:
-            self.check_args(module, module_name)
-            _register_generic_dim(self, dim, module_name, module)
-            return
-
-        # used as decorator
-        def register_fn(fn):
-            self.check_args(fn, module_name)
-            _register_generic_dim(self, dim, module_name, fn)
-            return fn
-        return register_fn
-
-
-class DatasetRegistry(DimRegistry):
-    def __init__(self, *args, **kwargs):
-        super(DatasetRegistry, self).__init__(*args, **kwargs)
-
-    def register(self, dim, module_name, fpath, module=None):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
-        dim = self.dim_mapping[dim]
-        # used as function call
-        if module is not None:
-            _register_generic_data(self, dim, module_name, fpath, module)
-            return
-
-        # used as decorator
-        def register_fn(fn):
-            _register_generic_data(self, dim, module_name, fpath, fn)
-            return fn
-        return register_fn
-
-    def _get_keys(self, val):
-        dims = ['2D', '3D']
-        results = []
-        for d in dims:
-            for key, value in self[d].items():
-                if val == value['FN']:
-                    results.append((d, key))
-        return results
-
-    def multi_in(self, *keys):
-        def register_input(fn):
-            dim_module_list = self._get_keys(fn)
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_IN": keys})
-            return fn
-        return register_input
-
-    def multi_out(self, *keys):
-        def register_output(fn):
-            dim_module_list = self._get_keys(fn)
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_OUT": keys})
-            return fn
-        return register_output

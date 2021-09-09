@@ -1,4 +1,4 @@
-from medlp.utilities.utils import NetworkRegistry
+from medlp.utilities.registry import NetworkRegistry
 
 CLASSIFICATION_ARCHI = NetworkRegistry()
 SEGMENTATION_ARCHI = NetworkRegistry()

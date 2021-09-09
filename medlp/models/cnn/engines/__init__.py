@@ -1,4 +1,4 @@
-from medlp.utilities.utils import Registry
+from medlp.utilities.registry import Registry
 
 TRAIN_ENGINES = Registry()
 TEST_ENGINES = Registry()

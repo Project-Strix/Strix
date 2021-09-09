@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader as _TorchDataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
-from medlp.utilities.utils import DatasetRegistry
+from medlp.utilities.registry import DatasetRegistry
 from monai_ex.data import DataLoader
 from medlp.configures import config as cfg
 import pandas as pd
