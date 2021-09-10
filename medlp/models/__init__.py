@@ -246,8 +246,11 @@ def get_test_engine(opts, test_loader):
         IgniteEngine: Return test engine.
     """
 
-    framework_type = opts.framework
     device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
+
+    frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
+    multi_input_keys  = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
+    multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
 
     net = get_network(opts).to(device)
 
@@ -256,10 +259,12 @@ def get_test_engine(opts, test_loader):
         'test_loader': test_loader,
         'net': net,
         'device': device,
-        'logger_name': f'{opts.tensor_dim}-Tester'
+        'logger_name': f'{opts.tensor_dim}-Tester',
+        'multi_input_keys': multi_input_keys,
+        'multi_output_keys': multi_output_keys
     }
 
     if get_attr_(opts, 'n_fold', 0) > 1 or get_attr_(opts, 'n_repeat', 0) > 1:
-        return ENSEMBLE_TEST_ENGINES[framework_type](**params)
+        return ENSEMBLE_TEST_ENGINES[frame](**params)
     else:
-        return TEST_ENGINES[framework_type](**params)
+        return TEST_ENGINES[frame](**params)

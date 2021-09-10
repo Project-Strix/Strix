@@ -347,6 +347,7 @@ def common_params(func):
     @option("--compact-log", is_flag=True, help="Output compact log info")
     @option("--symbolic-tb", is_flag=True, help='Create symbolic for tensorboard logs')
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
+    @option("--debug", is_flag=True, help='Enter debug mode')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

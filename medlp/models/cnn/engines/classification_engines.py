@@ -86,6 +86,19 @@ def get_prepare_batch_fn(opts, image_key, label_key, multi_input_keys, multi_out
     return prepare_batch_fn
 
 
+def get_unsupervised_prepare_batch_fn(opts, image_key, multi_input_keys):
+    if multi_input_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            tuple(x[key].to(device) for key in multi_input_keys), None
+        )
+    else:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device), None
+        )
+    
+    return prepare_batch_fn
+
+
 @TRAIN_ENGINES.register('classification')
 def build_classification_engine(**kwargs):
     opts = kwargs['opts']
@@ -269,8 +282,20 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
+    is_supervised = opts.phase=='test'
+    multi_input_keys = kwargs.get('multi_input_keys', None)
+    multi_output_keys = kwargs.get('multi_output_keys', None)
     _image_ = cfg.get_key("image")
     _pred_ = cfg.get_key("pred")
+
+    if is_supervised:
+        prepare_batch_fn = get_prepare_batch_fn(
+            opts, _image_, None, multi_input_keys, multi_output_keys
+        )
+    else:
+        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
+            opts, _image_, multi_input_keys
+        )
 
     if is_multilabel:
         post_transform = Compose([
@@ -347,23 +372,37 @@ def build_classification_test_engine(**kwargs):
             )
         ]
 
-    evaluator = SupervisedEvaluator(
-        device=device,
-        val_data_loader=test_loader,
-        # prepare_batch=lambda x : (x[0]["image"],torch.Tensor(0)),
-        network=net,
-        inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-        post_transform=None,  # post_transforms,
-        val_handlers=val_handlers,
-        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
-        additional_metrics={
-            'test_auc': ROCAUC(output_transform=auc_post_transforms),
-            'Prec': Precision(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
-            'Recall': Recall(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
-            'ROC': DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms)
-        },
-        amp=opts.amp
-    )
+    if is_supervised:
+        evaluator = SupervisedEvaluator(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
+            post_transform=None,  # post_transforms,
+            val_handlers=val_handlers,
+            key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
+            additional_metrics={
+                'test_auc': ROCAUC(output_transform=auc_post_transforms),
+                'Prec': Precision(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
+                'Recall': Recall(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
+                'ROC': DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms)
+            },
+            amp=opts.amp
+        )
+    else:
+        evaluator = SupervisedEvaluator(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
+            post_transform=None,
+            val_handlers=val_handlers,
+            key_val_metric=None,
+            additional_metrics=None,
+            amp=opts.amp
+        )
 
     return evaluator
 

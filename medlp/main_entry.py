@@ -120,7 +120,6 @@ def train_core(cargs, files_train, files_valid):
 
 
 @click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@click.option("--debug", is_flag=True)
 @clb.latent_auxilary_params
 @clb.common_params
 @clb.solver_params

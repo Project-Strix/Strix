@@ -35,9 +35,10 @@ def conv2_block(
 
 
 class VGG9AAG(nn.Module):
-    def __init__(self, dim, in_channels, num_classes, roi_classes, init_weights=True, **kwargs):
+    def __init__(self, dim, in_channels, num_classes, roi_classes, **kwargs):
         super(VGG9AAG, self).__init__()
         bottleneck_size = kwargs.get('bottleneck_size', 2)
+        init_weights = kwargs.get('init_weights', True)
         conv_type: Callable = Conv[Conv.CONV, dim]
         norm_type: Callable = Norm[Norm.BATCH, dim]
         pool_type: Callable = Pool[Pool.MAX, dim]
@@ -118,9 +119,9 @@ class VGG9AAG(nn.Module):
         return x
 
 
-def vgg9_aag(dim, in_channels, num_classes, roi_classes, init_weights=True, **kwargs):
+def vgg9_aag(dim, in_channels, num_classes, roi_classes, **kwargs):
     r"""VGG 9-layer model with AAG (configuration "S") with batch normalization
     """
 
-    return VGG9AAG(dim, in_channels, num_classes, roi_classes, init_weights, **kwargs)
+    return VGG9AAG(dim, in_channels, num_classes, roi_classes, **kwargs)
 
