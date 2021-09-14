@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from utils_cw import get_items_from_file, Print, check_dir
 
 import torch
-from torchvision.utils import make_grid, save_image
+from torchvision.utils import save_image
 
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
@@ -77,6 +77,7 @@ def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_i
 @click.option("--n-batch", prompt=True, type=int, default=10, help="Batch size")
 @click.option("--split", type=float, default=0.2, help="Training/testing split ratio")
 @click.option("--save-raw", is_flag=True, help="Save processed raw image to local")
+@click.option("--mask-overlap", is_flag=True, help='Overlapping mask if exists')
 @click.option("--seed", type=int, default=101, help="random seed")
 @click.option("--out-dir", type=str, prompt=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
 @click.pass_context
@@ -111,9 +112,11 @@ def check_data(ctx, **args):
     train_data = first(train_dataloader)
     # valid_data = first(valid_dataloader)
 
-    image_key = cfg.get_key("IMAGE")
-    data_shape = train_data[image_key][0].shape
-    data_dtype = train_data[image_key][0].dtype
+    img_key = cfg.get_key("IMAGE")
+    msk_key = cfg.get_key("MASK")
+    data_shape = train_data[img_key][0].shape
+    data_dtype = train_data[img_key][0].dtype
+    exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
     print("Channel:", channel, "Shape:", shape)
     if len(shape) == 2 and channel == 1:
@@ -121,14 +124,14 @@ def check_data(ctx, **args):
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
                 save_2d_image_grid(
-                    data[image_key],
+                    data[img_key],
                     int(np.round(np.sqrt(bs))),
                     cargs.out_dir,
                     phase,
                     cargs.data_list,
                     i,
                 )
-                fnames = {idx+1: fname for idx, fname in enumerate(data[image_key+'_meta_dict']['filename_or_obj'])}
+                fnames = {idx+1: fname for idx, fname in enumerate(data[img_key+'_meta_dict']['filename_or_obj'])}
                 save_fnames(fnames, cargs.out_dir, phase, cargs.data_list, i)
 
     elif len(shape) == 2 and channel > 1:
@@ -137,14 +140,14 @@ def check_data(ctx, **args):
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
                 if cargs.save_raw:
-                    if isinstance(data[image_key], torch.Tensor):
-                        out_data = data[image_key].cpu().numpy()
+                    if isinstance(data[img_key], torch.Tensor):
+                        out_data = data[img_key].cpu().numpy()
                     else:
-                        out_data = data[image_key]
+                        out_data = data[img_key]
 
                     save_raw_image(
                         out_data,
-                        data[f'{image_key}_meta_dict'],
+                        data[f'{img_key}_meta_dict'],
                         cargs.out_dir,
                         phase,
                         cargs.data_list,
@@ -153,7 +156,7 @@ def check_data(ctx, **args):
 
                 for ch_idx in range(channel):
                     save_2d_image_grid(
-                        data[image_key],
+                        data[img_key],
                         int(np.round(np.sqrt(bs))),
                         cargs.out_dir,
                         phase,
@@ -170,7 +173,7 @@ def check_data(ctx, **args):
                 bs = dataloader.batch_size
                 for slice_idx in range(shape[z_axis]):
                     save_3d_image_grid(
-                        data[image_key],
+                        data[img_key],
                         z_axis+2,
                         int(np.round(np.sqrt(bs))),
                         cargs.out_dir,

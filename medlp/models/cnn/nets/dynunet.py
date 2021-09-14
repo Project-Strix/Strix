@@ -164,20 +164,20 @@ class DynUNet(nn.Module):
         )
 
     def get_output_block(self, idx: int, upsample: int = 0, last_activation: Optional[str] = None):
-            if upsample > 1:
-                return nn.Sequential(UnetOutBlock(self.spatial_dims, 
-                                                  self.filters[idx], 
-                                                  self.out_channels, 
-                                                  is_prunable=self.is_prunable,), 
-                                     nn.UpsamplingBilinear2d(scale_factor=upsample))
-            else:
-                return UnetOutBlock(
-                    self.spatial_dims, 
-                    self.filters[idx], 
-                    self.out_channels, 
-                    activation=last_activation, 
-                    is_prunable=self.is_prunable,
-                )
+        if upsample > 1:
+            return nn.Sequential(UnetOutBlock(self.spatial_dims,
+                                                self.filters[idx],
+                                                self.out_channels,
+                                                is_prunable=self.is_prunable,),
+                                 nn.UpsamplingBilinear2d(scale_factor=upsample))
+        else:
+            return UnetOutBlock(
+                self.spatial_dims,
+                self.filters[idx],
+                self.out_channels,
+                activation=last_activation,
+                is_prunable=self.is_prunable,
+            )
 
     def get_downsamples(self):
         inp, out = self.filters[:-2], self.filters[1:-1]

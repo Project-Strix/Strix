@@ -95,7 +95,7 @@ def get_unsupervised_prepare_batch_fn(opts, image_key, multi_input_keys):
         prepare_batch_fn = lambda x, device, nb: (
             x[image_key].to(device), None
         )
-    
+
     return prepare_batch_fn
 
 
