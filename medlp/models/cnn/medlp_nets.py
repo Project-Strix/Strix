@@ -128,6 +128,7 @@ def medlp_dyn_unet(
     pretrained_model_path: str,
     **kwargs: Any
 ):
+    n_depth = 5 if n_depth == -1 else n_depth
     kernel_size = kwargs.get("kernel_size", (3,)+(3,)*n_depth)
     strides = kwargs.get("strides", (1,)+(2,)*n_depth)
     upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,)+(2,)*n_depth)
@@ -158,7 +159,7 @@ def medlp_dyn_unet(
 
 @SEGMENTATION_ARCHI.register('2D', 'res-unet')
 @SEGMENTATION_ARCHI.register('3D', 'res-unet')
-def medlp_dyn_unet(
+def medlp_dyn_resunet(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -172,6 +173,7 @@ def medlp_dyn_unet(
     pretrained_model_path: str,
     **kwargs: Any
 ):
+    n_depth = 5 if n_depth == -1 else n_depth
     kernel_size = kwargs.get("kernel_size", (3,)+(3,)*n_depth)
     strides = kwargs.get("strides", (1,)+(2,)*n_depth)
     upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,)+(2,)*n_depth)
@@ -319,6 +321,6 @@ def medlp_vggaag_34(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
+    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
 
     return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)
