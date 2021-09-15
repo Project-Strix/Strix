@@ -29,12 +29,13 @@ def medlp_resnet18(
     pretrained_model_path: str,
     **kwargs: Any
 ):
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['groups'] = n_group
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['groups'] = n_group
 
-    return resnet18(pretrained=False, progress=True, **kwargs)
+    return resnet18(pretrained=False, progress=True, **inkwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'resnet34')
@@ -53,12 +54,13 @@ def medlp_resnet50(
     pretrained_model_path: str,
     **kwargs: Any
 ):
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['groups'] = n_group
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['groups'] = n_group
 
-    return resnet34(pretrained=False, progress=True, **kwargs)
+    return resnet34(pretrained=False, progress=True, **inkwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'resnet50')
@@ -77,12 +79,13 @@ def medlp_resnet50(
     pretrained_model_path: str,
     **kwargs: Any
 ):
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['groups'] = n_group
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['groups'] = n_group
 
-    return resnet50(pretrained=False, progress=True, **kwargs)
+    return resnet50(pretrained=False, progress=True, **inkwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'vgg9_bn')
@@ -101,13 +104,14 @@ def medlp_vgg9_bn(
     pretrained_model_path: str,
     **kwargs: Any
 ):
-    kwargs['dim'] = spatial_dims
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
-    kwargs['is_prunable'] = is_prunable
-    kwargs['groups'] = n_group
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['is_prunable'] = is_prunable
+    inkwargs['groups'] = n_group
 
-    return vgg9_bn(pretrained=False, progress=True, **kwargs)
+    return vgg9_bn(pretrained=False, progress=True, **inkwargs)
 
 
 # @SELFLEARNING_ARCHI.register('2D', 'unet')
@@ -218,10 +222,11 @@ def medlp_drn_a_50(
     pretrained_model_path: str,
     **kwargs: Any
 ):
-    kwargs['in_channels'] = in_channels
-    kwargs['num_classes'] = out_channels
+    inkwargs = {}
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
 
-    return drn_a_50(pretrained=False, **kwargs)
+    return drn_a_50(pretrained=False, **inkwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'HESAM')
