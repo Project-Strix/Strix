@@ -157,3 +157,11 @@ class DatasetRegistry(DimRegistry):
                 self[dim][module_name].update({"M_OUT": keys})
             return fn
         return register_output
+
+    def snapshot(self, source):
+        def register_source(fn):
+            dim_module_list = self._get_keys(fn)
+            for dim, module_name in dim_module_list:
+                self[dim][module_name].update({"SOURCE": source})
+            return fn
+        return register_source

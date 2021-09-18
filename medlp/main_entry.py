@@ -165,8 +165,13 @@ def train(ctx, **args):
         os.sys.exit()
 
     data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["PATH"]
-    assert os.path.isfile(data_list), "Data list not exists!"
+    assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
     files_list = get_items_from_file(data_list, format="auto")
+
+    # dump dataset file
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["SOURCE"]
+    if source_file and os.path.isfile(source_file):
+        shutil.copyfile(source_file, cargs.experiment_path.joinpath(f'{cargs.data_list}.snapshot'))
 
     if cargs.partial < 1:
         Print("Use {} data".format(int(len(files_list) * cargs.partial)), color="y")
