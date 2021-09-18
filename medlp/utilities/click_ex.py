@@ -293,9 +293,9 @@ def data_select(ctx, param, value):
         DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
     )
 
-    assert (
-        len(datalist) > 0
-    ), f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
+    assert (len(datalist) > 0),\
+        f"No datalist available for {ctx.params['tensor_dim']} "\
+        f"{ctx.params['framework']} task! Abort!"
 
     if value is not None and value in datalist:
         return value

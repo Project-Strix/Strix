@@ -8,12 +8,16 @@ def _register_generic(module_dict, module_name, module):
 
 
 def _register_generic_dim(module_dict, dim, module_name, module):
-    assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
+    assert module_name not in module_dict.get(dim),\
+        f'{module_name} already registed in {module_dict.get(dim)}'
+
     module_dict[dim].update({module_name: module})
 
 
 def _register_generic_data(module_dict, dim, module_name, fpath, module):
-    assert module_name not in module_dict.get(dim), f'{module_name} already registed in {module_dict.get(dim)}'
+    assert module_name not in module_dict.get(dim),\
+        f'{module_name} already registed in {module_dict.get(dim)}'
+
     attr = {
         module_name: {'FN': module, 'PATH': fpath}
     }
