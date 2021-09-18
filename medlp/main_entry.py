@@ -29,6 +29,7 @@ from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
     Print,
     print_smi,
+    PathlibEncoder,
     confirmation,
     check_dir,
     get_items_from_file,
@@ -145,6 +146,10 @@ def train(ctx, **args):
     auxilary_params = get_unknown_options(ctx)
     args.update(auxilary_params)
     cargs = sn(**args)
+
+    if len(auxilary_params) > 0:  # dump auxilary params
+        with cargs.experiment_path.joinpath('param.list').open('w') as f:
+            json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         Print("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
