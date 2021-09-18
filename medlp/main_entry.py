@@ -134,10 +134,8 @@ def train_core(cargs, files_train, files_valid):
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm", callback=partial(
-        confirmation,
-        output_dir_ctx="experiment_path",
-        save_code=(cfg.get_medlp_cfg('mode') == 'dev'),
-        save_dir=cfg.get_medlp_cfg('external_dataset_dir'),
+        confirmation, output_dir_ctx="experiment_path",
+        save_code=(cfg.get_medlp_cfg('mode') == 'dev')
     )
 )
 @click.pass_context
