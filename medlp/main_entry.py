@@ -17,7 +17,11 @@ from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import SNIP_prune_handler
-from medlp.utilities.click_ex import get_unknown_options
+from medlp.utilities.click_ex import (
+    get_unknown_options,
+    get_exp_name,
+    input_cropsize
+)
 from medlp.configures import config as cfg
 import medlp.utilities.click_callbacks as clb
 
@@ -126,7 +130,7 @@ def train_core(cargs, files_train, files_valid):
 @clb.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
-@click.option("--experiment-path", type=str, callback=clb.get_exp_name, default="")
+@click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm", callback=partial(
         confirmation,
@@ -231,7 +235,7 @@ def train_cfg(**args):
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option(  # TODO: automatically decide when using patchdataset
-    "--slidingwindow", is_flag=True, callback=clb.input_cropsize, help='Use slidingwindow sampling'
+    "--slidingwindow", is_flag=True, callback=input_cropsize, help='Use slidingwindow sampling'
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")

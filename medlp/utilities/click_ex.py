@@ -229,7 +229,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
     if value is not None and value in losslist:
         return value
     else:
-        value = prompt("Loss list", type=Choice(losslist))
+        value = prompt("Loss list", type=NumericChoice(losslist))
 
         if 'WCE' in value:
             weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
@@ -281,7 +281,7 @@ def model_select(ctx, param, value):
     if value is not None and value in archilist:
         return value
     else:
-        return prompt("Model list", type=Choice(archilist))
+        return prompt("Model list", type=NumericChoice(archilist))
 
     return value
 
@@ -300,7 +300,7 @@ def data_select(ctx, param, value):
     if value is not None and value in datalist:
         return value
     else:
-        return prompt("Data list", type=Choice(datalist))
+        return prompt("Data list", type=NumericChoice(datalist))
 
 
 def input_cropsize(ctx, param, value):
