@@ -38,7 +38,7 @@ from utils_cw import (
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import CheckpointLoaderEx, TensorboardGraphHandler
+from monai_ex.handlers import TensorboardGraphHandler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 
@@ -135,7 +135,8 @@ def train_core(cargs, files_train, files_valid):
 @click.option(
     "--confirm", callback=partial(
         confirmation, output_dir_ctx="experiment_path",
-        save_code=(cfg.get_medlp_cfg('mode') == 'dev')
+        save_code=(cfg.get_medlp_cfg('mode') == 'dev'),
+        save_dir=Path(__file__).parent
     )
 )
 @click.pass_context

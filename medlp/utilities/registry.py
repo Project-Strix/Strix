@@ -1,3 +1,4 @@
+import os
 import inspect
 from medlp.utilities.enum import DIMS, NETWORK_ARGS
 
@@ -158,10 +159,11 @@ class DatasetRegistry(DimRegistry):
             return fn
         return register_output
 
-    def snapshot(self, source):
-        def register_source(fn):
-            dim_module_list = self._get_keys(fn)
+    def snapshot(self, fn):
+        def register_source(func):
+            source = os.path.abspath(inspect.getfile(func))
+            dim_module_list = self._get_keys(func)
             for dim, module_name in dim_module_list:
                 self[dim][module_name].update({"SOURCE": source})
-            return fn
-        return register_source
+            return func
+        return register_source(fn)
