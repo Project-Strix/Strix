@@ -286,11 +286,12 @@ def build_classification_test_engine(**kwargs):
     multi_input_keys = kwargs.get('multi_input_keys', None)
     multi_output_keys = kwargs.get('multi_output_keys', None)
     _image_ = cfg.get_key("image")
+    _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
 
     if is_supervised:
         prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image_, None, multi_input_keys, multi_output_keys
+            opts, _image_, _label_, multi_input_keys, multi_output_keys
         )
     else:
         prepare_batch_fn = get_unsupervised_prepare_batch_fn(
