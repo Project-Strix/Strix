@@ -9,7 +9,7 @@ from medlp.models.cnn.nets.vgg import vgg9_bn
 from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
-from medlp.models.cnn.nets.resnet_aag import resnet34_aag
+from medlp.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
 from medlp.models.cnn.nets.vgg_aag import vgg9_aag
 
 
@@ -307,6 +307,43 @@ def medlp_resnetaag_34(
         print("Freeze backbone for fine-tune!")
 
     return resnet34_aag(pretrained_model_path, **inkwargs)
+
+
+@CLASSIFICATION_ARCHI.register('2D', 'resnet_aag_50')
+@CLASSIFICATION_ARCHI.register('3D', 'resnet_aag_50')
+def medlp_resnetaag_50(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    r"""ResNetAAG-50 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    inkwargs = {}
+    inkwargs['dim'] = spatial_dims
+    inkwargs['in_channels'] = in_channels
+    inkwargs['num_classes'] = out_channels
+    inkwargs['groups'] = n_group
+    # inkwargs["pretrained_model_path"] = pretrained_model_path
+    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
+    inkwargs["freeze_backbone"] = kwargs.get("freeze_backbone", False)
+    if inkwargs["freeze_backbone"]:
+        print("Freeze backbone for fine-tune!")
+
+    return resnet50_aag(pretrained_model_path, **inkwargs)
 
 
 @CLASSIFICATION_ARCHI.register('2D', 'vgg9_aag')

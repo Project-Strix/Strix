@@ -2,7 +2,7 @@ import os
 
 import torch
 import torch.nn as nn
-from medlp.models.cnn.nets.resnet import ResNet, BasicBlock
+from medlp.models.cnn.nets.resnet import ResNet, BasicBlock, Bottleneck
 from medlp.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate as AAG
 from medlp.models.cnn.utils import set_trainable
 from monai.networks.blocks.dynunet_block import get_conv_layer
@@ -30,7 +30,11 @@ class ResNetAAG(ResNet):
             bias=True,
             conv_only=False
         )
-        roi_chns = [roi_classes, 64, 64, 128, 256]
+        if block == BasicBlock:
+            roi_chns = [roi_classes, 64, 64, 128, 256]
+        else:
+            roi_chns = [roi_classes, 64, 256, 512, 1024]
+
         self.roi_convs = nn.ModuleList(
             [
                 get_conv_layer(
@@ -92,6 +96,21 @@ def resnet34_aag(pretrained_model_path, **kwargs):
         kwargs['num_classes'] = 1
 
     model = ResNetAAG(BasicBlock, [3, 4, 6, 3], **kwargs)
+
+    if pretrained_model_path and os.path.exists(pretrained_model_path):
+        model.load_state_dict(torch.load(pretrained_model_path))
+        in_features_ = model.fc.in_features
+        model.fc = nn.Linear(in_features_, num_classes_)
+
+    return model
+
+
+def resnet50_aag(pretrained_model_path, **kwargs):
+    if pretrained_model_path and os.path.exists(pretrained_model_path):
+        num_classes_ = kwargs['num_classes']
+        kwargs['num_classes'] = 1
+
+    model = ResNetAAG(Bottleneck, [3, 4, 6, 3], **kwargs)
 
     if pretrained_model_path and os.path.exists(pretrained_model_path):
         model.load_state_dict(torch.load(pretrained_model_path))

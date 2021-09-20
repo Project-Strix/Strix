@@ -1,4 +1,6 @@
 import os
+from time import strftime
+from pathlib import Path
 import inspect
 from functools import partial
 from click import (
@@ -123,7 +125,7 @@ def get_exp_name(ctx, param, value):
     layer_norm = mapping[ctx.params["layer_norm"]]
     # update timestamp if train-from-cfg
     timestamp = (
-        time.strftime("%m%d_%H%M")
+        strftime("%m%d_%H%M")
         if ctx.params.get("config") is not None
         else ctx.params["timestamp"]
     )
@@ -146,9 +148,7 @@ def get_exp_name(ctx, param, value):
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
-    return os.path.join(
-        ctx.params["out_dir"], ctx.params["framework"], datalist_name, exp_name
-    )
+    return Path(ctx.params["out_dir"])/ctx.params["framework"]/datalist_name/exp_name
 
 
 def get_nni_exp_name(ctx, param, value):
