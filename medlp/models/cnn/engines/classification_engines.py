@@ -345,9 +345,9 @@ def build_classification_test_engine(**kwargs):
         val_handlers += [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
-                save_errors=False,  # opts.phase=='test',
-                batch_transform=lambda x: x[_image_+'_meta_dict'],  # lambda x: (x['image_meta_dict'], x['image'], x['label']) \
-                                #if opts.phase=='test' else lambda x: x['image_meta_dict'],
+                save_labels=True,  # opts.phase=='test',
+                batch_transform=lambda x: (x[_image_+'_meta_dict'], x[_label_])\
+                if opts.phase == 'test' else lambda x: x[_image_+'_meta_dict'],
                 output_transform=post_transform,
             ),
             ClassificationSaverEx(
