@@ -327,34 +327,3 @@ def test_cfg(**args):
         engine.run()
         if isinstance(model_path, Path):
             os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
-
-
-@click.command("unlink")
-@click.option(
-    "--root-dir", type=click.Path(exists=True),
-    help="Root dir contains symbolic dirs"
-)
-@click.option(
-    "-a",
-    "--all-dir",
-    is_flag=True,
-    help="Unlink all dirs including both avalible and unavailable dirs",
-)
-def unlink_dirs(root_dir, all_dir):
-    """Utility for unlink invalid symbolic tensorboard dir.
-
-    Args:
-        root_dir (str): Root dir contains symbolic dirs.
-        all_dir (bool): whether unlink both invalid and valid sym dirs.
-    """
-    for d in os.listdir(root_dir):
-        d = os.path.join(root_dir, d)
-        if os.path.islink(d):
-            if not os.path.isdir(d):
-                os.unlink(d)
-                print("Unlinked unavailable symbolic dir:", d)
-            elif all_dir:
-                os.unlink(d)
-                print("Unlinked symbolic dir:", d)
-            else:
-                pass
