@@ -234,10 +234,10 @@ class GradCamHandler:
             else:
                 origin_img = inputs.cpu().detach().numpy().squeeze(1)
 
-            # self.logger.debug(
-            #     f'Cam feature size: {self.cam.feature_map_size(origin_img.shape, device=self.device)}'
-            # )
-            print(f'\nlen:{len(inputs)}, shape:{inputs[0].shape}')
+            self.logger.debug(
+                f'Input len: {len(inputs)}, shape: {origin_img.shape}'
+            )
+
             cam_result = self.cam(inputs, class_idx=self.target_class, img_spatial_size=origin_img.shape[1:])
 
             self.logger.debug(
@@ -261,7 +261,7 @@ class GradCamHandler:
             else:
                 raise NotImplementedError(f"Cannot support ({origin_img.shape}) data.")
 
-            engine.terminate()
+        engine.terminate()
 
 
 class TensorboardDumper:

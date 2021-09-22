@@ -25,6 +25,8 @@ from medlp.utilities.handlers import GradCamHandler
 @click.option('--method', type=Choice(['gradcam', 'layercam']), default='gradcam', help='Choose visualize method')
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option("--debug", is_flag=True, help='Debug mode')
+@click.option("--n-sample", type=int, default=-1,
+              help="Number of samples to be processed. Defulat=-1 means all. n_sample=1 in debug mode.")
 @click.option('--gpus', prompt="Choose GPUs[eg: 0]", type=str)
 def gradcam(**args):
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -48,6 +50,11 @@ def gradcam(**args):
             test_files = get_items_from_file(test_fpath, format="auto")
         else:
             raise ValueError(f"Test file does not exists in {exp_dir}!")
+
+    if args['debug']:
+        test_files = test_files[:1]
+    elif args['n_sample'] > 0:
+        test_files = test_files[:args['n_sample']]
 
     phase = 'test_wo_label'
     configures["preload"] = 0.0
