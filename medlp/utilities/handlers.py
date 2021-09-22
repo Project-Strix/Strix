@@ -239,7 +239,7 @@ class GradCamHandler:
 
             if isinstance(inputs, (tuple, list)):
                 self.logger.warn(
-                    f"Got multiple inputs with size of {len(batch)}," 
+                    f"Got multiple inputs with size of {len(batch)},"
                     "select the first one as image data."
                 )
                 origin_img = inputs[0].cpu().detach().numpy().squeeze(1)
@@ -286,7 +286,8 @@ class GradCamHandler:
                     img_slice = np.uint8(Normalize2(img_slice) * 255)
 
                     img_slice = Image.fromarray(img_slice)
-                    no_trans_heatmap, heatmap_on_image = apply_colormap_on_image(img_slice, cam_slice, 'hsv')
+                    no_trans_heatmap, heatmap_on_image = \
+                        apply_colormap_on_image(img_slice, cam_slice, 'hsv')
 
                     heatmap_on_image.save(self.save_dir/f'batch{i}_{j}_heatmap_on_img.png')
             else:
