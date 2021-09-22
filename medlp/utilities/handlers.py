@@ -216,6 +216,7 @@ class GradCamHandler:
         self.device = device
         self.logger = logging.getLogger(logger_name)
         self.fusion = fusion
+        self.hierarchical = hierarchical
         if method == 'gradcam':
             self.cam = GradCAM(nn_module=self.net, target_layers=self.target_layers)
         elif method == 'layercam':
@@ -268,16 +269,16 @@ class GradCamHandler:
                         self.save_dir/f'batch{i}_{j}_images.nii.gz'
                     )
 
-                    if cam_slice.shape[0] > 1 and self.fusion:  # multiple cam maps
-                        nib.save(
-                            nib.Nifti1Image(cam_slice.mean(axis=0).squeeze(), np.eye(4)),
-                            self.save_dir/file_name
-                        )
+                    if cam_slice.shape[0] > 1 and self.fusion:
+                        output_cam = cam_slice.mean(axis=0).squeeze()
+                    elif self.hierarchical:
+                        output_cam = np.flip(cam_slice.transpose(1, 2, 3, 0), 3).squeeze()
                     else:
-                        nib.save(
-                            nib.Nifti1Image(cam_slice.transpose(1,2,3,0).squeeze(), np.eye(4)),
-                            self.save_dir/file_name
-                        )
+                        output_cam = cam_slice.transpose(1, 2, 3, 0).squeeze()
+
+                    nib.save(
+                        nib.Nifti1Image(output_cam, np.eye(4)), self.save_dir/file_name
+                    )
 
             elif len(origin_img.shape[1:]) == 2:
                 cam_result = np.uint8(cam_result.squeeze(1) * 255)
