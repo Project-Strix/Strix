@@ -308,7 +308,7 @@ def build_classification_test_engine(**kwargs):
     else:
         post_transform = Compose([
             ActivationsD(keys=_pred_, sigmoid=True),
-            AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
+            # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
             lambda x: x[_pred_].cpu().numpy()
         ])
 
