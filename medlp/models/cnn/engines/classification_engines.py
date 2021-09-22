@@ -282,7 +282,7 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase=='test'
+    is_supervised = kwargs.get('is_supervised', opts.phase=='test')
     multi_input_keys = kwargs.get('multi_input_keys', None)
     multi_output_keys = kwargs.get('multi_output_keys', None)
     _image_ = cfg.get_key("image")

@@ -1,5 +1,6 @@
 import os
-import time
+import logging
+from time import strftime
 from pathlib import Path
 from types import SimpleNamespace as sn
 
@@ -7,6 +8,7 @@ import click
 import torch
 from utils_cw import get_items_from_file, Print, check_dir
 from ignite.engine import Events
+from ignite.utils import setup_logger
 
 from medlp.models import get_test_engine
 from medlp.data_io.dataio import get_dataloader
@@ -20,7 +22,9 @@ from medlp.utilities.handlers import GradCamHandler
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @click.option('--target-layer', type=str, prompt=True, )
 @click.option('--target-class', type=int, prompt=True, default=1, help='GradCAM target class')
+@click.option('--method', type=Choice(['gradcam', 'layercam']), default='gradcam', help='Choose visualize method')
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
+@click.option("--debug", is_flag=True, help='Debug mode')
 @click.option('--gpus', prompt="Choose GPUs[eg: 0]", type=str)
 def gradcam(**args):
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -45,7 +49,7 @@ def gradcam(**args):
         else:
             raise ValueError(f"Test file does not exists in {exp_dir}!")
 
-    phase = 'test'
+    phase = 'test_wo_label'
     configures["preload"] = 0.0
     configures["phase"] = phase
     configures["experiment_path"] = exp_dir
@@ -54,12 +58,15 @@ def gradcam(**args):
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]
-        else check_dir(exp_dir, f'GradCam@{time.strftime("%m%d_%H%M")}')
+        else check_dir(exp_dir, f"{args['method']}@{strftime('%m%d_%H%M')}")
     )
 
     Print(f"{len(test_files)} test files", color="g")
     test_dataloader = get_dataloader(sn(**configures), test_files, phase=phase)
     engine = get_test_engine(sn(**configures), test_dataloader)
+
+    logging_level = logging.DEBUG if args["debug"] else logging.INFO
+    engine.logger = setup_logger(f"{args['method']}-interpreter", level=logging_level)
 
     engine.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(once=1),
@@ -69,6 +76,7 @@ def gradcam(**args):
             args["target_class"],
             engine.data_loader,
             engine.prepare_batch,
+            method=args['method'],
             save_dir=configures["out_dir"],
             device=torch.device("cuda")
             if args['gpus'] != "-1" else torch.device("cpu"),
