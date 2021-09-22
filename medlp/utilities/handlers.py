@@ -201,6 +201,7 @@ class GradCamHandler:
         data_loader,
         prepare_batch_fn,
         method: str = 'gradcam',
+        fusion: bool = False,
         save_dir: Optional[str] = None,
         device: torch.device = torch.device('cpu'),
         logger_name: Optional[str] = None
@@ -213,6 +214,7 @@ class GradCamHandler:
         self.save_dir = save_dir
         self.device = device
         self.logger = logging.getLogger(logger_name)
+        self.fusion = fusion
         if method == 'gradcam':
             self.cam = GradCAM(nn_module=self.net, target_layers=self.target_layers)
         elif method == 'layercam':
@@ -228,7 +230,8 @@ class GradCamHandler:
 
             if isinstance(inputs, (tuple, list)):
                 self.logger.warn(
-                    f"Got multiple inputs with size of {len(batch)}, select the first one as image data."
+                    f"Got multiple inputs with size of {len(batch)}," 
+                    "select the first one as image data."
                 )
                 origin_img = inputs[0].cpu().detach().numpy().squeeze(1)
             else:
@@ -238,16 +241,34 @@ class GradCamHandler:
                 f'Input len: {len(inputs)}, shape: {origin_img.shape}'
             )
 
-            cam_result = self.cam(inputs, class_idx=self.target_class, img_spatial_size=origin_img.shape[1:])
+            cam_result = self.cam(
+                inputs,
+                class_idx=self.target_class,
+                img_spatial_size=origin_img.shape[1:]
+            )
 
             self.logger.debug(
-                f'Image batchdata shape: {origin_img.shape}, CAM batchdata shape: {cam_result.shape}'
+                f'Image batchdata shape: {origin_img.shape}, '
+                f'CAM batchdata shape: {cam_result.shape}'
             )
 
             if len(origin_img.shape[1:]) == 3:
                 for j, (img_slice, cam_slice) in enumerate(zip(origin_img, cam_result)):
-                    nib.save(nib.Nifti1Image(img_slice.squeeze(), np.eye(4)), self.save_dir/f'{i}_{j}_images.nii.gz')
-                    nib.save(nib.Nifti1Image(cam_slice.squeeze(), np.eye(4)), self.save_dir/f'{i}_{j}_cam_map.nii.gz')
+                    nib.save(
+                        nib.Nifti1Image(img_slice.squeeze(), np.eye(4)),
+                        self.save_dir/f'batch{i}_{j}_images.nii.gz'
+                    )
+
+                    if cam_slice.shape[0] > 1 and self.fusion:  # multiple cam maps
+                        nib.save(
+                            nib.Nifti1Image(cam_slice.mean(axis=0).squeeze(), np.eye(4)),
+                            self.save_dir/f'batch{i}_{j}_cam_fusion_{self.target_layers}.nii.gz'
+                        )
+                    else:
+                        nib.save(
+                            nib.Nifti1Image(cam_slice.transpose(1,2,3,0).squeeze(), np.eye(4)),
+                            self.save_dir/f'batch{i}_{j}_cam_map_{self.target_layers}.nii.gz'
+                        )
 
             elif len(origin_img.shape[1:]) == 2:
                 cam_result = np.uint8(cam_result.squeeze(1) * 255)
@@ -257,7 +278,7 @@ class GradCamHandler:
                     img_slice = Image.fromarray(img_slice)
                     no_trans_heatmap, heatmap_on_image = apply_colormap_on_image(img_slice, cam_slice, 'hsv')
 
-                    heatmap_on_image.save(self.save_dir/f'{i}_{j}_heatmap_on_img.png')
+                    heatmap_on_image.save(self.save_dir/f'batch{i}_{j}_heatmap_on_img.png')
             else:
                 raise NotImplementedError(f"Cannot support ({origin_img.shape}) data.")
 
