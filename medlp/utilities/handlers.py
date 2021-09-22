@@ -202,6 +202,7 @@ class GradCamHandler:
         prepare_batch_fn,
         method: str = 'gradcam',
         fusion: bool = False,
+        hierarchical: bool = False,
         save_dir: Optional[str] = None,
         device: torch.device = torch.device('cpu'),
         logger_name: Optional[str] = None
@@ -218,7 +219,14 @@ class GradCamHandler:
         if method == 'gradcam':
             self.cam = GradCAM(nn_module=self.net, target_layers=self.target_layers)
         elif method == 'layercam':
-            self.cam = LayerCAM(nn_module=self.net, target_layers=self.target_layers)
+            self.cam = LayerCAM(nn_module=self.net, target_layers=self.target_layers, hierarchical=hierarchical)
+
+        if fusion:
+            self.suffix = 'fusion'
+        elif hierarchical:
+            self.suffix = 'hierarchical'
+        else:
+            self.suffix = ''
 
     def __call__(self, engine: Engine) -> None:
         for i, batchdata in enumerate(self.data_loader):
@@ -254,6 +262,7 @@ class GradCamHandler:
 
             if len(origin_img.shape[1:]) == 3:
                 for j, (img_slice, cam_slice) in enumerate(zip(origin_img, cam_result)):
+                    file_name = f'batch{i}_{j}_cam_{self.suffix}_{self.target_layers}.nii.gz'
                     nib.save(
                         nib.Nifti1Image(img_slice.squeeze(), np.eye(4)),
                         self.save_dir/f'batch{i}_{j}_images.nii.gz'
@@ -262,12 +271,12 @@ class GradCamHandler:
                     if cam_slice.shape[0] > 1 and self.fusion:  # multiple cam maps
                         nib.save(
                             nib.Nifti1Image(cam_slice.mean(axis=0).squeeze(), np.eye(4)),
-                            self.save_dir/f'batch{i}_{j}_cam_fusion_{self.target_layers}.nii.gz'
+                            self.save_dir/file_name
                         )
                     else:
                         nib.save(
                             nib.Nifti1Image(cam_slice.transpose(1,2,3,0).squeeze(), np.eye(4)),
-                            self.save_dir/f'batch{i}_{j}_cam_map_{self.target_layers}.nii.gz'
+                            self.save_dir/file_name
                         )
 
             elif len(origin_img.shape[1:]) == 2:

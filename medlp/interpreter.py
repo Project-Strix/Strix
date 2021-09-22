@@ -36,7 +36,9 @@ from medlp.utilities.handlers import GradCamHandler
 @click.option("--out-dir", type=str, default=None,
               help="Optional output dir to save results")
 @click.option("--fusion", is_flag=True,
-              help='Fuse multiple CAM maps')
+              help='Normal fusion of multiple CAM maps')
+@click.option("--hierarchical", is_flag=True,
+              help="Hierarchically fuse muliple CAM maps")
 @click.option("--debug", is_flag=True,
               help='Debug mode. In debug mode, n_sample=1')
 @click.option("--n-sample", type=int, default=-1,
@@ -89,6 +91,12 @@ def gradcam(**args):
     logging_level = logging.DEBUG if args["debug"] else logging.INFO
     engine.logger = setup_logger(f"{args['method']}-interpreter", level=logging_level)
 
+    if args['fusion'] and args['hierarchical']:
+        raise ValueError('fusion and hierarchical cannot be both True')
+
+    if args['hierarchical'] and args['method'] == 'gradcam':
+        engine.logger.warn("Gradcam do not support hierarchical fusion")
+
     engine.add_event_handler(
         event_name=Events.ITERATION_COMPLETED(once=1),
         handler=GradCamHandler(
@@ -99,6 +107,7 @@ def gradcam(**args):
             engine.prepare_batch,
             method=args['method'],
             fusion=args['fusion'],
+            hierarchical=args['hierarchical'],
             save_dir=configures["out_dir"],
             device=torch.device("cuda")
             if args['gpus'] != "-1" else torch.device("cpu"),
