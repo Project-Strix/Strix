@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 import yaml
 import click
 import numpy as np
@@ -98,9 +99,9 @@ def check_data(ctx, **args):
         valid_ds = dataset_fn(files_valid, 'valid', auxilary_params)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        Print(f"Creating dataset '{cargs.data_list}' failed! \nMsg: {e}", color='r')
-        Print(f"Error location: {fname}, line:{exc_tb.tb_lineno}", color='r')
+        Print(f"Creating dataset '{cargs.data_list}' failed! \nMsg: {repr(e)}", color='r')
+        Print('Exception trace:', color='r')
+        print('\n'.join(traceback.format_tb(exc_tb)))
         return
     else:
         Print(f"Creating dataset '{cargs.data_list}' successfully!", color='g')
