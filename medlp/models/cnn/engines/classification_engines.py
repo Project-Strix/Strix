@@ -282,7 +282,7 @@ def build_classification_test_engine(**kwargs):
     device = kwargs['device']
     logger_name = kwargs.get('logger_name', None)
     is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase=='test'
+    is_supervised = opts.phase == 'test'
     multi_input_keys = kwargs.get('multi_input_keys', None)
     multi_output_keys = kwargs.get('multi_output_keys', None)
     _image_ = cfg.get_key("image")
@@ -418,7 +418,11 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger_name = kwargs.get('logger_name', None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
+    is_supervised = opts.phase == 'test'
+    multi_input_keys = kwargs.get('multi_input_keys', None)
+    multi_output_keys = kwargs.get('multi_output_keys', None)
     _image_ = cfg.get_key("image")
+    _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
 
     cv_folders = [Path(opts.experiment_path)/f'{i}-th' for i in range(opts.n_fold)]
@@ -428,7 +432,6 @@ def build_classification_ensemble_test_engine(**kwargs):
     if best_model:
         best_models = []
         for folder in cv_folders:
-            # models = list(filter(lambda x: x.is_file(), [model for model in folder.joinpath('Models').rglob('*.pt')]))
             models = list(filter(lambda x: re.search(float_regex, x.name), [model for model in folder.joinpath('Models').rglob('*.pt')]))
             models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
             best_models.append(models[-1])
@@ -462,6 +465,14 @@ def build_classification_ensemble_test_engine(**kwargs):
     #     output_transform = lambda x: x['pred']
     # else:
     #     output_transform = lambda x: (x['pred'], x['label'])
+    if is_supervised:
+        prepare_batch_fn = get_prepare_batch_fn(
+            opts, _image_, _label_, multi_input_keys, multi_output_keys
+        )
+    else:
+        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
+            opts, _image_, multi_input_keys
+        )
 
     if opts.output_nc == 1:  # ensemble_type is 'mean':
         if best_model:
@@ -542,6 +553,7 @@ def build_classification_ensemble_test_engine(**kwargs):
         val_data_loader=test_loader,
         pred_keys=pred_keys,
         networks=nets,
+        prepare_batch=prepare_batch_fn,
         inferer=SimpleInfererEx(),
         post_transform=post_transforms,
         val_handlers=val_handlers,
