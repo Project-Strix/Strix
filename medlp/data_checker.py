@@ -30,9 +30,11 @@ def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index):
         nib.save(nib.Nifti1Image(patch.squeeze(), meta_dict['affine'][i]), out_fname )
 
 
-def save_fnames(fnames, out_dir, phase, dataset_name, batch_index):
-    out_fname = check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}-fnames.yml', isFile=True)
-    with out_fname.open('w') as f:
+def save_fnames(data, img_meta_key, image_fpath):
+    fnames = {idx+1: fname for idx, fname in enumerate(data[img_meta_key]['filename_or_obj'])}
+    image_fpath = str(image_fpath).split('-chn')[0]
+    output_path = os.path.splitext(image_fpath)[0] + '-fnames.yml'
+    with open(output_path, 'w') as f:
         yaml.dump(fnames, f)
 
 
@@ -69,16 +71,23 @@ def save_2d_image_grid(
             for img, msk in zip(data_slice, mask_slice)
         ]).float()
 
-    output_fname = f'_chn{chn_idx}' if chn_idx is not None else ''
+    output_fname = f'-chn{chn_idx}' if chn_idx is not None else ''
+
+    output_path = check_dir(
+        out_dir, dataset_name,
+        f'{phase}-batch{batch_index}{output_fname}.png', isFile=True
+    )
 
     save_image(
         images,
-        check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}{output_fname}.png', isFile=True),
+        output_path,
         nrow=nrow,
         padding=5,
         normalize=True,
         scale_each=True
     )
+
+    return output_path
 
 
 def save_3d_image_grid(
@@ -118,14 +127,21 @@ def save_3d_image_grid(
     else:
         output_fname = f'slice{slice_index}.png'
 
+    output_path = check_dir(
+        out_dir, dataset_name,
+        f'{phase}-batch{batch_index}', output_fname, isFile=True
+    )
+
     save_image(
         data_slice,
-        check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}', output_fname, isFile=True),
+        output_path,
         nrow=nrow,
         padding=5,
         normalize=True,
         scale_each=True
     )
+
+    return output_path
 
 
 @click.command("check-data", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -176,12 +192,13 @@ def check_data(ctx, **args):
     exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
     print("Channel:", channel, "Shape:", shape)
+
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
                 msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
-                save_2d_image_grid(
+                output_fpath = save_2d_image_grid(
                     data[img_key],
                     int(np.round(np.sqrt(bs))),
                     cargs.out_dir,
@@ -190,8 +207,8 @@ def check_data(ctx, **args):
                     i,
                     mask=msk
                 )
-                fnames = {idx+1: fname for idx, fname in enumerate(data[img_key+'_meta_dict']['filename_or_obj'])}
-                save_fnames(fnames, cargs.out_dir, phase, cargs.data_list, i)
+
+                save_fnames(data, img_key+'_meta_dict', output_fpath)
 
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
@@ -220,7 +237,7 @@ def check_data(ctx, **args):
                     )
 
                 for ch_idx in range(channel):
-                    save_2d_image_grid(
+                    output_fpath = save_2d_image_grid(
                         data[img_key],
                         int(np.round(np.sqrt(bs))),
                         cargs.out_dir,
@@ -232,6 +249,8 @@ def check_data(ctx, **args):
                         mask=msk
                     )
 
+                save_fnames(data, img_key+'_meta_dict', output_fpath)
+
     elif len(shape) == 3 and channel == 1:
         z_axis = np.argmin(shape)
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
@@ -239,7 +258,7 @@ def check_data(ctx, **args):
                 bs = dataloader.batch_size
                 msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
                 for slice_idx in range(shape[z_axis]):
-                    save_3d_image_grid(
+                    output_fpath = save_3d_image_grid(
                         data[img_key],
                         z_axis+2,
                         int(np.round(np.sqrt(bs))),
@@ -251,6 +270,8 @@ def check_data(ctx, **args):
                         multichannel=False,
                         mask=msk
                     )
+
+                save_fnames(data, img_key+'_meta_dict', output_fpath)
 
     else:
         raise NotImplementedError(
