@@ -17,7 +17,7 @@ from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
 from medlp.utilities.enum import FRAMEWORK_TYPES
-from medlp.utilities.utils import draw_segmentation_masks, norm_tensor
+from medlp.utilities.utils import draw_segmentation_masks, norm_tensor, get_colors
 from medlp.data_io import DATASET_MAPPING
 from medlp.configures import config as cfg
 from monai_ex.utils import first
@@ -81,7 +81,6 @@ def save_3d_image_grid(
         images, dim=axis, index=torch.tensor(slice_index)
     ).squeeze(axis)
 
-    normalize = True
     if mask is not None:
         mask_slice = torch.index_select(
             mask, dim=axis, index=torch.tensor(slice_index)
@@ -90,12 +89,13 @@ def save_3d_image_grid(
         data_slice = norm_tensor(data_slice, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
         mask_slice = mask_slice.to(torch.bool)
 
-        colors = ['green', 'tomato', 'yellow', 'pink', 'gold'] + list(ImageColor.colormap.keys())
         data_slice = torch.cat([
-            draw_segmentation_masks(img, msk, 0.8, colors=colors[:msk.size()[0]]).unsqueeze(0)
+            draw_segmentation_masks(
+                img, msk, 0.8,
+                colors=get_colors(msk.size()[0])
+            ).unsqueeze(0)
             for img, msk in zip(data_slice, mask_slice)
         ]).float()
-        normalize = True
 
     if multichannel:
         output_fname = f'channel{slice_index}.png'
@@ -107,7 +107,7 @@ def save_3d_image_grid(
         check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}', output_fname, isFile=True),
         nrow=nrow,
         padding=5,
-        normalize=normalize,
+        normalize=True,
         scale_each=True
     )
 
@@ -157,7 +157,6 @@ def check_data(ctx, **args):
     img_key = cfg.get_key("IMAGE")
     msk_key = cfg.get_key("MASK")
     data_shape = train_data[img_key][0].shape
-    # data_dtype = train_data[img_key][0].dtype
     exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
     print("Channel:", channel, "Shape:", shape)

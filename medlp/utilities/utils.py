@@ -28,6 +28,12 @@ def get_attr_(obj, name, default):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 
+def get_colors(num: int = None):
+    if num:
+        return list(mcolors.TABLEAU_COLORS.values())[:num]
+    else:
+        return list(mcolors.TABLEAU_COLORS.values())
+
 def bbox_3D(img):
     r = np.any(img, axis=(1, 2))
     c = np.any(img, axis=(0, 2))
@@ -225,7 +231,7 @@ def plot_summary(summary, output_fpath):
     try:
         f = plt.figure(1)
         plt.clf()
-        colors = list(mcolors.TABLEAU_COLORS.values())
+        colors = get_colors()
 
         for i, (key, step_value) in enumerate(summary.items()):
             plt.plot(step_value['steps'], step_value['values'], label=str(key), color=colors[i], linewidth=2.0)
