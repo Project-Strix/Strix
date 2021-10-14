@@ -53,6 +53,18 @@ def save_2d_image_grid(
             images, dim=axis, index=torch.tensor(chn_idx)
         )  #.squeeze(axis)
 
+    if mask is not None:
+        data_slice = norm_tensor(images, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
+        mask_slice = mask.to(torch.bool)
+
+        data_slice = torch.cat([
+            draw_segmentation_masks(
+                img, msk, 0.6,
+                colors=get_colors(msk.size()[0])
+            ).unsqueeze(0)
+            for img, msk in zip(data_slice, mask_slice)
+        ]).float()
+
     output_fname = f'_chn{chn_idx}' if chn_idx is not None else ''
 
     save_image(
@@ -91,7 +103,7 @@ def save_3d_image_grid(
 
         data_slice = torch.cat([
             draw_segmentation_masks(
-                img, msk, 0.8,
+                img, msk, 0.6,
                 colors=get_colors(msk.size()[0])
             ).unsqueeze(0)
             for img, msk in zip(data_slice, mask_slice)
@@ -164,6 +176,7 @@ def check_data(ctx, **args):
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
+                msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
                 save_2d_image_grid(
                     data[img_key],
                     int(np.round(np.sqrt(bs))),
@@ -171,6 +184,7 @@ def check_data(ctx, **args):
                     phase,
                     cargs.data_list,
                     i,
+                    mask=msk
                 )
                 fnames = {idx+1: fname for idx, fname in enumerate(data[img_key+'_meta_dict']['filename_or_obj'])}
                 save_fnames(fnames, cargs.out_dir, phase, cargs.data_list, i)
@@ -180,6 +194,11 @@ def check_data(ctx, **args):
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
+                if exist_mask and cargs.mask_overlap:
+                    raise NotImplementedError(
+                        "Currently, mask visualization are not support for multi-channel 2D images"
+                    )
+
                 if cargs.save_raw:
                     if isinstance(data[img_key], torch.Tensor):
                         out_data = data[img_key].cpu().numpy()
@@ -204,7 +223,8 @@ def check_data(ctx, **args):
                         cargs.data_list,
                         i,
                         z_axis,
-                        ch_idx
+                        ch_idx,
+                        mask=msk
                     )
 
     elif len(shape) == 3 and channel == 1:
@@ -212,6 +232,7 @@ def check_data(ctx, **args):
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
+                msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
                 for slice_idx in range(shape[z_axis]):
                     save_3d_image_grid(
                         data[img_key],
@@ -223,7 +244,7 @@ def check_data(ctx, **args):
                         i,
                         slice_idx,
                         multichannel=False,
-                        mask=data[msk_key] if exist_mask and cargs.mask_overlap else None
+                        mask=msk
                     )
 
     else:
