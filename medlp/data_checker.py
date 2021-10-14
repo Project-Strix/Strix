@@ -47,17 +47,21 @@ def save_2d_image_grid(
     chn_idx=None,
     mask=None
 ):
-    data_slice = None
     if axis is not None and chn_idx is not None:
-        data_slice = torch.index_select(
+        images = torch.index_select(
             images, dim=axis, index=torch.tensor(chn_idx)
-        )  #.squeeze(axis)
+        )
+
+        if mask is not None and mask.size(axis) > 1:
+            mask = torch.index_select(
+                mask, dim=axis, index=torch.tensor(chn_idx)
+            )
 
     if mask is not None:
         data_slice = norm_tensor(images, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
         mask_slice = mask.to(torch.bool)
 
-        data_slice = torch.cat([
+        images = torch.cat([
             draw_segmentation_masks(
                 img, msk, 0.6,
                 colors=get_colors(msk.size()[0])
@@ -68,7 +72,7 @@ def save_2d_image_grid(
     output_fname = f'_chn{chn_idx}' if chn_idx is not None else ''
 
     save_image(
-        images if data_slice is None else data_slice,
+        images,
         check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}{output_fname}.png', isFile=True),
         nrow=nrow,
         padding=5,
@@ -194,10 +198,11 @@ def check_data(ctx, **args):
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
             for i, data in enumerate(dataloader):
                 bs = dataloader.batch_size
-                if exist_mask and cargs.mask_overlap:
-                    raise NotImplementedError(
-                        "Currently, mask visualization are not support for multi-channel 2D images"
-                    )
+                msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
+                # if exist_mask and cargs.mask_overlap:
+                #     raise NotImplementedError(
+                #         "Currently, mask visualization are not support for multi-channel 2D images"
+                #     )
 
                 if cargs.save_raw:
                     if isinstance(data[img_key], torch.Tensor):
