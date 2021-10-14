@@ -5,6 +5,7 @@ import yaml
 import click
 import numpy as np
 import nibabel as nib
+from PIL import ImageColor
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
 from utils_cw import get_items_from_file, Print, check_dir
@@ -15,8 +16,9 @@ from torchvision.utils import save_image
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
-from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.enum import FRAMEWORK_TYPES
+from medlp.utilities.utils import draw_segmentation_masks, norm_tensor
+from medlp.data_io import DATASET_MAPPING
 from medlp.configures import config as cfg
 from monai_ex.utils import first
 from monai_ex.data import DataLoader
@@ -25,7 +27,7 @@ from monai_ex.data import DataLoader
 def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index):
     for i, patch in enumerate(data):
         out_fname = check_dir(out_dir, dataset_name, 'raw images', f'{phase}-batch{batch_index}-{i}.nii.gz', isFile=True)
-        nib.save( nib.Nifti1Image( patch.squeeze(), meta_dict['affine'][i] ), out_fname )
+        nib.save(nib.Nifti1Image(patch.squeeze(), meta_dict['affine'][i]), out_fname )
 
 
 def save_fnames(fnames, out_dir, phase, dataset_name, batch_index):
@@ -34,7 +36,17 @@ def save_fnames(fnames, out_dir, phase, dataset_name, batch_index):
         yaml.dump(fnames, f)
 
 
-def save_2d_image_grid(images, nrow, out_dir, phase, dataset_name, batch_index, axis=None, chn_idx=None):
+def save_2d_image_grid(
+    images,
+    nrow,
+    out_dir,
+    phase,
+    dataset_name,
+    batch_index,
+    axis=None,
+    chn_idx=None,
+    mask=None
+):
     data_slice = None
     if axis is not None and chn_idx is not None:
         data_slice = torch.index_select(
@@ -48,14 +60,42 @@ def save_2d_image_grid(images, nrow, out_dir, phase, dataset_name, batch_index, 
         check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}{output_fname}.png', isFile=True),
         nrow=nrow,
         padding=5,
-        normalize=True
+        normalize=True,
+        scale_each=True
     )
 
 
-def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_index, slice_index, multichannel=False):
+def save_3d_image_grid(
+    images,
+    axis,
+    nrow,
+    out_dir,
+    phase,
+    dataset_name,
+    batch_index,
+    slice_index,
+    multichannel=False,
+    mask=None,
+):
     data_slice = torch.index_select(
         images, dim=axis, index=torch.tensor(slice_index)
     ).squeeze(axis)
+
+    normalize = True
+    if mask is not None:
+        mask_slice = torch.index_select(
+            mask, dim=axis, index=torch.tensor(slice_index)
+        ).squeeze(axis)
+
+        data_slice = norm_tensor(data_slice, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
+        mask_slice = mask_slice.to(torch.bool)
+
+        colors = ['green', 'tomato', 'yellow', 'pink', 'gold'] + list(ImageColor.colormap.keys())
+        data_slice = torch.cat([
+            draw_segmentation_masks(img, msk, 0.8, colors=colors[:msk.size()[0]]).unsqueeze(0)
+            for img, msk in zip(data_slice, mask_slice)
+        ]).float()
+        normalize = True
 
     if multichannel:
         output_fname = f'channel{slice_index}.png'
@@ -67,7 +107,8 @@ def save_3d_image_grid(images, axis, nrow, out_dir, phase, dataset_name, batch_i
         check_dir(out_dir, dataset_name, f'{phase}-batch{batch_index}', output_fname, isFile=True),
         nrow=nrow,
         padding=5,
-        normalize=True
+        normalize=normalize,
+        scale_each=True
     )
 
 
@@ -116,7 +157,7 @@ def check_data(ctx, **args):
     img_key = cfg.get_key("IMAGE")
     msk_key = cfg.get_key("MASK")
     data_shape = train_data[img_key][0].shape
-    data_dtype = train_data[img_key][0].dtype
+    # data_dtype = train_data[img_key][0].dtype
     exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
     print("Channel:", channel, "Shape:", shape)
@@ -181,8 +222,12 @@ def check_data(ctx, **args):
                         phase,
                         cargs.data_list,
                         i,
-                        slice_idx
+                        slice_idx,
+                        multichannel=False,
+                        mask=data[msk_key] if exist_mask and cargs.mask_overlap else None
                     )
 
     else:
-        raise NotImplementedError
+        raise NotImplementedError(
+            f'Not implement data-checking for shape of {shape}, channel of {channel}'
+        )
