@@ -71,7 +71,7 @@ def get_3d_dataset(files_list, phase, opts):
         dataset_type=PersistentDataset,
         dataset_kwargs={'cache_dir': cache_dir},
         additional_transforms=None,
-    ).get_dataset()
+    )
 
     return dataset
 
@@ -173,6 +173,6 @@ def get_lung_mps_dataset(files_list, phase, opts, spatial_size):
         dataset_type=CacheDataset,
         dataset_kwargs={'cache_rate': preload},
         additional_transforms=additional_transforms,
-    ).get_dataset()
+    )
 
     return dataset
