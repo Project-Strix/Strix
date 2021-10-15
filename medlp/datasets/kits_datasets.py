@@ -146,6 +146,6 @@ def kits_dataset(files_list, phase, opts):
         dataset_type=PersistentDataset,
         dataset_kwargs={'cache_dir': cache_dir},
         additional_transforms=additional_transforms
-    ).get_dataset()
+    )
 
     return dataset

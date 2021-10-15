@@ -28,7 +28,7 @@ class BasicSegmentationDataset(object):
         dataset_kwargs: dict,
         additional_transforms: Optional[Sequence[MapTransform]] = None,
         check_data: bool = True,
-        verbose: Optional[bool] = False,
+        verbose: bool = False,
     ):
         self.files_list = files_list
         self.verbose = verbose
@@ -64,5 +64,4 @@ class BasicSegmentationDataset(object):
 
         self.transforms = Compose(self.transforms)
 
-    def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)

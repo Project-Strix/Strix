@@ -7,7 +7,7 @@ from medlp.data_io.base_dataset.utils import get_input_data
 
 
 class BasicClassificationDataset(object):
-    def __init__(
+    def __new__(
         self,
         files_list: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
@@ -60,5 +60,5 @@ class BasicClassificationDataset(object):
 
         self.transforms = Compose(self.transforms)
 
-    def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
+
