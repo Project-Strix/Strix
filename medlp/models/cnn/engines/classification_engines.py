@@ -389,9 +389,9 @@ def build_classification_test_engine(**kwargs):
             key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
             additional_metrics={
                 'test_auc': ROCAUC(output_transform=auc_post_transforms),
-                'Prec': Precision(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
-                'Recall': Recall(output_transform=acc_post_transforms, is_multilabel=is_multilabel),
-                'ROC': DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms)
+                'Prec': Precision(output_transform=acc_post_transforms, average=is_multilabel, is_multilabel=is_multilabel),
+                'Recall': Recall(output_transform=acc_post_transforms, average=is_multilabel, is_multilabel=is_multilabel),
+                'ROC': DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms, is_multilabel=is_multilabel)
             },
             amp=opts.amp
         )
