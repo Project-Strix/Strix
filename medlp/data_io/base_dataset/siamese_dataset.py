@@ -62,7 +62,7 @@ class SiameseDatasetWrapper(Dataset):
 
 
 class BasicSiameseDataset(BasicClassificationDataset):
-    def __init__(
+    def __new__(
         self,
         files_list: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
@@ -101,6 +101,4 @@ class BasicSiameseDataset(BasicClassificationDataset):
         assert dataset_type == SplitDataset, f'Only support SplitDataset, but got {dataset_type}'
         # self.label_image_dict = {data[CustomKeys.LABEL]: data for data in self.input_data}
         # self.labels = list(self.label_image_dict.keys())
-
-    def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
