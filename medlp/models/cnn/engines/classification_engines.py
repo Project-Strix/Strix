@@ -132,7 +132,11 @@ def build_classification_engine(**kwargs):
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_acc"),
+        TensorBoardStatsHandler(
+            summary_writer=writer,
+            tag_name=val_metric_name,
+            output_transform=lambda x: None
+        ),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),

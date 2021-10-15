@@ -240,7 +240,7 @@ def train_cfg(**args):
 
 
 @click.command("test-from-cfg")
-@click.option("--config", type=click.Path(exists=True))
+@click.option("--config", type=click.Path(exists=True), default='YourConfigFle')
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option(  # TODO: automatically decide when using patchdataset

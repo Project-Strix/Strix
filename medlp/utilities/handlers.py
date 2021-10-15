@@ -284,7 +284,7 @@ class TensorboardDumper:
                 self.logger.warn(f'No tensorboard db is found in the dir({self.log_dir})')
                 return
             elif len(files) > 1:
-                self.logger.warn(f'Multiple tensorboard db files are found! Skip dumping.')
+                self.logger.warn('Multiple tensorboard db files are found! Skip dumping.')
                 return
             else:
                 self.db_file = os.path.join(self.log_dir, files[0])

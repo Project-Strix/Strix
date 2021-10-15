@@ -304,6 +304,9 @@ def data_select(ctx, param, value):
 
 
 def input_cropsize(ctx, param, value):
+    if value is False:
+        return value
+
     configures = get_items_from_file(ctx.params["config"], format="json")
     if is_avaible_size(configures.get('crop_size', None)) or value is False:
         return value
