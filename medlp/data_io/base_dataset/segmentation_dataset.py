@@ -11,7 +11,7 @@ from medlp.data_io.base_dataset.utils import get_input_data
 
 # TODO: Need to be refactored like BasicClassificationDataset
 class BasicSegmentationDataset(object):
-    def __init__(
+    def __new__(
         self,
         files_list: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
