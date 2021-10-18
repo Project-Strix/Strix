@@ -5,6 +5,7 @@ import yaml
 import click
 import numpy as np
 import nibabel as nib
+from tqdm import tqdm
 from PIL import ImageColor
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
@@ -152,6 +153,7 @@ def save_3d_image_grid(
 @click.option("--split", type=float, default=0.2, help="Training/testing split ratio")
 @click.option("--save-raw", is_flag=True, help="Save processed raw image to local")
 @click.option("--mask-overlap", is_flag=True, help='Overlapping mask if exists')
+@click.option("--mask-key", type=str, help="Specify mask key, default is 'mask'")
 @click.option("--seed", type=int, default=101, help="random seed")
 @click.option("--out-dir", type=str, prompt=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
 @click.pass_context
@@ -187,7 +189,7 @@ def check_data(ctx, **args):
     # valid_data = first(valid_dataloader)
 
     img_key = cfg.get_key("IMAGE")
-    msk_key = cfg.get_key("MASK")
+    msk_key = cfg.get_key("MASK") if cargs.mask_key is None else cargs.mask_key
     data_shape = train_data[img_key][0].shape
     exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
@@ -195,7 +197,7 @@ def check_data(ctx, **args):
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
-            for i, data in enumerate(dataloader):
+            for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
                 output_fpath = save_2d_image_grid(
@@ -213,14 +215,9 @@ def check_data(ctx, **args):
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
-            for i, data in enumerate(dataloader):
+            for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
-                # if exist_mask and cargs.mask_overlap:
-                #     raise NotImplementedError(
-                #         "Currently, mask visualization are not support for multi-channel 2D images"
-                #     )
-
                 if cargs.save_raw:
                     if isinstance(data[img_key], torch.Tensor):
                         out_data = data[img_key].cpu().numpy()
@@ -254,7 +251,7 @@ def check_data(ctx, **args):
     elif len(shape) == 3 and channel == 1:
         z_axis = np.argmin(shape)
         for phase, dataloader in {'train': train_dataloader, 'valid': valid_dataloader}.items():
-            for i, data in enumerate(dataloader):
+            for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 msk = data[msk_key] if exist_mask and cargs.mask_overlap else None
                 for slice_idx in range(shape[z_axis]):
