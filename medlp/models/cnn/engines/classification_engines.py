@@ -11,6 +11,10 @@ from medlp.models.cnn.engines import (
     TEST_ENGINES,
     ENSEMBLE_TEST_ENGINES
 )
+from medlp.models.cnn.engines.utils import (
+    get_prepare_batch_fn,
+    get_unsupervised_prepare_batch_fn
+)
 from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
 from medlp.models.cnn.utils import output_onehot_transform
@@ -54,49 +58,6 @@ from monai_ex.handlers import (
     ROCAUC,
     stopping_fn_from_metric
 )
-
-
-def get_prepare_batch_fn(opts, image_key, label_key, multi_input_keys, multi_output_keys):
-    # if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
-    #     prepare_batch_fn = lambda x, device, nb: (
-    #         tuple(x[key].to(device) for key in multi_input_keys),
-    #         tuple(torch.as_tensor(x[key].unsqueeze(1), dtype=torch.float32).to(device) for key in multi_output_keys)
-    #     )
-    # else:
-    if multi_input_keys is not None and multi_output_keys is not None:
-        prepare_batch_fn = lambda x, device, nb: (
-            tuple(x[key].to(device) for key in multi_input_keys),
-            tuple(x[key].to(device) for key in multi_output_keys)
-        )
-    elif multi_input_keys is not None:
-        prepare_batch_fn = lambda x, device, nb: (
-            tuple(x[key].to(device) for key in multi_input_keys),
-            x[label_key].to(device),
-        )
-    elif multi_output_keys is not None:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_key].to(device),
-            tuple(x[key].to(device) for key in multi_output_keys)
-        )
-    else:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_key].to(device), x[label_key].to(device)
-        )
-
-    return prepare_batch_fn
-
-
-def get_unsupervised_prepare_batch_fn(opts, image_key, multi_input_keys):
-    if multi_input_keys is not None:
-        prepare_batch_fn = lambda x, device, nb: (
-            tuple(x[key].to(device) for key in multi_input_keys), None
-        )
-    else:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_key].to(device), None
-        )
-
-    return prepare_batch_fn
 
 
 @TRAIN_ENGINES.register('classification')

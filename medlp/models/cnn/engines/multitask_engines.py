@@ -1,4 +1,4 @@
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES
 
 
 @TRAIN_ENGINES.register('multitask')

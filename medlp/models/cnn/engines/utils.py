@@ -47,3 +47,50 @@ def get_models(folders, model_type):
                 f"but got '{model_type}' type"
             )
     return best_models
+
+
+def get_prepare_batch_fn(
+    opts,
+    image_key,
+    label_key,
+    multi_input_keys,
+    multi_output_keys
+):
+    if multi_input_keys is not None and multi_output_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            tuple(x[key].to(device) for key in multi_input_keys),
+            tuple(x[key].to(device) for key in multi_output_keys)
+        )
+    elif multi_input_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            tuple(x[key].to(device) for key in multi_input_keys),
+            x[label_key].to(device),
+        )
+    elif multi_output_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device),
+            tuple(x[key].to(device) for key in multi_output_keys)
+        )
+    else:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device), x[label_key].to(device)
+        )
+
+    return prepare_batch_fn
+
+
+def get_unsupervised_prepare_batch_fn(
+    opts,
+    image_key,
+    multi_input_keys
+):
+    if multi_input_keys is not None:
+        prepare_batch_fn = lambda x, device, nb: (
+            tuple(x[key].to(device) for key in multi_input_keys), None
+        )
+    else:
+        prepare_batch_fn = lambda x, device, nb: (
+            x[image_key].to(device), None
+        )
+
+    return prepare_batch_fn
