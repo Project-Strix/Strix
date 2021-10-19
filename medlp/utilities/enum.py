@@ -57,7 +57,7 @@ NETWORK_ARGS = [
 ]
 
 LAYER_ORDERS = ["crb", "cbr", "cgr", "cbe", "abn"]
-OPTIM_TYPES = ["sgd", "adam", "adamw", "radam"]
+OPTIM_TYPES = ["sgd", "adam", "adamw", "radam", "ranger"]
 
 CNN_MODEL_TYPES = ["vgg9", "vgg13", "vgg16", "resnet18", "resnet34", "resnet50"]
 FCN_MODEL_TYPES = [
