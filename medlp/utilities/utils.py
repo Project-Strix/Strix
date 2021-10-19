@@ -233,7 +233,6 @@ def plot_summary(summary, output_fpath):
         plt.clf()
         colors = get_colors()
 
-        # plots = [None,]*len(summary)
         for i, (key, step_value) in enumerate(summary.items()):
             # print('Key:', key, type(key), "step_value:", step_value['values'])
             plt.plot(step_value['steps'], step_value['values'], label=str(key), color=colors[i], linewidth=2.0)
