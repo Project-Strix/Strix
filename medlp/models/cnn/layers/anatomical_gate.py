@@ -11,6 +11,7 @@ class AnatomicalAttentionGate(nn.Module):
         featmap2_inchn: int
     ):
         super().__init__()
+        assert featmap1_inchn == featmap2_inchn, 'channel num must be same!'
         self.conv1 = get_conv_layer(
             spatial_dims,
             featmap1_inchn+featmap2_inchn,
@@ -34,11 +35,22 @@ class AnatomicalAttentionGate(nn.Module):
             bias=True,
             conv_only=False
         )
-        self.w = nn.Parameter(torch.Tensor([0.5]), requires_grad=True)
+
+        self.final_conv = get_conv_layer(
+            spatial_dims,
+            featmap1_inchn+featmap2_inchn,
+            featmap1_inchn,
+            kernel_size=3,
+            stride=1,
+            act='relu',
+            norm='batch',
+            bias=True,
+            conv_only=False,
+        )
 
     def forward(self, x1, x2):
         concat_featmap = torch.cat([x1, x2], dim=1)
         weighted_featmap1 = self.conv1(concat_featmap) * x1
         weighted_featmap2 = self.conv2(concat_featmap) * x2
+        return self.final_conv(torch.cat([weighted_featmap1, weighted_featmap2], dim=1))
         # return torch.add(weighted_featmap1, weighted_featmap2)
-        return weighted_featmap1 + self.w*weighted_featmap2
