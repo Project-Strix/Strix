@@ -26,7 +26,7 @@
             dataset_type = CacheDataset,
             dataset_kwargs = {'cache_rate': 1.0},
             additional_transforms = None,
-        ).get_dataset()
+        )
 
         return dataset
 

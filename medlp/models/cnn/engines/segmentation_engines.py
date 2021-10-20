@@ -5,7 +5,7 @@ import copy
 from pathlib import Path
 
 import torch
-from medlp.utilities.handlers import NNIReporterHandler
+from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import (
     is_avaible_size,
@@ -98,6 +98,11 @@ def build_segmentation_engine(**kwargs):
                 save_key_metric=True,
                 key_metric_n_saved=opts.save_n_best,
                 key_metric_save_after_epoch=0
+            ),
+            TensorboardDumper(
+                log_dir=writer.log_dir,
+                epoch_level=True,
+                logger_name=logger_name,
             )
         ]
 

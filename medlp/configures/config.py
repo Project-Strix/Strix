@@ -5,8 +5,9 @@ from configparser import ConfigParser
 DEFAULT_MEDLP_CONFIG = {
     "MODE": 'dev',  # release
     "CONFIG_FNAME": 'medlp_configures.cfg',
-    "OUTPUT_DIR": str(Path.home()/'Data'/'medlp_exp'),
-    "EXTERNAL_DATASET_DIR": str(Path.home()/'Data'/'medlp_datasets'),
+    "OUTPUT_DIR": str(Path.home()/'MeDLP'/'medlp_exp'),
+    "EXTERNAL_DATASET_DIR": str(Path.home()/'MeDLP'/'medlp_datasets'),
+    "EXTERNAL_NETWORK_DIR": str(Path.home()/'MeDLP'/'medlp_networks'),
 }
 
 

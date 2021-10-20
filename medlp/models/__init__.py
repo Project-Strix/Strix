@@ -9,6 +9,7 @@ from medlp.models.cnn.utils import (
     PolynomialLRDecay
 )
 from medlp.models.cnn.layers.radam import RAdam
+from medlp.models.cnn.layers.ranger21 import Ranger21
 from medlp.models.cnn.engines import (
     TRAIN_ENGINES,
     TEST_ENGINES,
@@ -20,16 +21,8 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import (
     LOSS_MAPPING,
-    CrossEntropyLossEx,
     DiceFocalLoss,
     ContrastiveLoss
-)
-
-from monai_ex.utils import Activation
-from monai_ex.losses import (
-    DiceLoss,
-    GeneralizedDiceLoss,
-    FocalLoss
 )
 
 
@@ -186,6 +179,16 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         optim = torch.optim.Adagrad(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == 'radam':
         optim = RAdam(net.parameters(), opts.lr, weight_decay=weight_decay)
+    elif opts.optim == 'ranger':
+        optim = Ranger21(
+            net.parameters(),
+            opts.lr,
+            weight_decay=weight_decay,
+            lookahead_active=True,
+            use_warmup=True,
+            num_batches_per_epoch=len(train_loader),
+            num_epochs=opts.n_epoch
+        )
     else:
         raise NotImplementedError
 

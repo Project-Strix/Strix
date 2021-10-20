@@ -28,6 +28,12 @@ def get_attr_(obj, name, default):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 
+def get_colors(num: int = None):
+    if num:
+        return list(mcolors.TABLEAU_COLORS.values())[:num]
+    else:
+        return list(mcolors.TABLEAU_COLORS.values())
+
 def bbox_3D(img):
     r = np.any(img, axis=(1, 2))
     c = np.any(img, axis=(0, 2))
@@ -225,17 +231,19 @@ def plot_summary(summary, output_fpath):
     try:
         f = plt.figure(1)
         plt.clf()
-        colors = list(mcolors.TABLEAU_COLORS.values())
+        colors = get_colors()
 
         for i, (key, step_value) in enumerate(summary.items()):
+            # print('Key:', key, type(key), "step_value:", step_value['values'])
             plt.plot(step_value['steps'], step_value['values'], label=str(key), color=colors[i], linewidth=2.0)
+
         # plt.ylim([0., 1.])
         ax = plt.axes()
         ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
         ax.yaxis.set_major_formatter(ScalarFormatter())
         plt.xlabel('Number of iterations per case')
         plt.grid(True)
-        ax.legend()
+        plt.legend(list(summary.keys()))
         plt.draw()
         plt.show(block=False)
         plt.pause(0.0001)
@@ -290,6 +298,19 @@ def _generate_color_palette(num_masks):
     return [tuple((i * palette) % 255) for i in range(num_masks)]
 
 
+def norm_ip(img, min, max):
+    img.clamp_(min=min, max=max)
+    img.add_(-min).div_(max - min + 1e-5)
+    return img
+
+
+def norm_tensor(t, range):
+    if range is not None:
+        return norm_ip(t, range[0], range[1])
+    else:
+        return norm_ip(t, float(t.min()), float(t.max()))
+
+
 def draw_segmentation_masks(
     image: torch.Tensor,
     masks: torch.Tensor,
@@ -322,7 +343,10 @@ def draw_segmentation_masks(
     elif image.dim() != 3:
         raise ValueError("Pass individual images, not batches")
     elif image.size()[0] != 3:
-        raise ValueError("Pass an RGB image. Other Image formats are not supported")
+        if image.size()[0] == 1:
+            image = image.repeat_interleave(3, dim=0)
+        else:
+            raise ValueError(f"Pass an RGB image. Other Image formats are not supported, got {image.size()}")
     if masks.ndim == 2:
         masks = masks[None, :, :]
     if masks.ndim != 3:

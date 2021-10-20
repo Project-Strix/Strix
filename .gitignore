@@ -114,3 +114,4 @@ venv.bak/
 *.zip
 medlp/tmp.py
 medlp_configures.cfg
+*.code-workspace

@@ -41,7 +41,7 @@ def PICC_dcm_seg_dataset(files_list,
         to_tensor=None,
         additional_transforms=additional_transforms,    
         preload=preload
-    ).get_dataset()
+    )
 
     return dataset
 

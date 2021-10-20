@@ -5,10 +5,11 @@ from monai_ex.data import CacheDataset, PersistentDataset
 from monai_ex.data import Dataset
 from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
+from medlp.data_io.base_dataset.utils import get_input_data
 
 
 class BasicSelflearningDataset(object):
-    def __init__(
+    def __new__(
         self,
         files_list: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
@@ -22,14 +23,20 @@ class BasicSelflearningDataset(object):
         to_tensor: Union[Sequence[MapTransform], MapTransform],
         dataset_type: Dataset,
         dataset_kwargs: dict,
-        additional_transforms,
-        verbose=False,
+        additional_transforms: Optional[Sequence[MapTransform]] = None,
+        check_data: bool = True,
+        verbose: bool = False,
     ):
         self.files_list = files_list
         self.verbose = verbose
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
-        self.input_data = self.get_input_data()
+        if check_data:
+            self.input_data = get_input_data(
+                files_list, False, verbose, self.__class__.__name__
+            )
+        else:
+            self.input_data = files_list
 
         self.transforms = ensure_list(loader)
         if channeler is not None:
@@ -49,21 +56,5 @@ class BasicSelflearningDataset(object):
 
         self.transforms = Compose(self.transforms)
 
-    def get_input_data(self):
-        """
-        check input file_list format and existence.
-        """
-        input_data = []
-        for f in self.files_list:
-            if isinstance(f, str):  # Recognize f as a file
-                assert os.path.exists(f), f"File not exists: {f}"
-                input_data.append({"image": f, "label": f})
-            elif isinstance(f, dict):
-                assert "image" in f, f"File {f} doesn't contain keyword 'image'"
-                assert os.path.exists(f["image"]), f"File not exists: {f['image']}"
-                input_data.append({"image": f["image"], "label": f["image"]})
-        return input_data
-
-    def get_dataset(self):
         return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
 
