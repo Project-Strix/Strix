@@ -8,7 +8,9 @@ class AnatomicalAttentionGate(nn.Module):
         self,
         spatial_dims: int,
         featmap1_inchn: int,
-        featmap2_inchn: int
+        featmap2_inchn: int,
+        # out_chn: int,
+        # merge: str = 'sum'
     ):
         super().__init__()
         assert featmap1_inchn == featmap2_inchn, 'channel num must be same!'
@@ -40,7 +42,7 @@ class AnatomicalAttentionGate(nn.Module):
             spatial_dims,
             featmap1_inchn+featmap2_inchn,
             featmap1_inchn,
-            kernel_size=3,
+            kernel_size=1,
             stride=1,
             act='relu',
             norm='batch',
