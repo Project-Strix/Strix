@@ -1,4 +1,3 @@
-import os
 import re
 import logging
 import copy
@@ -7,45 +6,28 @@ from functools import partial
 
 import torch
 from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
-from medlp.models.cnn.engines import (
-    TRAIN_ENGINES,
-    TEST_ENGINES,
-    ENSEMBLE_TEST_ENGINES
-)
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.models.cnn.engines.utils import (
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
     get_dice_metric_transform_fn,
 )
-from medlp.utilities.utils import (
-    is_avaible_size,
-    output_filename_check,
-    get_attr_
-)
+from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.utils import get_models
 
 from monai_ex.inferers import (
     SimpleInferer,
     SlidingWindowInferer,
-    SlidingWindowInferer2Dfor3D
+    SlidingWindowInferer2Dfor3D,
 )
 from monai_ex.networks import one_hot
 from ignite.engine import Events
 from ignite.handlers import EarlyStopping
 
-from monai_ex.engines import (
-    SupervisedTrainer,
-    SupervisedEvaluator,
-    EnsembleEvaluator
-)
+from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 
-from monai_ex.transforms import (
-    Compose,
-    ActivationsD,
-    AsDiscreteD,
-    MeanEnsembleD
-)
+from monai_ex.transforms import Compose, ActivationsD, AsDiscreteD, MeanEnsembleD
 from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
@@ -75,8 +57,8 @@ def build_segmentation_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
-    multi_input_keys = kwargs.get('multi_input_keys', None)
-    multi_output_keys = kwargs.get('multi_output_keys', None)
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
     _image_ = cfg.get_key("image")
     _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
@@ -99,27 +81,25 @@ def build_segmentation_engine(**kwargs):
     if opts.save_n_best > 0:
         val_handlers += [
             CheckpointSaverEx(
-                save_dir=model_dir/"Best_Models",
+                save_dir=model_dir / "Best_Models",
                 save_dict={"net": net},
                 file_prefix=val_metric,
                 save_key_metric=True,
                 key_metric_n_saved=opts.save_n_best,
-                key_metric_save_after_epoch=0
+                key_metric_save_after_epoch=0,
             ),
             TensorboardDumper(
                 log_dir=writer.log_dir,
                 epoch_level=True,
                 logger_name=logger_name,
-            )
+            ),
         ]
 
     # If in nni search mode
     if opts.nni:
         val_handlers += [
             NNIReporterHandler(
-                metric_name=val_metric,
-                max_epochs=opts.n_epoch,
-                logger_name=logger_name
+                metric_name=val_metric, max_epochs=opts.n_epoch, logger_name=logger_name
             )
         ]
 
@@ -161,8 +141,7 @@ def build_segmentation_engine(**kwargs):
         post_transform=trainval_post_transforms,
         key_val_metric={
             val_metric: MeanDice(
-                include_background=False,
-                output_transform=dice_metric_transform_fn
+                include_background=False, output_transform=dice_metric_transform_fn
             )
         },
         val_handlers=val_handlers,
@@ -189,11 +168,11 @@ def build_segmentation_engine(**kwargs):
             name=logger_name,
         ),
         CheckpointSaverEx(
-            save_dir=model_dir/"Checkpoint",
+            save_dir=model_dir / "Checkpoint",
             save_dict={"net": net, "optim": optim},
             save_interval=opts.save_epoch_freq,
             epoch_level=True,
-            n_saved=opts.save_n_best
+            n_saved=opts.save_n_best,
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
@@ -224,8 +203,7 @@ def build_segmentation_engine(**kwargs):
         post_transform=trainval_post_transforms,
         key_train_metric={
             "train_mean_dice": MeanDice(
-                include_background=False,
-                output_transform=dice_metric_transform_fn
+                include_background=False, output_transform=dice_metric_transform_fn
             )
         },
         train_handlers=train_handlers,
@@ -251,21 +229,21 @@ def build_segmentation_test_engine(**kwargs):
     net = kwargs["net"]
     device = kwargs["device"]
     logger_name = kwargs.get("logger_name", None)
-    crop_size = get_attr_(opts, 'crop_size', None)
+    crop_size = get_attr_(opts, "crop_size", None)
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
     is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase == 'test'
-    multi_input_keys = kwargs.get('multi_input_keys', None)
-    multi_output_keys = kwargs.get('multi_output_keys', None)
+    is_supervised = opts.phase == "test"
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
     _image_ = cfg.get_key("image")
     _pred_ = cfg.get_key("pred")
     _label_ = cfg.get_key("label")
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
-        print('patch size:', crop_size)
+        print("patch size:", crop_size)
     else:
         print("---Use simple infer!---")
 
@@ -277,7 +255,7 @@ def build_segmentation_test_engine(**kwargs):
             output_ext=".nii.gz",
             resample=resample,
             data_root_dir=output_filename_check(test_loader.dataset),
-            batch_transform=lambda x: x[_image_+"_meta_dict"],
+            batch_transform=lambda x: x[_image_ + "_meta_dict"],
             output_transform=lambda output: output[_pred_],
         ),
     ]
@@ -290,7 +268,7 @@ def build_segmentation_test_engine(**kwargs):
                 output_ext=".nii.gz",
                 resample=resample,
                 data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=lambda x: x[_image_+"_meta_dict"],
+                batch_transform=lambda x: x[_image_ + "_meta_dict"],
                 output_transform=lambda output: output[_image_],
             )
         ]
@@ -314,7 +292,9 @@ def build_segmentation_test_engine(**kwargs):
         dce_post_transforms = Compose(
             [
                 ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False, n_classes=opts.output_nc),
+                AsDiscreteD(
+                    keys=_pred_, argmax=True, to_onehot=False, n_classes=opts.output_nc
+                ),
                 partial(onehot_transform, n_classes=opts.output_nc),
             ]
         )
@@ -337,10 +317,14 @@ def build_segmentation_test_engine(**kwargs):
         }
 
     if use_slidingwindow:
-        if opts.tensor_dim == '2D':
-            inferer = SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
-        elif opts.tensor_dim == '3D':
-            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5)
+        if opts.tensor_dim == "2D":
+            inferer = SlidingWindowInferer2Dfor3D(
+                roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6
+            )
+        elif opts.tensor_dim == "3D":
+            inferer = SlidingWindowInferer(
+                roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
+            )
     else:
         inferer = SimpleInferer()
 
@@ -376,7 +360,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
 
     cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
-    best_models = get_models(cv_folders, 'best' if best_model else 'last')
+    best_models = get_models(cv_folders, "best" if best_model else "last")
     best_models = list(filter(lambda x: x is not None and x.is_file(), best_models))
 
     if len(best_models) != opts.n_fold:
@@ -387,9 +371,14 @@ def build_segmentation_ensemble_test_engine(**kwargs):
         )
     print(f"Using models: {[m.name for m in best_models]}")
 
-    nets = [copy.deepcopy(net),] * len(best_models)
+    nets = [
+        copy.deepcopy(net),
+    ] * len(best_models)
+
     for net, m in zip(nets, best_models):
-        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
+        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(
+            None
+        )
 
     pred_keys = [f"pred{i}" for i in range(len(best_models))]
 
@@ -413,11 +402,15 @@ def build_segmentation_ensemble_test_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=post_transforms,
         val_handlers=val_handlers,
-        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms,is_multilabel=is_multilabel)},
+        key_val_metric={
+            "test_acc": Accuracy(
+                output_transform=acc_post_transforms, is_multilabel=is_multilabel
+            )
+        },
         additional_metrics={
-            'test_auc':ROCAUC(output_transform=auc_post_transforms), 
-            'Prec':Precision(output_transform=acc_post_transforms),
-            'Recall':Recall(output_transform=acc_post_transforms)
+            "test_auc": ROCAUC(output_transform=auc_post_transforms),
+            "Prec": Precision(output_transform=acc_post_transforms),
+            "Recall": Recall(output_transform=acc_post_transforms),
         },
     )
 
