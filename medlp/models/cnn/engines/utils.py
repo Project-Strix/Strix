@@ -1,5 +1,6 @@
 import os
 import re
+from monai.networks import one_hot
 
 
 def get_best_model(folder, float_regex=r"=(-?\d+\.\d+).pt"):
@@ -94,3 +95,28 @@ def get_unsupervised_prepare_batch_fn(
         )
 
     return prepare_batch_fn
+
+
+def get_dice_metric_transform_fn(
+    opts,
+    pred_key,
+    label_key
+):
+    out_nc = opts.output_nc
+    multiclass = out_nc > 1
+    if opts.criterion in ["CE", "WCE"] and multiclass:
+        key_metric_transform_fn = lambda x: (
+            x[pred_key],
+            one_hot(x[label_key].unsqueeze(dim=1), num_classes=out_nc),
+        )
+    elif multiclass:
+        key_metric_transform_fn = lambda x: (
+            x[pred_key],
+            one_hot(x[label_key], num_classes=out_nc),
+        )
+    else:
+        key_metric_transform_fn = lambda x: (
+            x[pred_key], x[label_key],
+        )
+    
+    return key_metric_transform_fn

@@ -1,19 +1,12 @@
-import logging
-
 import numpy as np
 import torch
-import scipy.misc
-import scipy.ndimage
 import importlib.util
 from torch.autograd import Variable
 import torch.nn as nn
 from torch.optim.lr_scheduler import _LRScheduler
 from monai.networks import one_hot
-from monai.transforms import (
-    Activations, 
-    AsDiscrete, 
-    SqueezeDim
-)
+from monai.transforms import AsDiscrete
+
 
 class PolynomialLRDecay(_LRScheduler):
     """Polynomial learning rate decay until step reach to max_decay_step
@@ -54,18 +47,20 @@ class PolynomialLRDecay(_LRScheduler):
                 param_group['lr'] = lr
         self._last_lr = [group['lr'] for group in self.optimizer.param_groups]
 
+
+# Todo: refactor this function
 def output_onehot_transform(output, n_classes=3, verbose=False):
     y_pred, y = output["pred"], output["label"]
     if verbose:
         print('Input y_pred:', list(y_pred.cpu().numpy()), '\nInput y_ture:', list(y.cpu().numpy()))
-        
+
     if n_classes == 1:
         return y_pred, y
-    
+
     def onehot_(data, n_class):
         if data.ndimension() == 1:
             data_ = one_hot(data, n_class)
-        elif data.ndimension() == 2: #first dim is batch
+        elif data.ndimension() == 2: # first dim is batch
             data_ = one_hot(data, n_class, dim=1)
         elif data.ndimension() == 3 and data.shape[1] == 1:
             data_ = one_hot(data.squeeze(1), n_class, dim=1)
@@ -75,7 +70,7 @@ def output_onehot_transform(output, n_classes=3, verbose=False):
 
     pred_ = onehot_(y_pred, n_classes)
     true_ = onehot_(y, n_classes)
-    
+
     assert pred_.shape == true_.shape, f'Pred ({pred_.shape}) and True ({true_.shape}) data have different shape'
     #print('pred, true:', pred_.cpu().numpy(), true_.cpu().numpy())
     return pred_, true_
