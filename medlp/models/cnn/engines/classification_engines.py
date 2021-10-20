@@ -12,12 +12,12 @@ from medlp.models.cnn.engines import (
     ENSEMBLE_TEST_ENGINES
 )
 from medlp.models.cnn.engines.utils import (
+    output_onehot_transform,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn
 )
 from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
-from medlp.models.cnn.utils import output_onehot_transform
 from medlp.configures import config as cfg
 
 from monai_ex.inferers import SimpleInfererEx
@@ -81,10 +81,6 @@ def build_classification_engine(**kwargs):
     _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
     _loss_ = cfg.get_key("loss")
-
-    prepare_batch_fn = get_prepare_batch_fn(
-        opts, _image_, _label_, multi_input_keys, multi_output_keys
-    )
 
     if is_multilabel:
         val_metric_name = 'val_acc'
@@ -151,6 +147,10 @@ def build_classification_engine(**kwargs):
         key_val_metric = Accuracy(output_transform=partial(output_onehot_transform,n_classes=opts.output_nc), is_multilabel=is_multilabel)
     else:
         key_val_metric = ROCAUC(output_transform=partial(output_onehot_transform, n_classes=opts.output_nc))
+
+    prepare_batch_fn = get_prepare_batch_fn(
+        opts, _image_, _label_, multi_input_keys, multi_output_keys
+    )
 
     evaluator = SupervisedEvaluatorEx(
         device=device,

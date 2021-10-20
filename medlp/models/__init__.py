@@ -5,7 +5,6 @@ import numpy as np
 
 from medlp.models.cnn.utils import (
     print_network,
-    output_onehot_transform,
     PolynomialLRDecay
 )
 from medlp.models.cnn.layers.radam import RAdam

@@ -50,6 +50,33 @@ def get_models(folders, model_type):
     return best_models
 
 
+# Todo: refactor this function
+def output_onehot_transform(output, n_classes=3, verbose=False):
+    y_pred, y = output["pred"], output["label"]
+    if verbose:
+        print('Input y_pred:', list(y_pred.cpu().numpy()), '\nInput y_ture:', list(y.cpu().numpy()))
+
+    if n_classes == 1:
+        return y_pred, y
+
+    def onehot_(data, n_class):
+        if data.ndimension() == 1:
+            data_ = one_hot(data, n_class)
+        elif data.ndimension() == 2: # first dim is batch
+            data_ = one_hot(data, n_class, dim=1)
+        elif data.ndimension() == 3 and data.shape[1] == 1:
+            data_ = one_hot(data.squeeze(1), n_class, dim=1)
+        else:
+            raise ValueError(f'Cannot handle data ndim: {data.ndimension()}, shape: {data.shape}')
+        return data_
+
+    pred_ = onehot_(y_pred, n_classes)
+    true_ = onehot_(y, n_classes)
+
+    assert pred_.shape == true_.shape, f'Pred ({pred_.shape}) and True ({true_.shape}) data have different shape'
+    return pred_, true_
+
+
 def get_prepare_batch_fn(
     opts,
     image_key,
