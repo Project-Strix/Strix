@@ -240,6 +240,11 @@ def build_segmentation_test_engine(**kwargs):
     _image_ = cfg.get_key("image")
     _pred_ = cfg.get_key("pred")
     _label_ = cfg.get_key("label")
+    model_path = (
+        opts.model_path[0]
+        if isinstance(opts.model_path, (list, tuple))
+        else opts.model_path
+    )
 
     if use_slidingwindow:
         print("---Use slidingwindow infer!---")
@@ -249,7 +254,7 @@ def build_segmentation_test_engine(**kwargs):
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+        CheckpointLoader(load_path=model_path, load_dict={"net": net}),
         SegmentationSaver(
             output_dir=opts.out_dir,
             output_ext=".nii.gz",
@@ -351,16 +356,20 @@ def build_segmentation_ensemble_test_engine(**kwargs):
     test_loader = kwargs["test_loader"]
     net = kwargs["net"]
     device = kwargs["device"]
-    best_model = kwargs.get("best_val_model", True)
+    use_best_model = kwargs.get("best_val_model", True)
+    model_list = opts.model_path
+    is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
     logger_name = kwargs.get("logger_name", None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
     use_slidingwindow = is_avaible_size(opts.crop_size)
     float_regex = r"=(-?\d+\.\d+).pt"
+    if is_intra_ensemble:
+        raise NotImplementedError()
 
     cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
-    best_models = get_models(cv_folders, "best" if best_model else "last")
+    best_models = get_models(cv_folders, "best" if use_best_model else "last")
     best_models = list(filter(lambda x: x is not None and x.is_file(), best_models))
 
     if len(best_models) != opts.n_fold:
@@ -374,7 +383,6 @@ def build_segmentation_ensemble_test_engine(**kwargs):
     nets = [
         copy.deepcopy(net),
     ] * len(best_models)
-
     for net, m in zip(nets, best_models):
         CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(
             None
@@ -382,7 +390,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
 
     pred_keys = [f"pred{i}" for i in range(len(best_models))]
 
-    if best_model:
+    if use_best_model:
         w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models]
     else:
         w_ = None

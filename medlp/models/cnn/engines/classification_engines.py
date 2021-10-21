@@ -259,6 +259,11 @@ def build_classification_test_engine(**kwargs):
     _image_ = cfg.get_key("image")
     _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
+    model_path = (
+        opts.model_path[0]
+        if isinstance(opts.model_path, (list, tuple))
+        else opts.model_path
+    )
 
     if is_supervised:
         prepare_batch_fn = get_prepare_batch_fn(
@@ -321,7 +326,7 @@ def build_classification_test_engine(**kwargs):
 
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        CheckpointLoader(load_path=opts.model_path, load_dict={"net": net}),
+        CheckpointLoader(load_path=model_path, load_dict={"net": net}),
     ]
 
     if get_attr_(opts, "save_results", True):
@@ -414,7 +419,9 @@ def build_classification_ensemble_test_engine(**kwargs):
     test_loader = kwargs["test_loader"]
     net = kwargs["net"]
     device = kwargs["device"]
-    best_model = kwargs.get("best_val_model", True)
+    use_best_model = kwargs.get("best_val_model", True)
+    model_list = opts.model_path
+    is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
     logger_name = kwargs.get("logger_name", None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
@@ -429,19 +436,22 @@ def build_classification_ensemble_test_engine(**kwargs):
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
     float_regex = r"=(-?\d+\.\d+).pt"
     int_regex = r"=(\d+).pt"
-    if best_model:
-        best_models = []
+    if is_intra_ensemble:
+        if len(model_list) == 1:
+            raise ValueError(
+                "Only one model is specified for intra ensemble test, but need more!"
+            )
+    elif use_best_model:
         for folder in cv_folders:
             models = list(
                 filter(
                     lambda x: re.search(float_regex, x.name),
-                    [model for model in folder.joinpath("Models").rglob("*.pt")],
-                )
+                    [model for model in (folder / "Models").rglob("*.pt")],
+                )  # ? better to usefolder/"Models"/"Best_Models"
             )
             models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
-            best_models.append(models[-1])
-    else:  # get last
-        best_models = []
+            model_list.append(models[-1])
+    else:  # get latest
         for folder in cv_folders:
             models = list(
                 filter(
@@ -457,30 +467,26 @@ def build_classification_ensemble_test_engine(**kwargs):
                 )
                 print("invalid models:", invalid_models)
                 raise e
-            best_models.append(models[-1])
+            model_list.append(models[-1])
 
-    if len(best_models) != opts.n_fold:
+    if len(model_list) != opts.n_fold and not is_intra_ensemble:
         print(
-            f"Found {len(best_models)} best models,"
+            f"Found {len(model_list)} best models,"
             f"not equal to {opts.n_fold} n_folds.\n"
-            f"Use {len(best_models)} best models"
+            f"Use {len(model_list)} best models"
         )
-    print(f"Using models: {[m.name for m in best_models]}")
+    print(f"Using models: {[m.name for m in model_list]}")
 
     nets = [
         copy.deepcopy(net),
-    ] * len(best_models)
-    for net, m in zip(nets, best_models):
+    ] * len(model_list)
+    for net, m in zip(nets, model_list):
         CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(
             None
         )
 
-    pred_keys = [f"{_pred_}{i}" for i in range(len(best_models))]
+    pred_keys = [f"{_pred_}{i}" for i in range(len(model_list))]
 
-    # if opts.phase == 'test_wo_label':
-    #     output_transform = lambda x: x['pred']
-    # else:
-    #     output_transform = lambda x: (x['pred'], x['label'])
     if is_supervised:
         prepare_batch_fn = get_prepare_batch_fn(
             opts, _image_, _label_, multi_input_keys, multi_output_keys
@@ -491,8 +497,8 @@ def build_classification_ensemble_test_engine(**kwargs):
         )
 
     if opts.output_nc == 1:  # ensemble_type is 'mean':
-        if best_model:
-            w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models]
+        if use_best_model:
+            w_ = [float(re.search(float_regex, m.name).group(1)) for m in model_list]
         else:
             w_ = None
         post_transforms = MeanEnsembleD(

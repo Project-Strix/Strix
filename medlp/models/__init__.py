@@ -3,49 +3,38 @@ from utils_cw import check_dir
 import torch
 import numpy as np
 
-from medlp.models.cnn.utils import (
-    print_network,
-    PolynomialLRDecay
-)
+from medlp.models.cnn.utils import print_network, PolynomialLRDecay
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.layers.ranger21 import Ranger21
-from medlp.models.cnn.engines import (
-    TRAIN_ENGINES,
-    TEST_ENGINES,
-    ENSEMBLE_TEST_ENGINES
-)
+from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
-from medlp.models.cnn.losses import (
-    LOSS_MAPPING,
-    DiceFocalLoss,
-    ContrastiveLoss
-)
+from medlp.models.cnn.losses import LOSS_MAPPING, DiceFocalLoss, ContrastiveLoss
 
 
 def get_rcnn_config(archi, backbone):
-    folder = Path(__file__).parent.parent.joinpath('misc/config')
+    folder = Path(__file__).parent.parent.joinpath("misc/config")
     return {
-        'mask_rcnn': {
-            'R-50-C4': folder/'e2e_mask_rcnn_R_50_C4_1x.yaml',
-            'R-50-FPN': folder/'e2e_mask_rcnn_R_50_FPN_1x.yaml',
-            'R-101-FPN': folder/'e2e_mask_rcnn_R_101_FPN_1x.yaml'
+        "mask_rcnn": {
+            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
+            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
+            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
         },
-        'faster_rcnn': {
-            'R-50-FPN': folder/'fcos_R_50_FPN_1x.yaml',
-            'R-101-FPN': folder/'fcos_R_101_FPN_2x.yaml'
+        "faster_rcnn": {
+            "R-50-FPN": folder / "fcos_R_50_FPN_1x.yaml",
+            "R-101-FPN": folder / "fcos_R_101_FPN_2x.yaml",
         },
-        'fcos': {
-            'R-50-C4': folder/'e2e_mask_rcnn_R_50_C4_1x.yaml',
-            'R-50-FPN': folder/'e2e_mask_rcnn_R_50_FPN_1x.yaml',
-            'R-101-FPN': folder/'e2e_mask_rcnn_R_101_FPN_1x.yaml'
+        "fcos": {
+            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
+            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
+            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
         },
-        'retina':{
-            'R-50-FPN': folder/'retinanet_R-50-FPN_1x.yaml',
-            'R-101-FPN': folder/'retinanet_R-101-FPN_1x.yaml'
-        }
+        "retina": {
+            "R-50-FPN": folder / "retinanet_R-50-FPN_1x.yaml",
+            "R-101-FPN": folder / "retinanet_R-101-FPN_1x.yaml",
+        },
     }[archi][backbone]
 
 
@@ -54,31 +43,35 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
 
 
 def get_network(opts):
-    assert hasattr(opts, 'model_name') and hasattr(opts, 'input_nc') and \
-           hasattr(opts, 'tensor_dim') and hasattr(opts, 'output_nc')
+    assert (
+        hasattr(opts, "model_name")
+        and hasattr(opts, "input_nc")
+        and hasattr(opts, "tensor_dim")
+        and hasattr(opts, "output_nc")
+    )
 
     options = vars(opts).copy()
-    model_name = options.get('model_name')
-    dim = 2 if options.pop('tensor_dim') == '2D' else 3
-    in_channels = options.pop('input_nc')
-    out_channels = options.pop('output_nc')
+    model_name = options.get("model_name")
+    dim = 2 if options.pop("tensor_dim") == "2D" else 3
+    in_channels = options.pop("input_nc")
+    out_channels = options.pop("output_nc")
 
-    n_depth = options.pop('n_depth', -1)
-    pretrained = options.pop('pretrained', False)
-    act = options.pop('layer_act', 'relu')
-    norm = options.pop('layer_norm', 'batch')
-    is_prunable = options.pop('snip', False)
+    n_depth = options.pop("n_depth", -1)
+    pretrained = options.pop("pretrained", False)
+    act = options.pop("layer_act", "relu")
+    norm = options.pop("layer_norm", "batch")
+    is_prunable = options.pop("snip", False)
     # crop_size = get_attr_(opts, 'crop_size', None)
     # bottleneck_size = get_attr_(opts, 'bottleneck_size', 7)
-    drop_out = options.pop('dropout', None)
-    n_group = options.pop('n_group', 1)  # used for multi-group archi
-    pretrained_model_path = options.pop('pretrained_model_path', None)
+    drop_out = options.pop("dropout", None)
+    n_group = options.pop("n_group", 1)  # used for multi-group archi
+    pretrained_model_path = options.pop("pretrained_model_path", None)
 
     siamese = None
-    siamese_latent_dim = options.pop('latent_dim', 512)
+    siamese_latent_dim = options.pop("latent_dim", 512)
     if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
         loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
-        siamese = 'single' if loss_type == ContrastiveLoss else 'multi'
+        siamese = "single" if loss_type == ContrastiveLoss else "multi"
         raise NotImplementedError
     elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
@@ -100,7 +93,7 @@ def get_network(opts):
             is_prunable,
             pretrained,
             pretrained_model_path,
-            **options,  #Todo: Only pass network-related kwargs instead of all
+            **options,  # Todo: Only pass network-related kwargs instead of all
         )
 
 
@@ -121,31 +114,41 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         list: Return engine, net, loss
     """
     # Print the model type
-    print('\nInitialising model {}'.format(opts.model_name))
-    weight_decay = get_attr_(opts, 'l2_weight_decay', 0.0)
-    nesterov = get_attr_(opts, 'nesterov', False)
-    momentum = get_attr_(opts, 'momentum', 0.0)
-    valid_interval = get_attr_(opts, 'valid_interval', 5)
+    print("\nInitialising model {}".format(opts.model_name))
+    weight_decay = get_attr_(opts, "l2_weight_decay", 0.0)
+    nesterov = get_attr_(opts, "nesterov", False)
+    momentum = get_attr_(opts, "momentum", 0.0)
+    valid_interval = get_attr_(opts, "valid_interval", 5)
 
     frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
-    multi_input_keys  = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
+    multi_input_keys = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
     multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
 
     framework_type = opts.framework
-    device = torch.device("cuda") if opts.gpus != '-1' else torch.device("cpu")
-    model_dir = check_dir(opts.experiment_path, 'Models')
+    device = torch.device("cuda") if opts.gpus != "-1" else torch.device("cpu")
+    model_dir = check_dir(opts.experiment_path, "Models")
 
     loss = lr_scheduler = None
     loss_type = LOSS_MAPPING[framework_type][opts.criterion]
 
     if opts.output_nc == 1:
-        kwargs = {"include_background": False, "sigmoid": True, "softmax": False, "to_onehot_y": False}
+        kwargs = {
+            "include_background": False,
+            "sigmoid": True,
+            "softmax": False,
+            "to_onehot_y": False,
+        }
     else:
-        kwargs = {"include_background": False, "sigmoid": False, "softmax": True, "to_onehot_y": True}
+        kwargs = {
+            "include_background": False,
+            "sigmoid": False,
+            "softmax": True,
+            "to_onehot_y": True,
+        }
 
     # if loss_type in [DiceLoss, GeneralizedDiceLoss, DiceFocalLoss]:
     #     loss = loss_type(**kwargs)
-    if 'Dice' in loss_type.__name__:
+    if "Dice" in loss_type.__name__:
         kwargs.update(opts.loss_params)
         loss = loss_type(**kwargs)
     else:
@@ -165,20 +168,25 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     if opts.visualize:
         print_network(net)
 
-    if opts.optim == 'adam':
+    if opts.optim == "adam":
         optim = torch.optim.Adam(net.parameters(), opts.lr, weight_decay=weight_decay)
-    elif opts.optim == 'sgd':
+    elif opts.optim == "sgd":
         optim = torch.optim.SGD(
-            net.parameters(), opts.lr,
-            weight_decay=weight_decay, momentum=momentum, nesterov=nesterov
+            net.parameters(),
+            opts.lr,
+            weight_decay=weight_decay,
+            momentum=momentum,
+            nesterov=nesterov,
         )
-    elif opts.optim == 'adamw':
+    elif opts.optim == "adamw":
         optim = torch.optim.AdamW(net.parameters(), opts.lr, weight_decay=weight_decay)
-    elif opts.optim == 'adagrad':
-        optim = torch.optim.Adagrad(net.parameters(), opts.lr, weight_decay=weight_decay)
-    elif opts.optim == 'radam':
+    elif opts.optim == "adagrad":
+        optim = torch.optim.Adagrad(
+            net.parameters(), opts.lr, weight_decay=weight_decay
+        )
+    elif opts.optim == "radam":
         optim = RAdam(net.parameters(), opts.lr, weight_decay=weight_decay)
-    elif opts.optim == 'ranger':
+    elif opts.optim == "ranger":
         optim = Ranger21(
             net.parameters(),
             opts.lr,
@@ -186,50 +194,57 @@ def get_engine(opts, train_loader, test_loader, writer=None):
             lookahead_active=True,
             use_warmup=True,
             num_batches_per_epoch=len(train_loader),
-            num_epochs=opts.n_epoch
+            num_epochs=opts.n_epoch,
         )
     else:
         raise NotImplementedError
 
-    if opts.lr_policy == 'const':
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x:1)
-    elif opts.lr_policy == 'poly':
-        lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=opts.lr*0.1, power=0.9)
-    elif opts.lr_policy == 'step':
+    if opts.lr_policy == "const":
+        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x: 1)
+    elif opts.lr_policy == "poly":
+        lr_scheduler = PolynomialLRDecay(
+            optim, opts.n_epoch, end_learning_rate=opts.lr * 0.1, power=0.9
+        )
+    elif opts.lr_policy == "step":
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, **opts.lr_policy_params)
-    elif opts.lr_policy == 'multistep':
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim,  **opts.lr_policy_params)
-    elif opts.lr_policy == 'plateau':
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optim,
-                                                                  mode='max',
-                                                                  factor=0.1,
-                                                                  patience=opts.lr_policy_params['patience'],
-                                                                  cooldown=50,
-                                                                  min_lr=1e-5)
-    elif opts.lr_policy == 'SGDR':
-        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim,
-                                                                            T_0=opts.lr_policy_params['T_0'],
-                                                                            T_mult=opts.lr_policy_params['T_mult'],
-                                                                            eta_min=opts.lr_policy_params['eta_min'])
+    elif opts.lr_policy == "multistep":
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optim, **opts.lr_policy_params
+        )
+    elif opts.lr_policy == "plateau":
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optim,
+            mode="max",
+            factor=0.1,
+            patience=opts.lr_policy_params["patience"],
+            cooldown=50,
+            min_lr=1e-5,
+        )
+    elif opts.lr_policy == "SGDR":
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optim,
+            T_0=opts.lr_policy_params["T_0"],
+            T_mult=opts.lr_policy_params["T_mult"],
+            eta_min=opts.lr_policy_params["eta_min"],
+        )
     else:
         raise NotImplementedError
 
     params = {
-        'opts': opts,
-        'train_loader': train_loader,
-        'test_loader': test_loader,
-        'net': net,
-        'optim': optim,
-        'loss': loss,
-        'lr_scheduler': lr_scheduler,
-        'writer': writer,
-        'valid_interval': valid_interval,
-        'device': device,
-        'model_dir': model_dir,
-        'logger_name': f'{opts.tensor_dim}-Trainer',
-        'multi_input_keys': multi_input_keys,
-        'multi_output_keys': multi_output_keys
-
+        "opts": opts,
+        "train_loader": train_loader,
+        "test_loader": test_loader,
+        "net": net,
+        "optim": optim,
+        "loss": loss,
+        "lr_scheduler": lr_scheduler,
+        "writer": writer,
+        "valid_interval": valid_interval,
+        "device": device,
+        "model_dir": model_dir,
+        "logger_name": f"{opts.tensor_dim}-Trainer",
+        "multi_input_keys": multi_input_keys,
+        "multi_output_keys": multi_output_keys,
     }
 
     engine = TRAIN_ENGINES[framework_type](**params)
@@ -248,25 +263,33 @@ def get_test_engine(opts, test_loader):
         IgniteEngine: Return test engine.
     """
 
-    device = torch.device("cuda:0") if opts.gpus != '-1' else torch.device("cpu")
+    device = torch.device("cuda:0") if opts.gpus != "-1" else torch.device("cpu")
 
     frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
-    multi_input_keys  = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
+    multi_input_keys = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
     multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
 
     net = get_network(opts).to(device)
 
     params = {
-        'opts': opts,
-        'test_loader': test_loader,
-        'net': net,
-        'device': device,
-        'logger_name': f'{opts.tensor_dim}-Tester',
-        'multi_input_keys': multi_input_keys,
-        'multi_output_keys': multi_output_keys
+        "opts": opts,
+        "test_loader": test_loader,
+        "net": net,
+        "device": device,
+        "logger_name": f"{opts.tensor_dim}-Tester",
+        "multi_input_keys": multi_input_keys,
+        "multi_output_keys": multi_output_keys,
     }
 
-    if get_attr_(opts, 'n_fold', 0) > 1 or get_attr_(opts, 'n_repeat', 0) > 1:
+    is_intra_ensemble = (
+        isinstance(opts.model_path, (list, tuple)) and len(opts.model_path) > 1
+    )
+
+    if (
+        get_attr_(opts, "n_fold", 0) > 1
+        or get_attr_(opts, "n_repeat", 0) > 1
+        or is_intra_ensemble
+    ):
         return ENSEMBLE_TEST_ENGINES[frame](**params)
     else:
         return TEST_ENGINES[frame](**params)
