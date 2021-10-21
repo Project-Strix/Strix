@@ -285,7 +285,15 @@ def get_test_engine(opts, test_loader):
         "multi_output_keys": multi_output_keys,
     }
 
-    if get_attr_(opts, "n_fold", 0) > 1 or get_attr_(opts, "n_repeat", 0) > 1:
+    is_intra_ensemble = (
+        isinstance(opts.model_path, (list, tuple)) and len(opts.model_path) > 1
+    )
+
+    if (
+        get_attr_(opts, "n_fold", 0) > 1
+        or get_attr_(opts, "n_repeat", 0) > 1
+        or is_intra_ensemble
+    ):
         return ENSEMBLE_TEST_ENGINES[frame](**params)
     else:
         return TEST_ENGINES[frame](**params)

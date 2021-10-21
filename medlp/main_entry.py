@@ -298,10 +298,12 @@ def test_cfg(**args):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
     exp_dir = Path(configures.get("experiment_path", os.path.dirname(args["config"])))
+    is_crossvalid = configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1
+
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
-    elif configures.get("n_fold", 0) > 1:
+    elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found!"
             "You must provide external test file (.json/.yaml)."
@@ -314,21 +316,19 @@ def test_cfg(**args):
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
-    # configures["model_path"] = (
-    #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
-    # )
-    best_models = (
-        [""]
-        if configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1
-        else clb.get_trained_models(exp_dir, args["use_best_model"])
-    )
+    if args["use_best_model"]:
+        model_list = clb.get_best_trained_models(exp_dir)
+    elif is_crossvalid:
+        model_list = [""]
+    else:
+        model_list = [clb.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
     configures["experiment_path"] = exp_dir
-    configures["resample"] = True  #! departure
+    configures["resample"] = True  # ! departure
     configures["slidingwindow"] = args["slidingwindow"]
     if args.get("crop_size", None):
         configures["crop_size"] = args["crop_size"]
@@ -341,7 +341,7 @@ def test_cfg(**args):
     Print(f"{len(test_files)} test files", color="g")
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
-    for model_path in best_models:
+    for model_path in model_list:
         configures["model_path"] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
