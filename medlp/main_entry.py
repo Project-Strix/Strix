@@ -358,10 +358,19 @@ def test_cfg(**args):
             test_fpath, check_dir(configures["out_dir"]) / os.path.basename(test_fpath)
         )
         engine.run()
-        if isinstance(model_path, Path):
+
+        is_intra_ensemble = (
+            isinstance(model_path, (list, tuple)) and len(model_path) > 1
+        )
+        if is_intra_ensemble:
             os.rename(
                 configures["out_dir"],
-                str(configures["out_dir"]) + "-" + model_path.stem,
+                str(configures["out_dir"]) + "-intra-ensemble",
+            )
+        else:
+            os.rename(
+                configures["out_dir"],
+                str(configures["out_dir"]) + "-" + model_path[0].stem,
             )
 
 
