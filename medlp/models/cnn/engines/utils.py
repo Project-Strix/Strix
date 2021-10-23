@@ -126,18 +126,17 @@ def get_unsupervised_prepare_batch_fn(opts, image_key, multi_input_keys):
     return prepare_batch_fn
 
 
-def get_dice_metric_transform_fn(opts, pred_key, label_key):
-    out_nc = opts.output_nc
-    multiclass = out_nc > 1
-    if opts.criterion in ["CE", "WCE"] and multiclass:
+def get_dice_metric_transform_fn(output_nc, criterion, pred_key, label_key):
+    multiclass = output_nc > 1
+    if criterion in ["CE", "WCE"] and multiclass:
         key_metric_transform_fn = lambda x: (
             x[pred_key],
-            one_hot(x[label_key].unsqueeze(dim=1), num_classes=out_nc),
+            one_hot(x[label_key].unsqueeze(dim=1), num_classes=output_nc),
         )
     elif multiclass:
         key_metric_transform_fn = lambda x: (
             x[pred_key],
-            one_hot(x[label_key], num_classes=out_nc),
+            one_hot(x[label_key], num_classes=output_nc),
         )
     else:
         key_metric_transform_fn = lambda x: (
