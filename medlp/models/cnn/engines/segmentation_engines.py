@@ -309,12 +309,6 @@ class SegmentationTestEngine(MedlpTestEngine):
                 opts, _image_, multi_input_keys
             )
 
-        # def onehot_transform(output, n_classes=3, dim=1):
-        #     if n_classes == 1:
-        #         return output[_pred_], output[_label_]
-        #     y_pred, y = output[_pred_], output[_label_]
-        #     return one_hot(y_pred, n_classes, dim=dim), one_hot(y, n_classes, dim=dim)
-
         if use_slidingwindow:
             if opts.tensor_dim == "2D":
                 inferer = SlidingWindowInferer2Dfor3D(

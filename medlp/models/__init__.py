@@ -1,7 +1,6 @@
 from pathlib import Path
 from utils_cw import check_dir
 import torch
-import numpy as np
 
 from medlp.models.cnn.utils import print_network, PolynomialLRDecay
 from medlp.models.cnn.layers.radam import RAdam
@@ -11,7 +10,7 @@ from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
-from medlp.models.cnn.losses import LOSS_MAPPING, DiceFocalLoss, ContrastiveLoss
+from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
 
 
 def get_rcnn_config(archi, backbone):
