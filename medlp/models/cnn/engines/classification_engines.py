@@ -17,6 +17,7 @@ from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
 
+from monai_ex.utils import ensure_tuple
 from monai_ex.inferers import SimpleInfererEx
 from monai_ex.metrics import DrawRocCurve
 from ignite.engine import Events
@@ -270,13 +271,16 @@ class ClassificationTestEngine(MedlpTestEngine):
                 ]
             )
 
+        key_val_metric = ClassificationTestEngine.get_metric("acc", opts.output_nc)
+        key_metric_name = list(key_val_metric.keys())[0]
+
         val_handlers = MedlpTestEngine.get_extra_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
             net=net,
             logger_name=logger_name,
-            stats_dicts={val_metric_name: lambda x: None},
+            stats_dicts={key_metric_name: lambda x: None},
             save_image=opts.save_image,
             image_resample=False,
             test_loader=test_loader,
@@ -288,10 +292,10 @@ class ClassificationTestEngine(MedlpTestEngine):
             val_handlers += [
                 ClassificationSaverEx(
                     output_dir=opts.out_dir,
-                    save_labels=True,  # opts.phase=='test',
+                    save_labels=opts.phase == "test",
                     batch_transform=lambda x: (x[_image_ + "_meta_dict"], x[_label_])
                     if opts.phase == "test"
-                    else lambda x: x[_image_ + "_meta_dict"],
+                    else x[_image_ + "_meta_dict"],
                     output_transform=post_transform,
                 ),
                 ClassificationSaverEx(
@@ -310,11 +314,9 @@ class ClassificationTestEngine(MedlpTestEngine):
             inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
             post_transform=None,  # post_transforms,
             val_handlers=val_handlers,
-            key_val_metric=ClassificationTestEngine.get_metric("acc", output_nc)
-            if is_supervised
-            else None,
+            key_val_metric=key_val_metric if is_supervised else None,
             additional_metrics=ClassificationTestEngine.get_metric(
-                ["auc", "prec", "recall", "roc"], output_nc, out_dir
+                ["auc", "prec", "recall", "roc"], opts.output_nc, opts.out_dir
             )
             if is_supervised
             else None,
