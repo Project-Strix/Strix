@@ -77,6 +77,9 @@ class SegmentationTrainEngine(MedlpTrainEngine):
 
         val_handlers = MedlpTrainEngine.get_extra_handlers(
             phase="val",
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
             tb_summary_writer=writer,
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
@@ -152,6 +155,9 @@ class SegmentationTrainEngine(MedlpTrainEngine):
         ]
         train_handlers += MedlpTrainEngine.get_extra_handlers(
             phase="train",
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
             tb_summary_writer=writer,
             logger_name=logger_name,
             stats_dicts={"train_loss": lambda x: x[_loss_]},
@@ -192,19 +198,19 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             )
         return trainer
 
-        @staticmethod
-        def get_key_metric(phase: str, output_nc: int, criterion: str):
-            dice_metric_transform_fn = get_dice_metric_transform_fn(
-                output_nc,
-                criterion,
-                pred_key=cfg.get_key("pred"),
-                label_key=cfg.get_key("label"),
-            )
+    @staticmethod
+    def get_key_metric(phase: str, output_nc: int, criterion: str):
+        dice_metric_transform_fn = get_dice_metric_transform_fn(
+            output_nc,
+            criterion,
+            pred_key=cfg.get_key("pred"),
+            label_key=cfg.get_key("label"),
+        )
 
-            key_metric = MeanDice(
-                include_background=False, output_transform=dice_metric_transform_fn
-            )
-            return {phase + "_mean_dice": key_metric}
+        key_metric = MeanDice(
+            include_background=False, output_transform=dice_metric_transform_fn
+        )
+        return {phase + "_mean_dice": key_metric}
 
 
 @TEST_ENGINES.register("segmentation")
@@ -254,7 +260,7 @@ class SegmentationTestEngine(MedlpTestEngine):
                     lambda output: output[_pred_],
                 ]
             )
-            if output_nc == 1
+            if opts.output_nc == 1
             else Compose(
                 [
                     ActivationsD(keys=_pred_, softmax=True),
@@ -303,11 +309,11 @@ class SegmentationTestEngine(MedlpTestEngine):
                 opts, _image_, multi_input_keys
             )
 
-        def onehot_transform(output, n_classes=3, dim=1):
-            if n_classes == 1:
-                return output[_pred_], output[_label_]
-            y_pred, y = output[_pred_], output[_label_]
-            return one_hot(y_pred, n_classes, dim=dim), one_hot(y, n_classes, dim=dim)
+        # def onehot_transform(output, n_classes=3, dim=1):
+        #     if n_classes == 1:
+        #         return output[_pred_], output[_label_]
+        #     y_pred, y = output[_pred_], output[_label_]
+        #     return one_hot(y_pred, n_classes, dim=dim), one_hot(y, n_classes, dim=dim)
 
         if use_slidingwindow:
             if opts.tensor_dim == "2D":
@@ -337,13 +343,20 @@ class SegmentationTestEngine(MedlpTestEngine):
 
     @staticmethod
     def get_key_metric(phase: str, output_nc: int):
-        _pred_ = cfg.get("pred")
+        _pred_ = cfg.get_key("pred")
+
+        def onehot_transform(output, n_classes=3, dim=1):
+            if n_classes == 1:
+                return output[_pred_], output[_label_]
+            y_pred, y = output[_pred_], output[_label_]
+            return one_hot(y_pred, n_classes, dim=dim), one_hot(y, n_classes, dim=dim)
+
         post_transforms = (
             Compose(
                 [
                     ActivationsD(keys=_pred_, sigmoid=True),
                     AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                    partial(onehot_transform, n_classes=opts.output_nc),
+                    partial(onehot_transform, n_classes=output_nc),
                 ]
             )
             if output_nc == 1
@@ -354,15 +367,15 @@ class SegmentationTestEngine(MedlpTestEngine):
                         keys=_pred_,
                         argmax=True,
                         to_onehot=False,
-                        n_classes=opts.output_nc,
+                        n_classes=output_nc,
                     ),
-                    partial(onehot_transform, n_classes=opts.output_nc),
+                    partial(onehot_transform, n_classes=output_nc),
                 ]
             )
         )
 
         if phase == "test_wo_label":
-            return None
+            return {"val_mean_dice": None}
         elif phase == "test":
             return {
                 "val_mean_dice": MeanDice(
