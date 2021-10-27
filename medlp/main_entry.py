@@ -318,6 +318,9 @@ def test_cfg(**args):
 
     if args["use_best_model"]:
         model_list = clb.get_best_trained_models(exp_dir)
+        if is_crossvalid:
+            configures["n_fold"] = configures["n_repeat"] = 0
+            is_crossvalid = False
     elif is_crossvalid:
         model_list = [""]
     else:
@@ -373,10 +376,12 @@ def test_cfg(**args):
                 str(configures["out_dir"]) + "-ensemble",
             )
         else:
-            os.rename(
-                configures["out_dir"],
-                str(configures["out_dir"]) + "-" + model_path[0].stem,
+            postfix = (
+                model_path[0].stem
+                if isinstance(model_path, (list, tuple))
+                else model_path.stem
             )
+            os.rename(configures["out_dir"], str(configures["out_dir"]) + "-" + postfix)
 
 
 @click.command("unlink")

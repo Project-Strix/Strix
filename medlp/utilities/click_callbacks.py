@@ -15,14 +15,15 @@ from medlp.utilities.enum import *
 from utils_cw import prompt_when
 
 
-def get_best_trained_models(exp_folder):
-    model_dir = Path(exp_folder) / "Models"
-    assert model_dir.is_dir(), f"Model dir is not found! {model_dir}"
+def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
+    model_rootdir = Path(exp_folder)
+    assert model_rootdir.is_dir(), f"Model dir is not found! {model_rootdir}"
 
-    subcategories = list(filter(lambda x: x.is_dir(), model_dir.iterdir()))
+    subcategories = list(filter(lambda x: x.is_dir(), model_rootdir.iterdir()))
     best_models = []
-    for subdir in subcategories:
-        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subdir.iterdir()))
+
+    for model_dir in list(model_rootdir.rglob(best_model_dirname)):
+        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], model_dir.iterdir()))
         if len(files) > 0:
             best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
             best_models.append(best_model)
