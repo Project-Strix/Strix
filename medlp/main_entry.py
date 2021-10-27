@@ -347,7 +347,7 @@ def test_cfg(**args):
         engine = get_test_engine(sn(**configures), test_loader)
         engine.logger = setup_logger(
             f"{configures['tensor_dim']}-Tester", level=logging.INFO
-        )  #! not work
+        )
 
         if isinstance(engine, SupervisedEvaluator):
             Print("Begin testing...", color="g")
@@ -366,6 +366,11 @@ def test_cfg(**args):
             os.rename(
                 configures["out_dir"],
                 str(configures["out_dir"]) + "-intra-ensemble",
+            )
+        elif is_crossvalid:
+            os.rename(
+                configures["out_dir"],
+                str(configures["out_dir"]) + "-ensemble",
             )
         else:
             os.rename(

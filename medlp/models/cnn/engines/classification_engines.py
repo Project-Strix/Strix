@@ -484,6 +484,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 "Only one model is specified for intra ensemble test, but need more!"
             )
     elif use_best_model:
+        model_list = []
         for folder in cv_folders:
             models = list(
                 filter(
