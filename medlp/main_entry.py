@@ -166,7 +166,7 @@ def train(ctx, **args):
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)
-        return args
+        return cargs
 
     data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
         "PATH", ""
@@ -253,6 +253,12 @@ def train(ctx, **args):
     if cargs.do_test > 0:
         if test_file and os.path.isfile(test_file):
             test_datalist = get_items_from_file(test_file, format="auto")
+        elif len(test_datalist) > 0:
+            test_file = cargs.experiment_path.joinpath("test_files.yml")
+            with test_file.open("w") as f:
+                yaml.dump(test_datalist, f)
+        else:
+            return cargs
 
         has_labels = np.all([cfg.get_key("label") in item for item in test_datalist])
 
@@ -268,7 +274,7 @@ def train(ctx, **args):
             print("****configure:", configures)
             test_cfg(default_map=configures)
 
-    return args
+    return cargs
 
 
 @click.command(

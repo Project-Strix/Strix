@@ -75,7 +75,7 @@ setup(
         "console_scripts": [
             "medlp-train = medlp.main_entry:train",
             "medlp-train-from-cfg = medlp.main_entry:train_cfg",
-            "medlp-train-and-test = medlp.main_entry:train_and_test"
+            "medlp-train-and-test = medlp.main_entry:train_and_test",
             "medlp-test-from-cfg = medlp.main_entry:test_cfg",
             "medlp-nni-search = medlp.nni_search:nni_search",
             "medlp-check-data = medlp.data_checker:check_data",
