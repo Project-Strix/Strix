@@ -29,6 +29,7 @@ from utils_cw import (
     confirmation,
     check_dir,
     get_items_from_file,
+    split_train_test,
 )
 
 import click
@@ -167,11 +168,27 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
         return args
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
-        "PATH"
-    ]
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
+        "PATH", ""
+    )
+    test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
+        "TEST_PATH"
+    )
+
     assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-    files_list = get_items_from_file(data_list, format="auto")
+    train_datalist = get_items_from_file(data_list, format="auto")
+    test_datalist = []
+
+    if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
+        Print(
+            "Test datalist is not found, split test cohort from "
+            f"training data with split ratio of {cargs.split}",
+            color="y",
+        )
+        train_test_cohort = split_train_test(
+            train_datalist, cargs.split, cfg.get_key("label"), 1, random_seed=cargs.seed
+        )
+        train_datalist, test_datalist = train_test_cohort[0]
 
     # dump dataset file
     source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
@@ -183,8 +200,8 @@ def train(ctx, **args):
         )
 
     if cargs.partial < 1:
-        Print("Use {} data".format(int(len(files_list) * cargs.partial)), color="y")
-        files_list = files_list[: int(len(files_list) * cargs.partial)]
+        Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
+        train_datalist = train_datalist[: int(len(train_datalist) * cargs.partial)]
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
     if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
@@ -201,13 +218,13 @@ def train(ctx, **args):
                 f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})"
             )
 
-        for i, (train_index, test_index) in enumerate(kf.split(files_list)):
+        for i, (train_index, test_index) in enumerate(kf.split(train_datalist)):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
             Print(f"Processing {i+1}/{folds} cross-validation", color="g")
-            files_train = list(np.array(files_list)[train_index])
-            files_valid = list(np.array(files_list)[test_index])
+            train_data = list(np.array(train_datalist)[train_index])
+            valid_data = list(np.array(train_datalist)[test_index])
 
             if "-th" in os.path.basename(cargs.experiment_path):
                 cargs.experiment_path = check_dir(
@@ -222,42 +239,34 @@ def train(ctx, **args):
                 args["experiment_path"] = str(cargs.experiment_path)
                 json.dump(args, f, indent=2)
 
-            train_core(cargs, files_train, files_valid)
+            train_core(cargs, train_data, valid_data)
             Print("Cleaning CUDA cache...", color="g")
             gc.collect()
             torch.cuda.empty_cache()
     else:  # ! Plain training
-        files_train, files_valid = train_test_split(
-            files_list, test_size=cargs.split, random_state=cargs.seed
+        train_data, valid_data = train_test_split(
+            train_datalist, test_size=cargs.split, random_state=cargs.seed
         )
-        train_core(cargs, files_train, files_valid)
+        train_core(cargs, train_data, valid_data)
 
-    if cargs.do_test:
-        test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
-            cargs.data_list
-        ].get("TEST_PATH")
-        if test_file is None:
-            raise NotImplementedError("TEST_PATH is not registered yet")
-        else:
-            assert os.path.isfile(
-                test_file
-            ), f"Test data list does not exists: '{test_file}'"
+    # ! Do testing
+    if cargs.do_test > 0:
+        if test_file and os.path.isfile(test_file):
             test_datalist = get_items_from_file(test_file, format="auto")
-            has_labels = np.all(
-                [cfg.get_key("label") in item for item in test_datalist]
-            )
 
-            if len(test_datalist) > 0:
-                configures = {
-                    "config": os.path.join(args["experiment_path"], "param.list"),
-                    "test_files": test_file,
-                    "with_label": has_labels,
-                    "use_best_model": True,
-                    "smi": False,
-                    "gpus": args["gpus"],
-                }
-                print("****configure:", configures)
-                test_cfg(default_map=configures)
+        has_labels = np.all([cfg.get_key("label") in item for item in test_datalist])
+
+        if len(test_datalist) > 0:
+            configures = {
+                "config": os.path.join(args["experiment_path"], "param.list"),
+                "test_files": test_file,
+                "with_label": has_labels,
+                "use_best_model": True,
+                "smi": False,
+                "gpus": args["gpus"],
+            }
+            print("****configure:", configures)
+            test_cfg(default_map=configures)
 
     return args
 
@@ -422,5 +431,5 @@ def test_cfg(**args):
 )
 @click.pass_context
 def train_and_test(ctx, **args):
-    args.update({"do_test": True})
+    args.update({"do_test": 1})
     train_args = train(default_map=args)
