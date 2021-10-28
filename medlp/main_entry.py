@@ -174,7 +174,9 @@ def train(ctx, **args):
     files_list = get_items_from_file(data_list, format="auto")
 
     # dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("SOURCE")
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
+        cargs.data_list
+    ].get("SOURCE")
     if source_file and os.path.isfile(source_file):
         shutil.copyfile(
             source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
@@ -231,28 +233,31 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
 
     if cargs.do_test:
-        test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("TEST_PATH")
+        test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
+            cargs.data_list
+        ].get("TEST_PATH")
         if test_file is None:
             raise NotImplementedError("TEST_PATH is not registered yet")
         else:
-            assert os.path.isfile(test_file), f"Test data list does not exists: '{test_file}'"
+            assert os.path.isfile(
+                test_file
+            ), f"Test data list does not exists: '{test_file}'"
             test_datalist = get_items_from_file(test_file, format="auto")
             has_labels = np.all(
-                [item.get(cfg.get_key("label"), False) for item in test_datalist]
+                [cfg.get_key("label") in item for item in test_datalist]
             )
 
             if len(test_datalist) > 0:
                 configures = {
-                    "config": os.path.join(args['experiment_path'], 'param.list'),
+                    "config": os.path.join(args["experiment_path"], "param.list"),
                     "test_files": test_file,
                     "with_label": has_labels,
                     "use_best_model": True,
                     "smi": False,
                     "gpus": args["gpus"],
                 }
-                print('****configure:', configures)
+                print("****configure:", configures)
                 test_cfg(default_map=configures)
-
 
     return args
 
@@ -282,7 +287,10 @@ def train_cfg(**args):
     # ctx.invoke(train, **configures)
 
 
-@click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@click.command(
+    "test-from-cfg",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 @click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
 @click.option(
     "--test-files", type=str, default="", help="External files (json/yaml) for testing"
@@ -414,5 +422,5 @@ def test_cfg(**args):
 )
 @click.pass_context
 def train_and_test(ctx, **args):
-    args.update({'do_test': True})
+    args.update({"do_test": True})
     train_args = train(default_map=args)
