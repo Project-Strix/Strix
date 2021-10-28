@@ -11,7 +11,7 @@ from utils_cw import Print, get_items_from_file, check_dir
 from medlp.models import get_engine
 from medlp.data_io.dataio import get_dataloader, DATASET_MAPPING
 from medlp.utilities.utils import detect_port, parse_nested_data
-import medlp.utilities.click_callbacks as clb
+from medlp.utilities.click_ex import get_nni_exp_name
 
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
@@ -122,7 +122,7 @@ def train_nni(**kwargs):
 @click.option("--background", is_flag=True, help="Run nni in background")
 @click.option("--out-dir", type=str, prompt=True, show_default=True, default="/homes/clwang/Data/medlp_exp/NNI")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
-@click.option("--experiment-path", type=str, callback=clb.get_nni_exp_name, default="nni-search")
+@click.option("--experiment-path", type=str, callback=get_nni_exp_name, default="nni-search")
 def nni_search(**args):
     cargs = sn(**args)
     if "CUDA_VISIBLE_DEVICES" in os.environ:
