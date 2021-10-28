@@ -165,7 +165,7 @@ def train(ctx, **args):
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)
-        os.sys.exit()
+        return args
 
     data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
         "PATH"
@@ -174,9 +174,7 @@ def train(ctx, **args):
     files_list = get_items_from_file(data_list, format="auto")
 
     # dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
-        "SOURCE"
-    ]
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("SOURCE")
     if source_file and os.path.isfile(source_file):
         shutil.copyfile(
             source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
@@ -187,7 +185,7 @@ def train(ctx, **args):
         files_list = files_list[: int(len(files_list) * cargs.partial)]
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
-    if cargs.n_fold > 1 or cargs.n_repeat > 1:  #! K-fold cross-validation
+    if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
         if cargs.n_fold > 1:
             folds = cargs.n_fold
             kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
@@ -216,7 +214,7 @@ def train(ctx, **args):
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
 
-            # copy param.list to fold dir
+            # copy param.list to i-fold dir
             with cargs.experiment_path.joinpath("param.list").open("w") as f:
                 args["n_fold"] = args["n_repeat"] = 0
                 args["experiment_path"] = str(cargs.experiment_path)
@@ -226,11 +224,37 @@ def train(ctx, **args):
             Print("Cleaning CUDA cache...", color="g")
             gc.collect()
             torch.cuda.empty_cache()
-    else:  #! Plain training
+    else:  # ! Plain training
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
         )
         train_core(cargs, files_train, files_valid)
+
+    if cargs.do_test:
+        test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("TEST_PATH")
+        if test_file is None:
+            raise NotImplementedError("TEST_PATH is not registered yet")
+        else:
+            assert os.path.isfile(test_file), f"Test data list does not exists: '{test_file}'"
+            test_datalist = get_items_from_file(test_file, format="auto")
+            has_labels = np.all(
+                [item.get(cfg.get_key("label"), False) for item in test_datalist]
+            )
+
+            if len(test_datalist) > 0:
+                configures = {
+                    "config": os.path.join(args['experiment_path'], 'param.list'),
+                    "test_files": test_file,
+                    "with_label": has_labels,
+                    "use_best_model": True,
+                    "smi": False,
+                    "gpus": args["gpus"],
+                }
+                print('****configure:', configures)
+                test_cfg(default_map=configures)
+
+
+    return args
 
 
 @click.command(
@@ -258,7 +282,7 @@ def train_cfg(**args):
     # ctx.invoke(train, **configures)
 
 
-@click.command("test-from-cfg")
+@click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
 @click.option(
     "--test-files", type=str, default="", help="External files (json/yaml) for testing"
@@ -384,31 +408,11 @@ def test_cfg(**args):
             os.rename(configures["out_dir"], str(configures["out_dir"]) + "-" + postfix)
 
 
-@click.command("unlink")
-@click.option(
-    "--root-dir", type=click.Path(exists=True), help="Root dir contains symbolic dirs"
+@click.command(
+    "train-and-test",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-@click.option(
-    "-a",
-    "--all-dir",
-    is_flag=True,
-    help="Unlink all dirs including both avalible and unavailable dirs",
-)
-def unlink_dirs(root_dir, all_dir):
-    """Utility for unlink invalid symbolic tensorboard dir.
-
-    Args:
-        root_dir (str): Root dir contains symbolic dirs.
-        all_dir (bool): whether unlink both invalid and valid sym dirs.
-    """
-    for d in os.listdir(root_dir):
-        d = os.path.join(root_dir, d)
-        if os.path.islink(d):
-            if not os.path.isdir(d):
-                os.unlink(d)
-                print("Unlinked unavailable symbolic dir:", d)
-            elif all_dir:
-                os.unlink(d)
-                print("Unlinked symbolic dir:", d)
-            else:
-                pass
+@click.pass_context
+def train_and_test(ctx, **args):
+    args.update({'do_test': True})
+    train_args = train(default_map=args)
