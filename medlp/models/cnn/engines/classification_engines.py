@@ -372,13 +372,14 @@ def build_classification_test_engine(**kwargs):
     ]
 
     if get_attr_(opts, "save_results", True):
+        has_label = opts.phase=='test'
         val_handlers += [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
-                save_labels=True,  # opts.phase=='test',
+                save_labels=has_label,
                 batch_transform=lambda x: (x[_image_ + "_meta_dict"], x[_label_])
-                if opts.phase == "test"
-                else lambda x: x[_image_ + "_meta_dict"],
+                if has_label
+                else x[_image_ + "_meta_dict"],
                 output_transform=post_transform,
             ),
             ClassificationSaverEx(
