@@ -17,11 +17,7 @@ from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.handlers import SNIP_prune_handler
-from medlp.utilities.click_ex import (
-    get_unknown_options,
-    get_exp_name,
-    input_cropsize
-)
+from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 from medlp.configures import config as cfg
 import medlp.utilities.click_callbacks as clb
 
@@ -85,8 +81,10 @@ def train_core(cargs, files_train, files_valid):
         logging.StreamHandler.terminator = "\r"
 
     trainer.add_event_handler(
-        event_name=Events.EPOCH_STARTED, handler=
-        lambda x: print("\n", "-"*15, os.path.basename(cargs.experiment_path), "-"*15)
+        event_name=Events.EPOCH_STARTED,
+        handler=lambda x: print(
+            "\n", "-" * 15, os.path.basename(cargs.experiment_path), "-" * 15
+        ),
     )
 
     if cargs.visualize:
@@ -124,20 +122,26 @@ def train_core(cargs, files_train, files_valid):
     trainer.run()
 
 
-@click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@click.command(
+    "train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
 @clb.latent_auxilary_params
 @clb.common_params
 @clb.solver_params
 @clb.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@click.option(
+    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
+)
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
-    "--confirm", callback=partial(
-        confirmation, output_dir_ctx="experiment_path",
-        save_code=(cfg.get_medlp_cfg('mode') == 'dev'),
-        save_dir=Path(__file__).parent
-    )
+    "--confirm",
+    callback=partial(
+        confirmation,
+        output_dir_ctx="experiment_path",
+        save_code=(cfg.get_medlp_cfg("mode") == "dev"),
+        save_dir=Path(__file__).parent,
+    ),
 )
 @click.pass_context
 def train(ctx, **args):
@@ -147,7 +151,7 @@ def train(ctx, **args):
     cargs = sn(**args)
 
     if len(auxilary_params) > 0:  # dump auxilary params
-        with cargs.experiment_path.joinpath('param.list').open('w') as f:
+        with cargs.experiment_path.joinpath("param.list").open("w") as f:
             json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -163,14 +167,20 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
         os.sys.exit()
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["PATH"]
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
+        "PATH"
+    ]
     assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
     files_list = get_items_from_file(data_list, format="auto")
 
     # dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["SOURCE"]
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
+        "SOURCE"
+    ]
     if source_file and os.path.isfile(source_file):
-        shutil.copyfile(source_file, cargs.experiment_path.joinpath(f'{cargs.data_list}.snapshot'))
+        shutil.copyfile(
+            source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
+        )
 
     if cargs.partial < 1:
         Print("Use {} data".format(int(len(files_list) * cargs.partial)), color="y")
@@ -183,9 +193,13 @@ def train(ctx, **args):
             kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
         elif cargs.n_repeat > 1:
             folds = cargs.n_repeat
-            kf = ShuffleSplit(n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed)
+            kf = ShuffleSplit(
+                n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed
+            )
         else:
-            raise ValueError(f'Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})')
+            raise ValueError(
+                f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})"
+            )
 
         for i, (train_index, test_index) in enumerate(kf.split(files_list)):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
@@ -196,14 +210,16 @@ def train(ctx, **args):
             files_valid = list(np.array(files_list)[test_index])
 
             if "-th" in os.path.basename(cargs.experiment_path):
-                cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f"{i}-th")
+                cargs.experiment_path = check_dir(
+                    os.path.dirname(cargs.experiment_path), f"{i}-th"
+                )
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
 
             # copy param.list to fold dir
-            with cargs.experiment_path.joinpath('param.list').open('w') as f:
-                args['n_fold'] = args['n_repeat'] = 0
-                args['experiment_path'] = str(cargs.experiment_path)
+            with cargs.experiment_path.joinpath("param.list").open("w") as f:
+                args["n_fold"] = args["n_repeat"] = 0
+                args["experiment_path"] = str(cargs.experiment_path)
                 json.dump(args, f, indent=2)
 
             train_core(cargs, files_train, files_valid)
@@ -217,7 +233,10 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
 
 
-@click.command("train-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@click.command(
+    "train-from-cfg",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 @click.option("--config", type=click.Path(exists=True))
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
@@ -240,17 +259,28 @@ def train_cfg(**args):
 
 
 @click.command("test-from-cfg")
-@click.option("--config", type=click.Path(exists=True), default='YourConfigFle')
-@click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
-@click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
+@click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
+@click.option(
+    "--test-files", type=str, default="", help="External files (json/yaml) for testing"
+)
+@click.option(
+    "--out-dir", type=str, default=None, help="Optional output dir to save results"
+)
 @click.option(  # TODO: automatically decide when using patchdataset
-    "--slidingwindow", is_flag=True, callback=input_cropsize, help='Use slidingwindow sampling'
+    "--slidingwindow",
+    is_flag=True,
+    callback=input_cropsize,
+    help="Use slidingwindow sampling",
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
-@click.option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
+@click.option(
+    "--use-best-model", is_flag=True, help="Automatically select best model for testing"
+)
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@click.option(
+    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
+)
 def test_cfg(**args):
     """Entry of test-from-cfg command.
 
@@ -268,37 +298,43 @@ def test_cfg(**args):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
     exp_dir = Path(configures.get("experiment_path", os.path.dirname(args["config"])))
+    is_crossvalid = configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1
+
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
-    elif configures.get("n_fold", 0) > 1:
+    elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found!"
             "You must provide external test file (.json/.yaml)."
         )
     else:
-        test_fpaths = list(exp_dir.glob('valid_files*'))
+        test_fpaths = list(exp_dir.glob("valid_files*"))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
             test_files = get_items_from_file(test_fpath, format="auto")
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
-    # configures["model_path"] = (
-    #     clb.get_trained_models(exp_dir, args['use_best_model']) if configures.get("n_fold", 0) <= 1 else None
-    # )
-    best_models = [''] if configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1 \
-        else clb.get_trained_models(exp_dir, args['use_best_model'])
+    if args["use_best_model"]:
+        model_list = clb.get_best_trained_models(exp_dir)
+        if is_crossvalid:
+            configures["n_fold"] = configures["n_repeat"] = 0
+            is_crossvalid = False
+    elif is_crossvalid:
+        model_list = [""]
+    else:
+        model_list = [clb.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
     phase = "test" if args["with_label"] else "test_wo_label"
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
     configures["experiment_path"] = exp_dir
-    configures['resample'] = True  #! departure
-    configures['slidingwindow'] = args['slidingwindow']
-    if args.get('crop_size', None):
-        configures['crop_size'] = args['crop_size']
+    configures["resample"] = True  # ! departure
+    configures["slidingwindow"] = args["slidingwindow"]
+    if args.get("crop_size", None):
+        configures["crop_size"] = args["crop_size"]
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]
@@ -308,13 +344,13 @@ def test_cfg(**args):
     Print(f"{len(test_files)} test files", color="g")
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
-    for model_path in best_models:
-        configures['model_path'] = model_path
+    for model_path in model_list:
+        configures["model_path"] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
         engine.logger = setup_logger(
             f"{configures['tensor_dim']}-Tester", level=logging.INFO
-        )  #! not work
+        )
 
         if isinstance(engine, SupervisedEvaluator):
             Print("Begin testing...", color="g")
@@ -322,17 +358,35 @@ def test_cfg(**args):
             Print("Begin ensemble testing...", color="g")
 
         shutil.copyfile(
-            test_fpath, check_dir(configures["out_dir"])/os.path.basename(test_fpath)
+            test_fpath, check_dir(configures["out_dir"]) / os.path.basename(test_fpath)
         )
         engine.run()
-        if isinstance(model_path, Path):
-            os.rename(configures["out_dir"], str(configures["out_dir"])+"-"+model_path.stem)
+
+        is_intra_ensemble = (
+            isinstance(model_path, (list, tuple)) and len(model_path) > 1
+        )
+        if is_intra_ensemble:
+            os.rename(
+                configures["out_dir"],
+                str(configures["out_dir"]) + "-intra-ensemble",
+            )
+        elif is_crossvalid:
+            os.rename(
+                configures["out_dir"],
+                str(configures["out_dir"]) + "-ensemble",
+            )
+        else:
+            postfix = (
+                model_path[0].stem
+                if isinstance(model_path, (list, tuple))
+                else model_path.stem
+            )
+            os.rename(configures["out_dir"], str(configures["out_dir"]) + "-" + postfix)
 
 
 @click.command("unlink")
 @click.option(
-    "--root-dir", type=click.Path(exists=True),
-    help="Root dir contains symbolic dirs"
+    "--root-dir", type=click.Path(exists=True), help="Root dir contains symbolic dirs"
 )
 @click.option(
     "-a",
