@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from torchvision.models.utils import load_state_dict_from_url
 from monai.networks.layers.factories import Conv, Norm, Pool
-from medlp.models.cnn.utils import get_attn
 
 __all__ = [
     "ResNet",
