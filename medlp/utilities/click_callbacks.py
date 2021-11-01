@@ -142,8 +142,8 @@ def common_params(func):
     @option(
         "--early-stop",
         type=int,
-        default=200,
-        help="Patience of early stopping. default: 200epochs",
+        default=100,
+        help="Patience of early stopping. default: 100epochs",
     )
     @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
     @option("--save-n-best", type=int, default=3, help="Save best N models")
