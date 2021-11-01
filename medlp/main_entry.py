@@ -235,9 +235,10 @@ def train(ctx, **args):
 
             # copy param.list to i-fold dir
             with cargs.experiment_path.joinpath("param.list").open("w") as f:
-                args["n_fold"] = args["n_repeat"] = 0
-                args["experiment_path"] = str(cargs.experiment_path)
-                json.dump(args, f, indent=2)
+                fold_args = args.copy()
+                fold_args["n_fold"] = fold_args["n_repeat"] = 0
+                fold_args["experiment_path"] = str(cargs.experiment_path)
+                json.dump(fold_args, f, indent=2)
 
             train_core(cargs, train_data, valid_data)
             Print("Cleaning CUDA cache...", color="g")
