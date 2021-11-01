@@ -61,10 +61,10 @@ def get_prepare_batch_fn(
     #         tuple(torch.as_tensor(x[key].unsqueeze(1), dtype=torch.float32).to(device) for key in multi_output_keys)
     #     )
     # else:
-    if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
-        target_type=torch.FloatTensor
-    elif opts.criterion in ['CE', 'WCE']:
-        target_type=torch.LongTensor
+    if opts.criterion in ["BCE", "WBCE", "FocalLoss"]:
+        target_type = torch.FloatTensor
+    elif opts.criterion in ["CE", "WCE"]:
+        target_type = torch.LongTensor
 
     if multi_input_keys is not None and multi_output_keys is not None:
         prepare_batch_fn = lambda x, device, nb: (
@@ -300,7 +300,7 @@ def build_classification_test_engine(**kwargs):
     device = kwargs["device"]
     logger_name = kwargs.get("logger_name", None)
     is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase == "test"
+    is_supervised = kwargs.get("is_supervised", opts.phase == "test")
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
     _image_ = cfg.get_key("image")
@@ -377,7 +377,7 @@ def build_classification_test_engine(**kwargs):
     ]
 
     if get_attr_(opts, "save_results", True):
-        has_label = opts.phase=='test'
+        has_label = opts.phase == "test"
         val_handlers += [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
