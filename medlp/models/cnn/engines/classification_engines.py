@@ -61,25 +61,30 @@ def get_prepare_batch_fn(
     #         tuple(torch.as_tensor(x[key].unsqueeze(1), dtype=torch.float32).to(device) for key in multi_output_keys)
     #     )
     # else:
+    if opts.criterion in ['BCE', 'WBCE', 'FocalLoss']:
+        target_type=torch.FloatTensor
+    elif opts.criterion in ['CE', 'WCE']:
+        target_type=torch.LongTensor
+
     if multi_input_keys is not None and multi_output_keys is not None:
         prepare_batch_fn = lambda x, device, nb: (
             tuple(x[key].to(device) for key in multi_input_keys),
-            tuple(x[key].to(device) for key in multi_output_keys),
+            tuple(x[key].type(target_type).to(device) for key in multi_output_keys),
         )
     elif multi_input_keys is not None:
         prepare_batch_fn = lambda x, device, nb: (
             tuple(x[key].to(device) for key in multi_input_keys),
-            x[label_key].to(device),
+            x[label_key].type(target_type).to(device),
         )
     elif multi_output_keys is not None:
         prepare_batch_fn = lambda x, device, nb: (
             x[image_key].to(device),
-            tuple(x[key].to(device) for key in multi_output_keys),
+            tuple(x[key].type(target_type).to(device) for key in multi_output_keys),
         )
     else:
         prepare_batch_fn = lambda x, device, nb: (
             x[image_key].to(device),
-            x[label_key].to(device),
+            x[label_key].type(target_type).to(device),
         )
 
     return prepare_batch_fn
