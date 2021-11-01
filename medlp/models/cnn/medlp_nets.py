@@ -10,7 +10,7 @@ from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
 from medlp.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
-from medlp.models.cnn.nets.vgg_aag import vgg9_aag
+from medlp.models.cnn.nets.vgg_aag import vgg9_aag, vgg9_aag2
 
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet18")
@@ -368,9 +368,9 @@ def medlp_vggaag_34(
     return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag_cat")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag_cat")
-def medlp_vggaag_34(
+@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag2")
+@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag2")
+def medlp_vggaag2(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -386,14 +386,37 @@ def medlp_vggaag_34(
 ):
     inkwargs = {}
     inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-    inkwargs["mode"] = "cat"
+
+    return vgg9_aag2(spatial_dims, in_channels, out_channels, **inkwargs)
+
+
+@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag_prod2")
+@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag_prod2")
+def medlp_vggaag_prod2(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    inkwargs = {}
+    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
+    inkwargs["mode"] = "product2"
+    inkwargs["bottleneck_size"] = kwargs.get("bottleneck", 2)
 
     return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag_w")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag_w")
-def medlp_vggaag_34(
+# @CLASSIFICATION_ARCHI.register("2D", "vgg9_aag_softm")
+# @CLASSIFICATION_ARCHI.register("3D", "vgg9_aag_softm")
+def medlp_vggaag_softm(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -409,6 +432,6 @@ def medlp_vggaag_34(
 ):
     inkwargs = {}
     inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-    inkwargs["mode"] = "weighted"
+    inkwargs["act"] = "softmax"
 
     return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)

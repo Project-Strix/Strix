@@ -7,6 +7,7 @@ import numpy as np
 
 from medlp.models.cnn.nets.vgg import VGG
 from medlp.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate as AAG
+from medlp.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate2 as AAG2
 
 # from medlp.models.cnn.utils import set_trainable
 from monai.networks.blocks.dynunet_block import get_conv_layer
@@ -44,7 +45,9 @@ class VGG9AAG(nn.Module):
         norm_type: Callable = Norm[Norm.BATCH, dim]
         pool_type: Callable = Pool[Pool.MAX, dim]
         avgpool_type: Callable = Pool[Pool.ADAPTIVEAVG, dim]
+        aag_type = kwargs.get('aag_type', 1)
         aag_mode = kwargs.get("mode", "sum")
+        aag_act = kwargs.get("act", "sigmoid")
 
         # Conv blocks (BatchNorm + ReLU activation added in each block)
         self.maxpool = pool_type(kernel_size=2, stride=2)
@@ -71,12 +74,18 @@ class VGG9AAG(nn.Module):
                 for i, chn in enumerate(roi_chns[:-1])
             ]
         )
-        self.aag_layers = nn.ModuleList(
-            [AAG(dim, chn, chn, aag_mode) for chn in roi_chns[1:]]
-        )
+        if aag_type == 1:
+            self.aag_layers = nn.ModuleList(
+                [AAG(dim, chn, chn, aag_mode, aag_act) for chn in roi_chns[1:]]
+            )
+        elif aag_type == 2:
+            self.aag_layers = nn.ModuleList(
+                [AAG2(dim, chn, chn) for chn in roi_chns[1:]]
+            )
 
         # FC layers
         output_size = (bottleneck_size,) * dim  # (2,2,2) #For OOM issue
+        output_size = tuple(map(int, output_size))
         num_ = np.prod(output_size)
         self.avgpool = avgpool_type(output_size)
         self.classifier = nn.Sequential(
@@ -127,4 +136,9 @@ class VGG9AAG(nn.Module):
 def vgg9_aag(dim, in_channels, num_classes, roi_classes, **kwargs):
     r"""VGG 9-layer model with AAG (configuration "S") with batch normalization"""
 
+    return VGG9AAG(dim, in_channels, num_classes, roi_classes, **kwargs)
+
+
+def vgg9_aag2(dim, in_channels, num_classes, roi_classes, **kwargs):
+    kwargs.update({"aag_type": 2})
     return VGG9AAG(dim, in_channels, num_classes, roi_classes, **kwargs)
