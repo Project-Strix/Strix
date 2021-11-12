@@ -2,6 +2,7 @@ import sys
 import click
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 
@@ -24,7 +25,7 @@ if __name__ == "__main__":
     from medlp.main_entry import train
     from medlp.main_entry import train_cfg
     from medlp.main_entry import test_cfg
-    from medlp.main_entry import unlink_dirs
+    from medlp.main_entry import train_and_test
     from nni_search import nni_search
     from nni_search import train_nni
     from data_checker import check_data
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     main.add_command(train)
     main.add_command(train_cfg)
     main.add_command(test_cfg)
-    main.add_command(unlink_dirs)
+    main.add_command(train_and_test)
     main.add_command(nni_search)
     main.add_command(train_nni)
     main.add_command(check_data)

@@ -36,8 +36,8 @@ def get_default_setting(phase, **kwargs):
         pin_memory = kwargs.get("valid_pin_memory", True)
     elif phase == "test" or phase == "test_wo_label":
         shuffle = kwargs.get("test_shuffle", False)
-        batch_size = kwargs.get("test_n_batch", 2)
-        num_workers = kwargs.get("test_n_workers", 2)
+        batch_size = kwargs.get("test_n_batch", 1)
+        num_workers = kwargs.get("test_n_workers", 1)
         drop_last = kwargs.get("test_drop_last", False)
         pin_memory = kwargs.get("test_pin_memory", True)
     else:
@@ -58,16 +58,22 @@ def get_dataloader(args, files_list, phase="train"):
     )  #! How to customize?
     arguments = {"files_list": files_list, "phase": phase, "opts": vars(args)}
 
-    dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]['FN'](
+    dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]["FN"](
         **arguments
     )
 
     label_key = cfg.get_key("LABEL")
     if isinstance(dataset_, _TorchDataLoader):
         return dataset_
-    elif phase=="train" and args.imbalance_sample and files_list[0].get(label_key) is not None:
+    elif (
+        phase == "train"
+        and args.imbalance_sample
+        and files_list[0].get(label_key) is not None
+    ):
         if isinstance(files_list[0][label_key], (list, tuple)):
-            raise NotImplementedError('Imbalanced dataset sampling cannot handle list&tuple label')
+            raise NotImplementedError(
+                "Imbalanced dataset sampling cannot handle list&tuple label"
+            )
 
         print("Using imbalanced dataset sampling!")
         params.update({"shuffle": False})
@@ -84,7 +90,7 @@ def get_dataloader(args, files_list, phase="train"):
         return DataLoader(
             dataset_,
             sampler=WeightedRandomSampler(weights=weights, num_samples=len(dataset_)),
-            **params
+            **params,
         )
     else:
         return DataLoader(dataset_, **params)

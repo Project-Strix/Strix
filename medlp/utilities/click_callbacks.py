@@ -142,8 +142,8 @@ def common_params(func):
     @option(
         "--early-stop",
         type=int,
-        default=200,
-        help="Patience of early stopping. default: 200epochs",
+        default=100,
+        help="Patience of early stopping. default: 100epochs",
     )
     @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
     @option("--save-n-best", type=int, default=3, help="Save best N models")
@@ -283,7 +283,13 @@ def latent_auxilary_params(func):
     )
     @option("--config", type=click.Path(exists=True))
     @option("--n-group", type=int, default=1, help="Num of conv groups")
-    # @option("--bott leneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
+    @option(
+        "--do-test",
+        type=bool,
+        default=False,
+        hidden=True,
+        help="Automatically do test after training",
+    )
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
