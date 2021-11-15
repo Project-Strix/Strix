@@ -8,7 +8,6 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import output_filename_check, get_attr_
-from medlp.utilities.handlers import NNIReporterHandler, TensorboardDumper
 from medlp.models.cnn.utils import output_onehot_transform
 from medlp.configures import config as cfg
 
@@ -49,6 +48,8 @@ from monai_ex.handlers import (
     ClassificationSaverEx,
     ROCAUC,
     stopping_fn_from_metric,
+    NNIReporterHandler,
+    TensorboardDumper,
 )
 
 

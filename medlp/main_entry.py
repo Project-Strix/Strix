@@ -16,7 +16,6 @@ from types import SimpleNamespace as sn
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.handlers import SNIP_prune_handler
 from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 from medlp.configures import config as cfg
 import medlp.utilities.click_callbacks as clb
@@ -35,7 +34,7 @@ from utils_cw import (
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import TensorboardGraphHandler
+from monai_ex.handlers import TensorboardGraphHandler, SNIP_prune_handler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 
