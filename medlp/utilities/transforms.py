@@ -547,3 +547,109 @@ class ConcatModalityD(MapTransform):
         d[self.output_key] = concat_data
 
         return d
+
+class RandCrop2dByPosNegLabelD(Randomizable, MapTransform):
+    def __init__(
+        self,
+        n_layer: int,   
+        keys: KeysCollection,
+        label_key: str,
+        spatial_size: Union[Sequence[int], int],
+        crop_mode: str,
+        z_axis: int,
+        pos: float = 1.0,
+        neg: float = 0.0,
+        num_samples: int = 1,
+        image_key: Optional[str] = None,
+        image_threshold: float = 0.0,
+        fg_indices_key: Optional[str] = None,
+        bg_indices_key: Optional[str] = None,
+    ) -> None:
+        super().__init__(keys)
+        self.spatial_size = ensure_tuple_rep(spatial_size, 2)
+        self.label_key = label_key
+        self.num_samples = num_samples
+        self.image_key = image_key
+        self.image_threshold = image_threshold
+        self.centers: Optional[List[List[np.ndarray]]] = None
+        self.fg_indices_key = fg_indices_key
+        self.bg_indices_key = bg_indices_key
+        self.n_layer = n_layer
+
+        if pos < 0 or neg < 0:
+            raise ValueError(f"pos and neg must be nonnegative, got pos={pos} neg={neg}.")
+        if pos + neg == 0:
+            raise ValueError("Incompatible values: pos=0 and neg=0.")
+        self.pos_ratio = pos / (pos + neg)
+        if crop_mode not in ['single', 'cross', 'parallel']:
+            raise ValueError("Cropping mode must be one of 'single, cross, parallel'")
+        self.crop_mode = crop_mode
+        self.z_axis = z_axis
+
+    def get_new_spatial_size(self):
+        spatial_size_ = ensure_list(self.spatial_size)
+        if self.crop_mode == 'single':
+            spatial_size_.insert(self.z_axis, 1)
+        elif self.crop_mode == 'parallel':
+            spatial_size_.insert(self.z_axis, self.n_layer)
+        else:
+            spatial_size_ = [max(spatial_size_),]*3
+
+        return spatial_size_
+
+    def randomize(
+        self,
+        label: np.ndarray,
+        fg_indices: Optional[np.ndarray] = None,
+        bg_indices: Optional[np.ndarray] = None,
+        image: Optional[np.ndarray] = None,
+    ) -> None:
+        if fg_indices is None or bg_indices is None:
+            fg_indices_, bg_indices_ = map_binary_to_indices(label, image, self.image_threshold)
+        else:
+            fg_indices_ = fg_indices
+            bg_indices_ = bg_indices
+
+        self.centers = generate_pos_neg_label_crop_centers(
+            self.get_new_spatial_size(),
+            self.num_samples,
+            self.pos_ratio,
+            label.shape[1:],
+            fg_indices_,
+            bg_indices_,
+            self.R
+        )
+
+    def __call__(self, data: Mapping[Hashable, np.ndarray]) -> List[Dict[Hashable, np.ndarray]]:
+        d = dict(data)
+        label = d[self.label_key]
+        image = d[self.image_key] if self.image_key else None
+        fg_indices = d.get(self.fg_indices_key, None) if self.fg_indices_key is not None else None
+        bg_indices = d.get(self.bg_indices_key, None) if self.bg_indices_key is not None else None
+
+        self.randomize(label, fg_indices, bg_indices, image)
+        assert isinstance(self.spatial_size, tuple)
+        assert self.centers is not None
+        results: List[Dict[Hashable, np.ndarray]] = [dict() for _ in range(self.num_samples)]
+        for key in data.keys():
+            if key in self.keys:
+                img = d[key]
+                for i, center in enumerate(self.centers):
+                    if self.crop_mode in ['single', 'parallel']:
+                        size_ = self.get_new_spatial_size()
+                        slice_ = SpatialCrop(roi_center=tuple(center), roi_size=size_)(img)
+
+                        seg_sum = slice_.squeeze().sum()
+                        results[i][key] = np.moveaxis(slice_.squeeze(0), self.z_axis, 0)
+                    else:
+                        cross_slices = np.zeros(shape=(3,)+self.spatial_size)
+                        for k in range(3):
+                            size_ = np.insert(self.spatial_size, k, 1)
+                            slice_ = SpatialCrop(roi_center=tuple(center), roi_size=size_)(img)
+                            cross_slices[k] = slice_.squeeze()
+                        results[i][key] = cross_slices
+            else:
+                for i in range(self.num_samples):
+                    results[i][key] = data[key]
+
+        return results
