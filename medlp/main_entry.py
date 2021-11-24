@@ -23,6 +23,7 @@ import medlp.utilities.click_callbacks as clb
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
     Print,
+    prompt_when,
     print_smi,
     PathlibEncoder,
     confirmation,
@@ -161,6 +162,16 @@ def train(ctx, **args):
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
+    # dump dataset file
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
+        cargs.data_list
+    ].get("SOURCE")
+    if source_file and os.path.isfile(source_file):
+        shutil.copyfile(
+            source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
+        )
+
+    # Manually specified train&valid datalist
     if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
@@ -188,15 +199,6 @@ def train(ctx, **args):
             train_datalist, cargs.split, cfg.get_key("label"), 1, random_seed=cargs.seed
         )
         train_datalist, test_datalist = train_test_cohort[0]
-
-    # dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
-        cargs.data_list
-    ].get("SOURCE")
-    if source_file and os.path.isfile(source_file):
-        shutil.copyfile(
-            source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
-        )
 
     if cargs.partial < 1:
         Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
@@ -321,6 +323,13 @@ def train_cfg(**args):
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--save-latent", is_flag=True, help="Save the latent code")
+@click.option(
+    "--target-layer",
+    type=str,
+    callback=partial(prompt_when, keyword="save_latent"),
+    help="Target layer of saving latent code",
+)
 @click.option(
     "--use-best-model", is_flag=True, help="Automatically select best model for testing"
 )
@@ -380,6 +389,8 @@ def test_cfg(**args):
     configures["experiment_path"] = exp_dir
     configures["resample"] = True  # ! departure
     configures["slidingwindow"] = args["slidingwindow"]
+    configures["save_latent"] = args["save_latent"]
+    configures["target_layer"] = args["target_layer"]
     if args.get("crop_size", None):
         configures["crop_size"] = args["crop_size"]
     configures["out_dir"] = (
