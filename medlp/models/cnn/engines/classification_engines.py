@@ -50,6 +50,7 @@ from monai_ex.handlers import (
     stopping_fn_from_metric,
     NNIReporterHandler,
     TensorboardDumper,
+    LatentCodeSaver,
 )
 
 
@@ -304,9 +305,14 @@ def build_classification_test_engine(**kwargs):
     is_supervised = kwargs.get("is_supervised", opts.phase == "test")
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
+    output_latent_code = kwargs.get("output_latent_code", False)
+    target_latent_layer = kwargs.get("target_latent_layer", None)
+    root_dir = output_filename_check(test_loader.dataset)
     _image_ = cfg.get_key("image")
     _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
+    _acti_ = cfg.get_key("forward")
+
     model_path = (
         opts.model_path[0]
         if isinstance(opts.model_path, (list, tuple))
@@ -397,8 +403,6 @@ def build_classification_test_engine(**kwargs):
         ]
 
     if get_attr_(opts, "save_image", False):
-        # check output filename
-        root_dir = output_filename_check(test_loader.dataset)
         val_handlers += [
             SegmentationSaver(
                 output_dir=opts.out_dir,
@@ -411,8 +415,23 @@ def build_classification_test_engine(**kwargs):
             )
         ]
 
+    if output_latent_code:
+        val_handlers += [
+            LatentCodeSaver(
+                output_dir=opts.out_dir,
+                filename="latent",
+                data_root_dir=root_dir,
+                overwrite=True,
+                batch_transform=lambda x: x[_image_ + "_meta_dict"],
+                output_transform=lambda x: x[_acti_],
+                name=logger_name,
+                save_to_np=True,
+                save_as_onefile=True,
+            )
+        ]
+
     if is_supervised:
-        evaluator = SupervisedEvaluator(
+        evaluator = SupervisedEvaluatorEx(
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -444,9 +463,12 @@ def build_classification_test_engine(**kwargs):
                 ),
             },
             amp=opts.amp,
+            custom_keys=cfg.get_keys_dict(),
+            output_latent_code=output_latent_code,
+            target_latent_layer=target_latent_layer,
         )
     else:
-        evaluator = SupervisedEvaluator(
+        evaluator = SupervisedEvaluatorEx(
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -457,6 +479,9 @@ def build_classification_test_engine(**kwargs):
             key_val_metric=None,
             additional_metrics=None,
             amp=opts.amp,
+            custom_keys=cfg.get_keys_dict(),
+            output_latent_code=output_latent_code,
+            target_latent_layer=target_latent_layer,
         )
 
     return evaluator
