@@ -30,6 +30,7 @@ if __name__ == "__main__":
     from nni_search import train_nni
     from data_checker import check_data
     from interpreter import gradcam
+    from tools import merge_roc_curves
 
     main.add_command(train)
     main.add_command(train_cfg)
@@ -39,4 +40,5 @@ if __name__ == "__main__":
     main.add_command(train_nni)
     main.add_command(check_data)
     main.add_command(gradcam)
+    main.add_command(merge_roc_curves)
     main()
