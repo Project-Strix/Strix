@@ -283,6 +283,8 @@ def get_test_engine(opts, test_loader):
         "logger_name": f"{opts.tensor_dim}-Tester",
         "multi_input_keys": multi_input_keys,
         "multi_output_keys": multi_output_keys,
+        "output_latent_code": opts.save_latent,
+        "target_latent_layer": opts.target_layer,
     }
 
     is_intra_ensemble = (
