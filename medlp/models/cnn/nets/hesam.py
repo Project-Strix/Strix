@@ -28,8 +28,26 @@ class TwoConv(nn.Sequential):
     ):
         super().__init__()
 
-        conv_0 = Convolution(dim, in_chns, out_chns, act=act, norm=norm, dropout=dropout, padding=1, groups=groups)
-        conv_1 = Convolution(dim, out_chns, out_chns, act=act, norm=norm, dropout=dropout, padding=1, groups=groups)
+        conv_0 = Convolution(
+            dim,
+            in_chns,
+            out_chns,
+            act=act,
+            norm=norm,
+            dropout=dropout,
+            padding=1,
+            groups=groups,
+        )
+        conv_1 = Convolution(
+            dim,
+            out_chns,
+            out_chns,
+            act=act,
+            norm=norm,
+            dropout=dropout,
+            padding=1,
+            groups=groups,
+        )
         self.add_module("conv_0", conv_0)
         self.add_module("conv_1", conv_1)
 
@@ -86,12 +104,18 @@ class UpCat(nn.Module):
         self.groups = groups
         up_chns = in_chns // 2 if halves else in_chns
         self.upsample = UpSample(dim, in_chns, up_chns, 2, mode=upsample)
-        self.convs = TwoConv(dim, cat_chns + up_chns, out_chns, act, norm, dropout, groups=groups)
+        self.convs = TwoConv(
+            dim, cat_chns + up_chns, out_chns, act, norm, dropout, groups=groups
+        )
 
     def group_cat(self, x, y):
         x_shape = list(x.shape)  # [batch, x*cx, *]
-        x = x.reshape([x_shape[0], self.groups, x_shape[1] // self.groups] + x_shape[2:])  # (batch, n, c, h, w, d)
-        y = y.reshape([x_shape[0], self.groups, y.shape[1] // self.groups] + x_shape[2:])
+        x = x.reshape(
+            [x_shape[0], self.groups, x_shape[1] // self.groups] + x_shape[2:]
+        )  # (batch, n, c, h, w, d)
+        y = y.reshape(
+            [x_shape[0], self.groups, y.shape[1] // self.groups] + x_shape[2:]
+        )
         x = torch.cat([x, y], dim=2)  # (batch, n, cx+cy, h, w, d)
         x = x.reshape([x_shape[0], -1] + x_shape[2:])  # (batch, n*(cx+cy), h, w, d)
         return x
@@ -116,7 +140,9 @@ class UpCat(nn.Module):
         if self.groups > 1:
             x = self.convs(self.group_cat(x_e, x_0))
         else:
-            x = self.convs(torch.cat([x_e, x_0], dim=1))  # input channels: (cat_chns + up_chns)
+            x = self.convs(
+                torch.cat([x_e, x_0], dim=1)
+            )  # input channels: (cat_chns + up_chns)
         return x
 
 
@@ -142,13 +168,22 @@ class MultiChannelLinear(nn.Module):
     def forward(self, x):
         def apply_along_axis(x1, func1, func2, axis):
             if self.bias is not None:
-                return torch.stack([
-                    func2(func1(x_i, self.weights[i:i+1].t()), self.bias[i]) for i, x_i in enumerate(torch.unbind(x1, dim=axis))
-                ], dim=axis)
+                return torch.stack(
+                    [
+                        func2(func1(x_i, self.weights[i : i + 1].t()), self.bias[i])
+                        for i, x_i in enumerate(torch.unbind(x1, dim=axis))
+                    ],
+                    dim=axis,
+                )
             else:
-                return torch.stack([
-                    func1(x_i, self.weights[i:i+1].t()) for i, x_i in enumerate(torch.unbind(x1, dim=axis))
-                ], dim=axis)
+                return torch.stack(
+                    [
+                        func1(x_i, self.weights[i : i + 1].t())
+                        for i, x_i in enumerate(torch.unbind(x1, dim=axis))
+                    ],
+                    dim=axis,
+                )
+
         return apply_along_axis(x, torch.mm, torch.add, 1)
 
 
@@ -178,6 +213,7 @@ class HESAM(nn.Module):
         out_channels: int,
         features: Sequence[int] = (64, 128, 256, 256),
         last_feature: int = 64,
+        sam_size: int = 6,
         act=Act.PRELU,
         norm=Norm.INSTANCE,
         dropout=0.0,
@@ -202,25 +238,68 @@ class HESAM(nn.Module):
         super().__init__()
         print(f"HESAM features: {features}.")
         globalmaxpool: Callable = Pool[Pool.ADAPTIVEMAX, dimensions]
-        avgpool: Callable = Pool[Pool.AVG, dimensions]
+        globalavgpool: Callable = Pool[Pool.ADAPTIVEAVG, dimensions]
 
-        self.conv_0 = TwoConv(dimensions, in_channels, features[0], act, norm, dropout, groups=groups)
-        self.down_1 = Down(dimensions, features[0], features[1], act, norm, dropout, groups=groups)
-        self.down_2 = Down(dimensions, features[1], features[2], act, norm, dropout, groups=groups)
-        self.down_3 = Down(dimensions, features[2], features[3], act, norm, dropout, groups=groups)
+        self.conv_0 = TwoConv(
+            dimensions, in_channels, features[0], act, norm, dropout, groups=groups
+        )
+        self.down_1 = Down(
+            dimensions, features[0], features[1], act, norm, dropout, groups=groups
+        )
+        self.down_2 = Down(
+            dimensions, features[1], features[2], act, norm, dropout, groups=groups
+        )
+        self.down_3 = Down(
+            dimensions, features[2], features[3], act, norm, dropout, groups=groups
+        )
 
-        self.upcat_3 = UpCat(dimensions, features[3], features[2], features[1], act, norm, dropout, upsample, halves=False, groups=groups)
-        self.upcat_2 = UpCat(dimensions, features[1], features[1], features[0], act, norm, dropout, upsample, halves=False, groups=groups)
-        self.upcat_1 = UpCat(dimensions, features[0], features[0], last_feature, act, norm, dropout, upsample, halves=False, groups=groups)
+        self.upcat_3 = UpCat(
+            dimensions,
+            features[3],
+            features[2],
+            features[1],
+            act,
+            norm,
+            dropout,
+            upsample,
+            halves=False,
+            groups=groups,
+        )
+        self.upcat_2 = UpCat(
+            dimensions,
+            features[1],
+            features[1],
+            features[0],
+            act,
+            norm,
+            dropout,
+            upsample,
+            halves=False,
+            groups=groups,
+        )
+        self.upcat_1 = UpCat(
+            dimensions,
+            features[0],
+            features[0],
+            last_feature,
+            act,
+            norm,
+            dropout,
+            upsample,
+            halves=False,
+            groups=groups,
+        )
 
-        self.final_conv = Conv["conv", dimensions](last_feature, last_feature, kernel_size=1)
-        self.gmp = globalmaxpool(((1,)*dimensions))
+        self.final_conv = Conv["conv", dimensions](
+            last_feature, last_feature, kernel_size=1
+        )
+        self.gmp = globalmaxpool(((1,) * dimensions))
         self.residuals = nn.Sequential(
             ResidualUnit(
                 dimensions=dimensions,
                 in_channels=last_feature,
                 out_channels=features[-1],
-                adn_ordering=('NA', 'N'),
+                adn_ordering=("NA", "N"),
                 strides=2,
                 act=Act.RELU,
                 norm=Norm.BATCH,
@@ -230,7 +309,7 @@ class HESAM(nn.Module):
                 dimensions=dimensions,
                 in_channels=features[-1],
                 out_channels=features[-1],
-                adn_ordering=('NA', 'N'),
+                adn_ordering=("NA", "N"),
                 strides=1,
                 act=Act.RELU,
                 norm=Norm.BATCH,
@@ -238,10 +317,10 @@ class HESAM(nn.Module):
             nn.ReLU(),
         )
         self.sam = nn.Sequential(
-            avgpool(kernel_size=5, stride=2, padding=0),
+            globalavgpool((sam_size,) * dimensions),
             # nn.Conv2d(features[-1], features[-1], kernel_size=sam_size, groups=features[-1]),
             nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((6,)*dimensions), features[-1])
+            MultiChannelLinear(np.prod((sam_size,) * dimensions), features[-1]),
         )
         self.final_fc = nn.Linear(features[-1], out_channels)
         self.apply(self.initialize_weights)
@@ -315,14 +394,14 @@ class HESAM2(nn.Module):
             spatial_dims=dimensions,
             in_channels=in_channels,
             out_channels=last_feature,
-            kernel_size=(3,)+(3,)*n_depth,
-            strides=(1,)+(2,)*n_depth,
-            upsample_kernel_size=(1,)+(2,)*n_depth,
+            kernel_size=(3,) + (3,) * n_depth,
+            strides=(1,) + (2,) * n_depth,
+            upsample_kernel_size=(1,) + (2,) * n_depth,
             norm_name=norm,
             deep_supervision=False,
             deep_supr_num=1,
             res_block=False,
-            output_bottleneck=True
+            output_bottleneck=True,
         )
         # self.latent_code = None
         # self.backbone.bottleneck.register_forward_hook(
@@ -331,7 +410,7 @@ class HESAM2(nn.Module):
         features = self.backbone.filters
         print(f"nnHESAM features: {features}.")
 
-        self.gmp = globalmaxpool(((1,)*dimensions))
+        self.gmp = globalmaxpool(((1,) * dimensions))
         self.residuals = nn.Sequential(
             ResidualUnit(
                 dimensions=dimensions,
@@ -339,7 +418,7 @@ class HESAM2(nn.Module):
                 out_channels=features[-1],
                 strides=2,
                 act="relu",
-                norm="batch"
+                norm="batch",
             ),
             ResidualUnit(
                 dimensions=dimensions,
@@ -347,20 +426,21 @@ class HESAM2(nn.Module):
                 out_channels=features[-1],
                 strides=1,
                 act="relu",
-                norm="batch"
-            )
+                norm="batch",
+            ),
         )
         self.sam = nn.Sequential(
-            globalavgpool((sam_size,)*dimensions),
+            globalavgpool((sam_size,) * dimensions),
             # nn.Conv2d(features[-1], features[-1], kernel_size=sam_size),
             nn.Flatten(start_dim=2),
-            MultiChannelLinear(np.prod((sam_size,)*dimensions), features[-1])
+            MultiChannelLinear(np.prod((sam_size,) * dimensions), features[-1]),
         )
         self.final_fc = nn.Linear(features[-1], out_channels)
 
     def get_latent(self):
         def hook(model, input, output):
             self.latent_code = output
+
         return hook
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
