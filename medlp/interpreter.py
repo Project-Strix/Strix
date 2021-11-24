@@ -13,6 +13,7 @@ from ignite.utils import setup_logger
 
 from medlp.models import get_test_engine
 from medlp.data_io.dataio import get_dataloader
+from medlp.utilities.utils import get_specify_file
 from medlp.utilities.click_ex import NumericChoice as Choice, parse_input_str
 from medlp.utilities.click_callbacks import get_trained_models
 from monai_ex.handlers import GradCamHandler
@@ -76,13 +77,16 @@ def gradcam(**args):
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
         test_files = get_items_from_file(args["test_files"], format="auto")
+    elif get_specify_file(exp_dir, "test_files*"):
+        test_fpath = get_specify_file(exp_dir, "test_files*")
+        test_files = get_items_from_file(test_fpath, format="auto")
+    elif get_specify_file(exp_dir, "valid_files*"):
+        test_fpath = get_specify_file(exp_dir, "valid_files*")
+        test_files = get_items_from_file(test_fpath, format="auto")
     else:
-        test_fpaths = list(exp_dir.glob("valid_files*"))
-        if len(test_fpaths) > 0:
-            test_fpath = test_fpaths[0]
-            test_files = get_items_from_file(test_fpath, format="auto")
-        else:
-            raise ValueError(f"Test file does not exists in {exp_dir}!")
+        raise ValueError(f"Test file does not exists in {exp_dir}!")
+
+    Print(f"Used test file: {test_fpath}", color="green")
 
     if args["debug"]:
         test_files = test_files[:1]
@@ -95,6 +99,8 @@ def gradcam(**args):
     configures["experiment_path"] = exp_dir
     configures["model_path"] = get_trained_models(exp_dir)[0]  # Get the first model
     configures["save_results"] = False
+    configures["save_latent"] = False
+    configures["target_layer"] = None
     configures["out_dir"] = (
         check_dir(args["out_dir"])
         if args["out_dir"]

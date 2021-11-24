@@ -224,9 +224,13 @@ def add_3D_image_to_summary(manager, image, name, centers=None):
     manager.add_image(name + "_z", segmentation_overlay_z)
 
 
+# todo: check through all data
 def output_filename_check(torch_dataset, meta_key="image_meta_dict"):
     if len(torch_dataset) == 1:
-        return Path(torch_dataset[0][meta_key]["filename_or_obj"]).parent.parent
+        data = torch_dataset[0]
+        if isinstance(data, list):
+            data = data[0]
+        return Path(data[meta_key]["filename_or_obj"]).parent.parent
 
     prev_data = torch_dataset[0]
     next_data = torch_dataset[1]
@@ -288,6 +292,14 @@ def is_avaible_size(value):
         if np.all(np.greater(value, 0)):
             return True
     return False
+
+
+def get_specify_file(target_dir, regex_kw, get_first=True):
+    files = list(target_dir.glob(regex_kw))
+    if len(files) > 0:
+        return files[0] if get_first else files
+    else:
+        return files
 
 
 def plot_summary(summary, output_fpath):
