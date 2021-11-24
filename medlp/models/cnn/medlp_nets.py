@@ -10,7 +10,6 @@ from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
 from medlp.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
-from medlp.models.cnn.nets.vgg_aag import vgg9_aag, vgg9_aag2
 
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet18")
@@ -110,6 +109,7 @@ def medlp_vgg9_bn(
     inkwargs["num_classes"] = out_channels
     inkwargs["is_prunable"] = is_prunable
     inkwargs["groups"] = n_group
+    inkwargs["bottleneck_size"] = kwargs.get("bottleneck_size", 5)
 
     return vgg9_bn(pretrained=False, progress=True, **inkwargs)
 
@@ -248,6 +248,7 @@ def medlp_hesam(
     features = kwargs.get("features", (64, 128, 256, 256))
     last_feature = kwargs.get("last_feature", 64)
     upsample = kwargs.get("upsample", "deconv")
+    sam_size = kwargs.get("sam_size", 6)
 
     net = HESAM(
         spatial_dims,
@@ -255,6 +256,7 @@ def medlp_hesam(
         out_channels,
         features,
         last_feature,
+        sam_size,
         act,
         norm,
         drop_out,
@@ -344,69 +346,3 @@ def medlp_resnetaag_50(
         print("Freeze backbone for fine-tune!")
 
     return resnet50_aag(pretrained_model_path, **inkwargs)
-
-
-@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag")
-def medlp_vggaag_34(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    inkwargs = {}
-    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-
-    return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)
-
-
-def medlp_vggaag2(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    inkwargs = {}
-    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-
-    return vgg9_aag2(spatial_dims, in_channels, out_channels, **inkwargs)
-
-
-@CLASSIFICATION_ARCHI.register("2D", "vgg9_aag_prod2")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9_aag_prod2")
-def medlp_vggaag_prod2(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    inkwargs = {}
-    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-    inkwargs["mode"] = "product2"
-    inkwargs["bottleneck_size"] = kwargs.get("bottleneck", 2)
-
-    return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)

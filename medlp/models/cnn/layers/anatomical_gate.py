@@ -56,7 +56,7 @@ class AnatomicalAttentionGate(nn.Module):
             self.w = nn.Parameter(torch.Tensor([0.5]), requires_grad=True)
         elif self.mode == "sum":
             self.w = 1
-        elif self.mode in ["product", "product2"]:
+        elif self.mode in ["product", "product2", "product3"]:
             pass
         else:
             raise ValueError(f"Unsupported mode {self.mode}")
@@ -64,6 +64,13 @@ class AnatomicalAttentionGate(nn.Module):
     def forward(self, x1, x2):
         concat_featmap = torch.cat([x1, x2], dim=1)
         weighted_featmap1 = self.conv1(concat_featmap) * x1
+        if self.mode == "product3":
+            dims = list(range(2, 2 + self.spatial_dims))
+            weighted_featmap2 = self.conv2(concat_featmap)
+            weights = weighted_featmap2.mean(dims, keepdim=True)
+            norm_weights = nn.functional.sigmoid(weights)
+            return weighted_featmap1 * norm_weights
+
         weighted_featmap2 = self.conv2(concat_featmap) * x2
 
         if self.mode == "cat":
@@ -75,13 +82,11 @@ class AnatomicalAttentionGate(nn.Module):
         elif self.mode == "product":
             dims = list(range(2, 2 + self.spatial_dims))
             return weighted_featmap1 * weighted_featmap2.mean(dims, keepdim=True)
-        elif self.mode == 'product2':
+        elif self.mode == "product2":
             dims = list(range(2, 2 + self.spatial_dims))
             weights = weighted_featmap2.mean(dims, keepdim=True)
-            norm_weights = nn.functional.sigmoid(weights) + 0.5
+            norm_weights = nn.functional.sigmoid(weights)
             return weighted_featmap1 * norm_weights
-        elif self.mode == 'product3':
-            dims = list(range(2, 2 + self.spatial_dims))
 
 
 class AnatomicalAttentionGate2(nn.Module):
@@ -92,7 +97,7 @@ class AnatomicalAttentionGate2(nn.Module):
         featmap2_inchn: int,
         use_W: bool = True,
         use_W_bn: bool = True,
-        mode: str = "concatenation_range_normalise"
+        mode: str = "concatenation_range_normalise",
     ):
         super().__init__()
         self.spatial_dims = spatial_dims
@@ -123,12 +128,7 @@ class AnatomicalAttentionGate2(nn.Module):
         )
 
         self.psi = get_conv_layer(
-            spatial_dims,
-            featmap2_inchn,
-            1,
-            kernel_size=1,
-            stride=1,
-            bias=True
+            spatial_dims, featmap2_inchn, 1, kernel_size=1, stride=1, bias=True
         )
         self.nonlinear = lambda x: nn.functional.relu(x, inplace=True)
 
@@ -140,9 +140,9 @@ class AnatomicalAttentionGate2(nn.Module):
                 kernel_size=1,
                 stride=1,
                 act=None,
-                norm='batch' if use_W_bn else None,
+                norm="batch" if use_W_bn else None,
                 bias=True,
-                conv_only=False
+                conv_only=False,
             )
         else:
             self.W = nn.Identity()
@@ -158,15 +158,15 @@ class AnatomicalAttentionGate2(nn.Module):
         # normalisation -- scale compatibility score
         #  psi^T . f -> (b, 1, t/s1, h/s2, w/s3)
         dims = list(range(2, 2 + self.spatial_dims))
-        if self.mode == 'concatenation_mean_flow':
+        if self.mode == "concatenation_mean_flow":
             psi_f_min = psi_f.amin(dims, keepdim=True)
             psi_f_sum = psi_f.sum(dims, keepdim=True)
             sigm_psi_f = (psi_f - psi_f_min) / psi_f_sum
-        elif self.mode == 'concatenation_range_normalise':
+        elif self.mode == "concatenation_range_normalise":
             psi_f_min = psi_f.amin(dims, keepdim=True)
             psi_f_max = psi_f.amax(dims, keepdim=True)
             sigm_psi_f = (psi_f - psi_f_min) / (psi_f_max - psi_f_min)
-        elif self.mode == 'concatenation_sigmoid':
+        elif self.mode == "concatenation_sigmoid":
             sigm_psi_f = nn.functional.sigmoid(psi_f)
         else:
             raise NotImplementedError

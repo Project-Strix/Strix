@@ -51,7 +51,7 @@ from setuptools import setup, find_namespace_packages
 setup(
     name="medlp",
     packages=find_namespace_packages(include=["medlp", "medlp.*"]),
-    version="0.0.5",
+    version="0.0.6",
     description="Medical Deep Learning Platform",
     author="Chenglong Wang",
     author_email="clwang@phy.ecnu.edu.cn",
