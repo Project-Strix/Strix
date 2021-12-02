@@ -14,11 +14,15 @@ import numpy as np
 @click.option(
     "--exp-dir", type=click.Path(exists=True), help="Dir contains test folders"
 )
-def merge_roc_curves(exp_dir):
+@click.option(
+    "--dirname-as-legend", type=bool, default=True, help="Use dirname as legend label"
+)
+def merge_roc_curves(exp_dir, dirname_as_legend):
     """Utility for mergeing multiple ROC curves.
 
     Args:
         root_dir (str): Root dir contains test folders.
+        dirname-as-legend (bool): Use dirname as legend label
     """
     roc_files = list(Path(exp_dir).rglob("roc_scores.csv"))
     if len(roc_files) <= 1:
@@ -31,16 +35,23 @@ def merge_roc_curves(exp_dir):
     legend_names = []
     auc_values = []
     for roc_file in roc_files:
-        test_cohort_name = list(roc_file.parent.glob("*_files.*"))
-        if len(test_cohort_name) > 0:
-            try:
-                cohort_name = test_cohort_name[0].stem.split("_")[0]
-            except:
+        if dirname_as_legend:
+            legend_name = roc_file.parent.name
+        else:
+            test_cohort_name = list(roc_file.parent.glob("*_files.*"))
+            if len(test_cohort_name) > 0:
+                try:
+                    cohort_name = test_cohort_name[0].stem.split("_")[0]
+                except:
+                    cohort_name = None
+            else:
                 cohort_name = None
 
-        legend_name = click.prompt(
-            f"Input legend for {roc_file.parent.name}", type=str, default=cohort_name
-        )
+            legend_name = click.prompt(
+                f"Input legend for {roc_file.parent.name}",
+                type=str,
+                default=cohort_name,
+            )
         legend_names.append(legend_name)
 
         cls_result_file = roc_file.parent.joinpath("classification_results.json")
@@ -58,13 +69,14 @@ def merge_roc_curves(exp_dir):
     plt.rcParams["font.family"] = "serif"
     plt.rcParams["font.serif"] = ["Times New Roman"] + plt.rcParams["font.serif"]
     plt.rcParams["font.size"] = 10
-    for roc_file, legend_name, auc in zip(roc_files, legend_names, auc_values):
-        with open(roc_file) as f:
+
+    for auc, roc, legend in sorted(zip(auc_values, roc_files, legend_names)):
+        with open(roc) as f:
             reader = csv.DictReader(f)
             fpr_tpr = np.array(
                 [[float(row["FPR"]), float(row["TPR"])] for row in reader]
             )
-        plt.plot(fpr_tpr[:, 0], fpr_tpr[:, 1], label=f"{legend_name}={auc:.2f}")
+        plt.plot(fpr_tpr[:, 0], fpr_tpr[:, 1], label=f"{legend} AUC={auc:.2f}")
     plt.plot([0, 1], [0, 1], "k--")
     plt.xlabel("False positive rate")
     plt.ylabel("True positive rate")
