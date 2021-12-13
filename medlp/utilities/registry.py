@@ -196,3 +196,12 @@ class DatasetRegistry(DimRegistry):
             return func
 
         return register_source(fn)
+
+    def project(self, proj_name):
+        def register_proj(fn):
+            dim_module_list = self._get_keys(fn)
+            for dim, module_name in dim_module_list:
+                self[dim][module_name].update({"PROJECT": proj_name})
+            return fn
+
+        return register_proj

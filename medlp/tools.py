@@ -68,7 +68,7 @@ def merge_roc_curves(exp_dir, dirname_as_legend):
     fig = plt.figure(figsize=(8, 5), dpi=200)
     plt.rcParams["font.family"] = "serif"
     plt.rcParams["font.serif"] = ["Times New Roman"] + plt.rcParams["font.serif"]
-    plt.rcParams["font.size"] = 10
+    plt.rcParams["font.size"] = 9
 
     for auc, roc, legend in sorted(zip(auc_values, roc_files, legend_names)):
         with open(roc) as f:
