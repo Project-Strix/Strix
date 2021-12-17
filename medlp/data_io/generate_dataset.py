@@ -93,7 +93,11 @@ def parse_dataset_config(configs):
                 f"args must be dict, but got {args} ({type(args)})"
             arguments.update(args)
 
-            func = mapping[processor][step]
+            try:
+                func = mapping[processor][step]
+            except KeyError as e:
+                print(f"Error: Cannot find key: {step} in {processor}")
+                sys.exit(1)
 
             try:  # TODO extract to function?
                 fn = func(**arguments)
@@ -249,7 +253,7 @@ def test_dataset_from_config(config_path, phase, opts):
             keys=configs["ATTRIBUTE"]["KEYS"],
             prefix=configs["ATTRIBUTE"]["KEYS"],
             logger_handler=logging.StreamHandler(sys.stdout) #! No output!
-            )
+        )
     )
     dataset = create_dataset_from_cfg(
         get_items_from_file(configs["ATTRIBUTE"]["FILES_LIST"], format='auto'),
