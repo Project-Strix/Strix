@@ -185,6 +185,11 @@ def train(ctx, **args):
         "TEST_PATH"
     )
 
+    if cargs.debug and not os.path.isfile(data_list):
+        Print('Using synthetic test data...', color='y')
+        train_core(cargs, [None,]*20, [None,]*10)
+        return cargs
+
     assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
     train_datalist = get_items_from_file(data_list, format="auto")
     test_datalist = []

@@ -43,6 +43,7 @@ from monai_ex.handlers import (
     stopping_fn_from_metric,
     NNIReporterHandler,
     TensorboardDumper,
+    from_engine_ex as from_engine,
 )
 
 
@@ -64,6 +65,7 @@ def build_segmentation_engine(**kwargs):
     label_ = cfg.get_key("label")
     pred_ = cfg.get_key("pred")
     loss_ = cfg.get_key("loss")
+    decollate = True
 
     val_metric = "val_mean_dice"
     val_handlers = [
@@ -71,8 +73,8 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
+            batch_transform=from_engine([image_, label_]),
+            output_transform=from_engine(pred_),
             max_channels=opts.output_nc,
             prefix_name="Val",
         ),
@@ -148,15 +150,16 @@ def build_segmentation_engine(**kwargs):
             x[label_].to(device),
         )
         if opts.output_nc > 1:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                one_hot(x[label_], num_classes=opts.output_nc),
+            ch_dim = 0 if decollate else 1
+            key_metric_transform_fn = from_engine(
+                [pred_, label_],
+                transforms=[
+                    lambda x: x,
+                    lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
+                ]
             )
         else:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                x[label_],
-            )
+            key_metric_transform_fn = from_engine([pred_, label_])
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -167,7 +170,7 @@ def build_segmentation_engine(**kwargs):
         else int(opts.n_epoch_len * len(test_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),  # SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
-        post_transform=trainval_post_transforms,
+        postprocessing=trainval_post_transforms,
         key_val_metric={
             val_metric: MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
@@ -175,6 +178,7 @@ def build_segmentation_engine(**kwargs):
         },
         val_handlers=val_handlers,
         amp=opts.amp,
+        decollate=decollate,
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -193,7 +197,7 @@ def build_segmentation_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x[loss_],
+            output_transform=from_engine(loss_),
             name=logger_name,
         ),
         CheckpointSaverEx(
@@ -206,12 +210,12 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x[loss_],
+            output_transform=from_engine(loss_),
         ),
         TensorBoardImageHandlerEx(
             summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
+            batch_transform=from_engine([image_, label_]),
+            output_transform=from_engine(pred_),
             max_channels=opts.output_nc,
             prefix_name="train",
         ),
@@ -229,7 +233,7 @@ def build_segmentation_engine(**kwargs):
         else int(opts.n_epoch_len * len(train_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
-        post_transform=trainval_post_transforms,
+        postprocessing=trainval_post_transforms,
         key_train_metric={
             "train_mean_dice": MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
@@ -237,6 +241,7 @@ def build_segmentation_engine(**kwargs):
         },
         train_handlers=train_handlers,
         amp=opts.amp,
+        decollate=decollate,
     )
 
     if opts.early_stop > 0:
