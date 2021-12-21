@@ -8,7 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import output_filename_check, get_attr_
-from medlp.models.cnn.utils import output_onehot_transform
+from medlp.models.cnn.utils import output_onehot_transform, onehot_process
 from medlp.configures import config as cfg
 
 from monai_ex.inferers import SimpleInfererEx
@@ -32,6 +32,7 @@ from monai_ex.transforms import (
     MeanEnsembleD,
     VoteEnsembleD,
     SqueezeDimD,
+    EnsureTypeD,
 )
 
 
@@ -51,6 +52,7 @@ from monai_ex.handlers import (
     NNIReporterHandler,
     TensorboardDumper,
     LatentCodeSaver,
+    from_engine_ex as from_engine
 )
 
 
@@ -118,6 +120,7 @@ def build_classification_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
+    decollate = True
     is_multilabel = opts.output_nc > 1
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
@@ -136,7 +139,10 @@ def build_classification_engine(**kwargs):
         val_metric_name = "val_auc"
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None, name=logger_name),
+        StatsHandler(
+            output_transform=lambda x: None,
+            name=logger_name
+        ),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name=val_metric_name,
@@ -145,7 +151,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x[_image_],
+            output_transform=from_engine(_image_),
             max_channels=1,
             prefix_name="Val",
         ),
@@ -179,9 +185,15 @@ def build_classification_engine(**kwargs):
             )
         ]
 
+    def debug(data):
+        print('debug label:', data[_label_].shape)
+        return data
+
+
     if opts.output_nc == 1:
         train_post_transforms = Compose(
             [
+                EnsureTypeD(keys=[_pred_, _label_]),
                 ActivationsD(keys=_pred_, sigmoid=True),
                 # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
             ]
@@ -190,19 +202,24 @@ def build_classification_engine(**kwargs):
         train_post_transforms = Compose(
             [
                 ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=_pred_),
+                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=None),
+                EnsureTypeD(keys=[_pred_, _label_]),
             ]
         )
 
     if is_multilabel:
         key_val_metric = Accuracy(
-            output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
+            # output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
+            output_transform=from_engine(
+                [_pred_, _label_], onehot_process(opts.output_nc),
+            ),
             is_multilabel=is_multilabel,
         )
     else:
         key_val_metric = ROCAUC(
-            output_transform=partial(output_onehot_transform, n_classes=opts.output_nc)
+            output_transform=from_engine(
+                [_pred_, _label_], onehot_process(opts.output_nc)
+            )
         )
 
     evaluator = SupervisedEvaluatorEx(
@@ -214,10 +231,11 @@ def build_classification_engine(**kwargs):
         else int(opts.n_epoch_len * len(test_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInfererEx(),
-        post_transform=train_post_transforms,
+        postprocessing=train_post_transforms,
         key_val_metric={val_metric_name: key_val_metric},
         val_handlers=val_handlers,
         amp=opts.amp,
+        decollate=decollate,
         custom_keys=cfg.get_keys_dict(),
     )
 
@@ -233,17 +251,19 @@ def build_classification_engine(**kwargs):
             step_transform=lr_step_transform,
         ),
         ValidationHandler(
-            validator=evaluator, interval=valid_interval, epoch_level=True
+            validator=evaluator,
+            interval=valid_interval,
+            epoch_level=True
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x[_loss_],
+            output_transform=from_engine(_loss_),
             name=logger_name,
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x[_loss_],
+            output_transform=from_engine(_loss_),
         ),
         CheckpointSaverEx(
             save_dir=model_dir / "Checkpoint",
@@ -255,7 +275,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=lambda x: x[_image_],
+            output_transform=from_engine(_image_),
             max_channels=1,
             prefix_name="Train",
         ),
@@ -273,11 +293,12 @@ def build_classification_engine(**kwargs):
         else int(opts.n_epoch_len * len(train_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInfererEx(logger_name),
-        post_transform=train_post_transforms,
+        postprocessing=train_post_transforms,
         key_train_metric={"train_auc": key_val_metric},
         # additional_metrics={"roccurve": add_roc_metric},
         train_handlers=train_handlers,
         amp=opts.amp,
+        decollate=decollate,
         custom_keys=cfg.get_keys_dict(),
     )
 
@@ -351,13 +372,15 @@ def build_classification_test_engine(**kwargs):
             [
                 ActivationsD(keys=_pred_, sigmoid=True),
                 AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
+                # partial(output_onehot_transform, n_classes=opts.output_nc),
+                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
             ]
         )
         auc_post_transforms = Compose(
             [
                 ActivationsD(keys=_pred_, sigmoid=True),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
+                # partial(output_onehot_transform, n_classes=opts.output_nc),
+                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
             ]
         )
     else:
@@ -366,7 +389,8 @@ def build_classification_test_engine(**kwargs):
                 ActivationsD(keys=_pred_, softmax=True),
                 AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=_pred_),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
+                # partial(output_onehot_transform, n_classes=opts.output_nc),
+                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
             ]
         )
         auc_post_transforms = Compose(
@@ -374,7 +398,8 @@ def build_classification_test_engine(**kwargs):
                 ActivationsD(keys=_pred_, softmax=True),
                 AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=_pred_),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
+                # partial(output_onehot_transform, n_classes=opts.output_nc),
+                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
             ]
         )
 

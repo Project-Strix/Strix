@@ -185,9 +185,14 @@ def train(ctx, **args):
         "TEST_PATH"
     )
 
+    # ! Synthetic test phase
     if cargs.debug and not os.path.isfile(data_list):
         Print('Using synthetic test data...', color='y')
-        train_core(cargs, [None,]*20, [None,]*10)
+        train_core(
+            cargs, 
+            [{"image": None, "label": None}, ] * 20,
+            [{"image": None, "label": None}, ] * 10
+        )
         return cargs
 
     assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
