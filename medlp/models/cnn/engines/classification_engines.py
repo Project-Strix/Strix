@@ -257,7 +257,7 @@ def build_classification_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=from_engine(_loss_),
+            output_transform=from_engine(_loss_, first=True),
             name=logger_name,
         ),
         TensorBoardStatsHandler(

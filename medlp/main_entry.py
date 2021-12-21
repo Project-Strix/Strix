@@ -162,7 +162,7 @@ def train(ctx, **args):
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
-    # dump dataset file
+    # ! dump dataset file
     source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
         cargs.data_list
     ].get("SOURCE")
@@ -171,7 +171,7 @@ def train(ctx, **args):
             source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
         )
 
-    # Manually specified train&valid datalist
+    # ! Manually specified train&valid datalist
     if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
