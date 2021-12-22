@@ -77,7 +77,7 @@ def train_core(cargs, files_train, files_valid):
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
+    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
     if cargs.compact_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
 
