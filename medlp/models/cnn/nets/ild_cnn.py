@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Callable
 import numpy as np
-from medlp.models.cnn import CLASSIFICATION_ARCHI
-from monai_ex.networks.layers import Conv, Dropout, Norm, Pool, PrunableLinear
+from monai_ex.networks.layers import Conv, Norm, Pool, PrunableLinear
 
 
 def get_FeatureMaps(L, policy, constant=17):

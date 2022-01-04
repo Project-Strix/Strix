@@ -3,7 +3,7 @@ from typing import Any
 import os
 import torch
 
-from medlp.models.cnn import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
+from medlp.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
 from medlp.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from medlp.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from medlp.models.cnn.nets.dynunet import DynUNet
