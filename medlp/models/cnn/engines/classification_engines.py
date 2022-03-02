@@ -26,7 +26,7 @@ from monai_ex.engines import (
 )
 
 from monai_ex.transforms import (
-    Compose,
+    ComposeEx as Compose,
     ActivationsD,
     AsDiscreteD,
     MeanEnsembleD,
@@ -52,7 +52,7 @@ from monai_ex.handlers import (
     NNIReporterHandler,
     TensorboardDumper,
     LatentCodeSaver,
-    from_engine_ex as from_engine
+    from_engine_ex as from_engine,
 )
 
 
@@ -139,10 +139,7 @@ def build_classification_engine(**kwargs):
         val_metric_name = "val_auc"
 
     val_handlers = [
-        StatsHandler(
-            output_transform=lambda x: None,
-            name=logger_name
-        ),
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name=val_metric_name,
@@ -185,11 +182,6 @@ def build_classification_engine(**kwargs):
             )
         ]
 
-    def debug(data):
-        print('debug label:', data[_label_].shape)
-        return data
-
-
     if opts.output_nc == 1:
         train_post_transforms = Compose(
             [
@@ -211,7 +203,8 @@ def build_classification_engine(**kwargs):
         key_val_metric = Accuracy(
             # output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
             output_transform=from_engine(
-                [_pred_, _label_], onehot_process(opts.output_nc),
+                [_pred_, _label_],
+                onehot_process(opts.output_nc),
             ),
             is_multilabel=is_multilabel,
         )
@@ -251,9 +244,7 @@ def build_classification_engine(**kwargs):
             step_transform=lr_step_transform,
         ),
         ValidationHandler(
-            validator=evaluator,
-            interval=valid_interval,
-            epoch_level=True
+            validator=evaluator, interval=valid_interval, epoch_level=True
         ),
         StatsHandler(
             tag_name="train_loss",
@@ -329,6 +320,7 @@ def build_classification_test_engine(**kwargs):
     output_latent_code = kwargs.get("output_latent_code", False)
     target_latent_layer = kwargs.get("target_latent_layer", None)
     root_dir = output_filename_check(test_loader.dataset)
+    decollate = True
     _image_ = cfg.get_key("image")
     _label_ = cfg.get_key("label")
     _pred_ = cfg.get_key("pred")
@@ -349,62 +341,65 @@ def build_classification_test_engine(**kwargs):
             opts, _image_, multi_input_keys
         )
 
-    if is_multilabel:
-        post_transform = Compose(
-            [
-                ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=_pred_),
-                lambda x: x[_pred_].cpu().numpy(),
-            ]
-        )
-    else:
-        post_transform = Compose(
-            [
-                ActivationsD(keys=_pred_, sigmoid=True),
-                # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                lambda x: x[_pred_].cpu().numpy(),
-            ]
-        )
+    def debug(data):
+        print("--debug:", type(data), len(data), data)
+        return data
 
     if not is_multilabel:
+        saver_post_transform = Compose(
+            [
+                EnsureTypeD(keys=[_pred_, _label_]),
+                ActivationsD(keys=_pred_, sigmoid=True),
+                from_engine(_pred_)
+            ],
+            first=False,
+        )
         acc_post_transforms = Compose(
             [
+                EnsureTypeD(keys=[_pred_, _label_]),
                 ActivationsD(keys=_pred_, sigmoid=True),
                 AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                # partial(output_onehot_transform, n_classes=opts.output_nc),
-                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
-            ]
+                from_engine([_pred_, _label_], ensure_dim=decollate),
+            ],
+            first=decollate,
         )
         auc_post_transforms = Compose(
             [
+                EnsureTypeD(keys=[_pred_, _label_]),
                 ActivationsD(keys=_pred_, sigmoid=True),
-                # partial(output_onehot_transform, n_classes=opts.output_nc),
-                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
-            ]
+                from_engine([_pred_, _label_], ensure_dim=decollate),
+            ],
+            first=decollate,
         )
     else:
+        saver_post_transform = Compose(
+            [
+                EnsureTypeD(keys=[_pred_, _label_]),
+                ActivationsD(keys=_pred_, softmax=True),
+                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=None),
+                from_engine(_pred_)
+            ],
+            first=False,
+        )
         acc_post_transforms = Compose(
             [
+                EnsureTypeD(keys=[_pred_, _label_]),
                 ActivationsD(keys=_pred_, softmax=True),
                 AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=_pred_),
-                # partial(output_onehot_transform, n_classes=opts.output_nc),
-                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
+                from_engine([_pred_, _label_], onehot_process(opts.output_nc)),
             ]
         )
         auc_post_transforms = Compose(
             [
+                EnsureTypeD(keys=[_pred_, _label_]),
                 ActivationsD(keys=_pred_, softmax=True),
                 AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=_pred_),
-                # partial(output_onehot_transform, n_classes=opts.output_nc),
-                from_engine([_pred_, _label_], partial(onehot_process, n_class=opts.output_nc))
+                from_engine([_pred_, _label_], onehot_process(opts.output_nc)),
             ]
         )
 
     val_handlers = [
-        StatsHandler(output_transform=lambda x: None, name=logger_name),
+        StatsHandler(name=logger_name),
         CheckpointLoader(load_path=model_path, load_dict={"net": net}),
     ]
 
@@ -414,16 +409,16 @@ def build_classification_test_engine(**kwargs):
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
                 save_labels=has_label,
-                batch_transform=lambda x: (x[_image_ + "_meta_dict"], x[_label_])
+                batch_transform=from_engine([_image_ + "_meta_dict", _label_])
                 if has_label
-                else x[_image_ + "_meta_dict"],
-                output_transform=post_transform,
+                else from_engine(_image_ + "_meta_dict"),
+                output_transform=saver_post_transform,
             ),
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
                 filename="logits.csv",
-                batch_transform=lambda x: x[_image_ + "_meta_dict"],
-                output_transform=lambda x: x[_pred_].cpu().numpy(),
+                batch_transform=from_engine(_image_ + "_meta_dict"),
+                output_transform=from_engine(_pred_),
             ),
         ]
 
@@ -435,8 +430,8 @@ def build_classification_test_engine(**kwargs):
                 data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
-                batch_transform=lambda x: x[_image_ + "_meta_dict"],
-                output_transform=lambda x: x[_image_],  # [:,0:1,:,:]
+                batch_transform=from_engine(_image_ + "_meta_dict"),
+                output_transform=from_engine(_image_),
             )
         ]
 
@@ -447,8 +442,8 @@ def build_classification_test_engine(**kwargs):
                 filename="latent",
                 data_root_dir=root_dir,
                 overwrite=True,
-                batch_transform=lambda x: x[_image_ + "_meta_dict"],
-                output_transform=lambda x: x[_acti_],
+                batch_transform=from_engine(_image_ + "_meta_dict"),
+                output_transform=from_engine(_acti_),
                 name=logger_name,
                 save_to_np=True,
                 save_as_onefile=True,
@@ -462,7 +457,7 @@ def build_classification_test_engine(**kwargs):
             network=net,
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-            post_transform=None,  # post_transforms,
+            postprocessing=None,  # post_transforms,
             val_handlers=val_handlers,
             key_val_metric={
                 "test_acc": Accuracy(
@@ -488,6 +483,7 @@ def build_classification_test_engine(**kwargs):
                 ),
             },
             amp=opts.amp,
+            decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
             output_latent_code=output_latent_code,
             target_latent_layer=target_latent_layer,
@@ -499,11 +495,12 @@ def build_classification_test_engine(**kwargs):
             network=net,
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-            post_transform=None,
+            postprocessing=None,
             val_handlers=val_handlers,
             key_val_metric=None,
             additional_metrics=None,
             amp=opts.amp,
+            decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
             output_latent_code=output_latent_code,
             target_latent_layer=target_latent_layer,

@@ -32,7 +32,7 @@ from monai_ex.transforms import (
 from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
-    TensorBoardImageHandlerEx,
+    TensorBoardImageHandlerEx as TensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
@@ -71,7 +71,7 @@ def build_segmentation_engine(**kwargs):
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
-        TensorBoardImageHandlerEx(
+        TensorBoardImageHandler(
             summary_writer=writer,
             batch_transform=from_engine([image_, label_]),
             output_transform=from_engine(pred_),
@@ -197,7 +197,7 @@ def build_segmentation_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=from_engine(loss_),
+            output_transform=from_engine(loss_, first=True),
             name=logger_name,
         ),
         CheckpointSaverEx(
@@ -212,12 +212,12 @@ def build_segmentation_engine(**kwargs):
             tag_name="train_loss",
             output_transform=from_engine(loss_),
         ),
-        TensorBoardImageHandlerEx(
+        TensorBoardImageHandler(
             summary_writer=writer,
             batch_transform=from_engine([image_, label_]),
             output_transform=from_engine(pred_),
             max_channels=opts.output_nc,
-            prefix_name="train",
+            prefix_name="Train",
         ),
     ]
 

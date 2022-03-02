@@ -1,9 +1,14 @@
 import numpy as np
-from utils_cw import Print, check_dir
 
 from monai_ex.data import Dataset
-from monai_ex.transforms import GenerateSyntheticDataD, GenerateRandomDataD, EnsureChannelFirstD, NormalizeIntensityD, CastToTypeD, ToTensorD
-from monai.transforms.transform import MapTransform
+from monai_ex.transforms import (
+    GenerateSyntheticDataD,
+    GenerateRandomDataD,
+    EnsureChannelFirstD,
+    NormalizeIntensityD,
+    CastToTypeD,
+    ToTensorD,
+)
 
 from medlp.data_io import (
     SEGMENTATION_DATASETS,
@@ -12,40 +17,43 @@ from medlp.data_io import (
     BasicClassificationDataset,
 )
 
-@SEGMENTATION_DATASETS.register('2D', 'synthetic_nc1', "dummy.json")
-@SEGMENTATION_DATASETS.register('3D', 'synthetic_nc1', "dummy.json")
+
+@SEGMENTATION_DATASETS.register("2D", "SyntheticData", None)
+@SEGMENTATION_DATASETS.register("3D", "SyntheticData", None)
 def synthetic_dataset_3d(files_list, phase, opts):
-    opts["out_cls"] = 1
-    return synthetic_dataset_generator(files_list, phase, opts)
+    if opts['output_nc'] in [1, 2]:
+        seg_cls = 1
+    elif opts['output_nc'] > 2:
+        seg_cls = opts['output_nc'] - 1
+    else:
+        raise ValueError(f"Got unexpected output_nc: {opts['output_nc']}")
 
+    dim = opts["tensor_dim"]
 
-@SEGMENTATION_DATASETS.register('2D', 'synthetic_nc2', "dummy.json")
-@SEGMENTATION_DATASETS.register('3D', 'synthetic_nc2', "dummy.json")
-def synthetic_dataset_3d(files_list, phase, opts):
-    opts["out_cls"] = 2
-    return synthetic_dataset_generator(files_list, phase, opts)
-
-
-def synthetic_dataset_generator(files_list, phase, opts):
-    out_cls = opts["out_cls"]
-    dim = opts['tensor_dim']
-
-    if dim == '2D':
-        loader = GenerateSyntheticDataD(keys=['image', 'label'], width=64, height=64, num_seg_classes=out_cls)
-    elif dim == '3D':
-        loader = GenerateSyntheticDataD(keys=['image', 'label'], width=64, height=64, depth=64, num_seg_classes=out_cls)
+    if dim == "2D":
+        loader = GenerateSyntheticDataD(
+            keys=["image", "label"],
+            width=64, height=64,
+            num_seg_classes=seg_cls
+        )
+    elif dim == "3D":
+        loader = GenerateSyntheticDataD(
+            keys=["image", "label"],
+            width=64, height=64, depth=64,
+            num_seg_classes=seg_cls,
+        )
 
     return BasicSegmentationDataset(
         files_list,
         loader=loader,
-        channeler=EnsureChannelFirstD(keys=['image', 'label']),
+        channeler=EnsureChannelFirstD(keys=["image", "label"]),
         orienter=None,
         spacer=None,
-        rescaler=NormalizeIntensityD(keys=['image']),
+        rescaler=NormalizeIntensityD(keys=["image"]),
         resizer=None,
         cropper=None,
-        caster=CastToTypeD(keys=['image', 'label'], dtype=[np.float32, np.int64]),
-        to_tensor=ToTensorD(keys=['image', 'label']),
+        caster=CastToTypeD(keys=["image", "label"], dtype=[np.float32, np.int64]),
+        to_tensor=ToTensorD(keys=["image", "label"]),
         is_supervised=True,
         dataset_type=Dataset,
         dataset_kwargs={},
@@ -55,44 +63,38 @@ def synthetic_dataset_generator(files_list, phase, opts):
     )
 
 
-@CLASSIFICATION_DATASETS.register('2D', 'random_nc1', "dummy.json")
-@CLASSIFICATION_DATASETS.register('3D', 'random_nc1', "dummy.json")
+@CLASSIFICATION_DATASETS.register("2D", "RandomData", None)
+@CLASSIFICATION_DATASETS.register("3D", "RandomData", None)
 def random_dataset_cls_nc1(files_list, phase, opts):
-    opts["out_cls"] = 1
-    return random_cls_dataset_generator(files_list, phase, opts)
+    if opts['output_nc'] in [1, 2]:
+        out_cls = 1
+    elif opts['output_nc'] > 2:
+        out_cls = opts['output_nc'] - 1
+    else:
+        raise ValueError(f"Got unexpected output_nc: {opts['output_nc']}")
 
+    dim = opts["tensor_dim"]
 
-@CLASSIFICATION_DATASETS.register('2D', 'random_nc2', "dummy.json")
-@CLASSIFICATION_DATASETS.register('3D', 'random_nc2', "dummy.json")
-def random_dataset_cls_nc2(files_list, phase, opts):
-    opts["out_cls"] = 2
-    return random_cls_dataset_generator(files_list, phase, opts)
-
-
-def random_cls_dataset_generator(files_list, phase, opts):
-    out_cls = opts["out_cls"]
-    dim = opts['tensor_dim']
-
-    if dim == '2D':
+    if dim == "2D":
         loader = GenerateRandomDataD(
-            keys=['image', 'label'], width=64, height=64, num_classes=out_cls
+            keys=["image", "label"], width=64, height=64, num_classes=out_cls
         )
-    elif dim == '3D':
+    elif dim == "3D":
         loader = GenerateRandomDataD(
-            keys=['image', 'label'], width=64, height=64, depth=32, num_classes=out_cls
+            keys=["image", "label"], width=64, height=64, depth=32, num_classes=out_cls
         )
 
     return BasicClassificationDataset(
         files_list,
         loader=loader,
-        channeler=EnsureChannelFirstD(keys='image'),
+        channeler=EnsureChannelFirstD(keys="image"),
         orienter=None,
         spacer=None,
-        rescaler=NormalizeIntensityD(keys=['image']),
+        rescaler=NormalizeIntensityD(keys=["image"]),
         resizer=None,
         cropper=None,
-        caster=CastToTypeD(keys='image', dtype=np.float32),
-        to_tensor=ToTensorD(keys=['image', 'label']),
+        caster=CastToTypeD(keys="image", dtype=np.float32),
+        to_tensor=ToTensorD(keys=["image", "label"]),
         is_supervised=True,
         dataset_type=Dataset,
         dataset_kwargs={},
@@ -100,4 +102,3 @@ def random_cls_dataset_generator(files_list, phase, opts):
         check_data=False,
         verbose=True,
     )
-
