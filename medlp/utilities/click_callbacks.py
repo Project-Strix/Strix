@@ -10,6 +10,7 @@ from medlp.utilities.click_ex import (
     loss_select,
     model_select,
     data_select,
+    parse_input_str,
 )
 from medlp.utilities.enum import *
 from utils_cw import prompt_when
@@ -108,9 +109,8 @@ def common_params(func):
         help="Use imbalanced dataset sampling",
     )
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
-    @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
-    @option("--input-nc", type=int, default=1, help="input data channels")
-    @option("--output-nc", type=int, default=3, help="output channels (classes)")
+    @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
+    @option("--output-nc", type=int, default=1, prompt=True, help="output channels (classes)")
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default="", help="Specified training datalist")
     @option("--valid-list", type=str, default="", help="Specified validation datalist")
@@ -136,7 +136,7 @@ def common_params(func):
     @option(
         "--valid-interval",
         type=int,
-        default=4,
+        default=2,
         help="Interval of validation during training",
     )
     @option(
@@ -145,7 +145,7 @@ def common_params(func):
         default=100,
         help="Patience of early stopping. default: 100epochs",
     )
-    @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
+    @option("--save-epoch-freq", type=int, default=100, help="Save model freq")
     @option("--save-n-best", type=int, default=3, help="Save best N models")
     @option("--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6")
     @option(
@@ -168,6 +168,7 @@ def common_params(func):
         "--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp"
     )
     @option("--debug", is_flag=True, help="Enter debug mode")
+    @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
