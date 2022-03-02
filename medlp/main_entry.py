@@ -186,12 +186,12 @@ def train(ctx, **args):
     )
 
     # ! Synthetic test phase
-    if cargs.debug and not os.path.isfile(data_list):
+    if data_list is None:
         Print('Using synthetic test data...', color='y')
         train_core(
             cargs, 
-            [{"image": None, "label": None}, ] * 20,
-            [{"image": None, "label": None}, ] * 10
+            [{"image": None, "label": None}, ] * 60,
+            [{"image": None, "label": None}, ] * 40
         )
         return cargs
 
@@ -213,6 +213,8 @@ def train(ctx, **args):
     if cargs.partial < 1:
         Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
         train_datalist = train_datalist[: int(len(train_datalist) * cargs.partial)]
+    elif cargs.partial > 1:
+        Print(f"Expect partial < 1, but got'{cargs.partial}'. Ignored.")
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
     if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
