@@ -38,6 +38,8 @@
   <p align="center">
     A Medical Deep Learning Platform
     <br />
+    <i>Make deep-learning easier for medical problems</i>
+    <br />
     <a href="https://gitlab.com/ChingRyu/MeDLP"><strong>Explore the docs »</strong></a>
     <br />
     <br />
@@ -49,10 +51,7 @@
   </p>
 </p>
 
-
-
-<!-- TABLE OF CONTENTS -->
-## Table of Contents
+<!-- ## Table of Contents
 
 * [About the Project](#about-the-project)
   * [Built With](#built-with)
@@ -64,26 +63,37 @@
 * [Contributing](#contributing)
 * [License](#license)
 * [Contact](#contact)
-* [Acknowledgements](#acknowledgements)
+* [Acknowledgements](#acknowledgements) -->
 
-
+<br />
 
 <!-- ABOUT THE PROJECT -->
-## About The Project
+# About The Project
+## Motivation:
+*We are trying to create a comprehensive framework to easily build medical deep-learning applications.*
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+- Friendly interactive interface
+- Good plug and play capacity
+- Various tasks support
+- Easy debug & Good reproducibility
 
+## Design Concept:
+*We aim to disentangle both Data scientist & Archi Engineer, Networks & Pipelines.* \
+You can easily put your own datasets and networks into MeDLP and run it!
+- Data scientists can focus on data collection, analysis and preprocessing.
+- Architecture engineers can focus on exploring network architectures.
 
+<img src="images/disentangle.png" alt="Design Concept" width="650">
 
+<br />
+<br />
 
 <!-- GETTING STARTED -->
-## Getting Started
-
-
+# Getting Started
 
 ### Prerequisites
-
-MeDLP heavily depend on following packages to make it work. Theoretically, these packages will be automatically installed via pip installation.
+MeDLP is powered by [Pytorch](https://pytorch.org), [MONAI](https://monai.io) and [Ignite](https://pytorch-ignite.ai).\
+MeDLP relies heavily on following packages to make it work. Theoretically, these packages will be automatically installed via pip installation. If not, please manually install them.
 * pytorch
 * tb-nightly
 * click
@@ -114,11 +124,28 @@ pip install git+https://gitlab.com/ChingRyu/MeDLP.git
 
 
 <!-- USAGE EXAMPLES -->
-## Usage
+# Usage
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+### MeDLP has 7 different commands: 
+
+- `medlp-train`: Main train entry. Use this command for general DL training process.
+- `medlp-train-from-cfg`: Begin a training process from specified configure file, usually used for reproduction.
+- `medlp-train-and-test`: Begin a full training&testing process automatically.
+- `medlp-test-from-cfg`: Begin a testing processing from specified configure file.
+- `medlp-nni-search`: Use [NNI](https://nni.readthedocs.io) for automatic hyper-parameter tuning. 
+- `medlp-check-data`: Visualize preprocessed input dataset.
+- `medlp-gradcam-from-cfg`: Gradcam visualization.
+
+**Here is a usage example!**\
+<img src="images/usage-example.png" alt="Usage-example" width="650">
+
+### How to use my own dataset & network?
+
+- If you want use your own dataset, first you need to create a simple python script of a configuration to generate your dataset. For more details, please refer to this [readme](medlp/datasets/README.md)
+- If you want try your own network, you need to follow this [steps](medlp/models/README.md) to easily register your network to MeDLP.
+- After preparation, just simply put own dataset/network file into custom folder, and run!
 
 
 <!-- ROADMAP -->
@@ -133,11 +160,11 @@ See the [open issues](https://gitlab.com/ChingRyu/MeDLP/issues) for a list of pr
 
 Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-1. Fork the Project
+<!-- 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+5. Open a Pull Request -->
 
 
 
@@ -159,9 +186,6 @@ Project Link: [https://gitlab.com/ChingRyu/MeDLP](https://gitlab.com/ChingRyu/Me
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
 
-* []()
-* []()
-* []()
 
 
 
