@@ -120,6 +120,7 @@ For users, you can just install via pip.
 ```
 pip install git+https://gitlab.com/ChingRyu/MeDLP.git
 ```
+More details please refer to [install](./install.md).
 
 
 
@@ -171,7 +172,7 @@ Contributions are what make the open source community such an amazing place to b
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the GNU GPL v3.0 License. See `LICENSE` for more information.
 
 
 
