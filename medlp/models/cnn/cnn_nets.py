@@ -3,9 +3,9 @@ from typing import Any
 import os
 import torch
 
-from medlp.models.cnn import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
+from medlp.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
 from medlp.models.cnn.nets.resnet import resnet18, resnet34, resnet50
-from medlp.models.cnn.nets.vgg import vgg9_bn
+from medlp.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
@@ -87,8 +87,8 @@ def medlp_resnet50(
     return resnet50(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "vgg9_bn")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9_bn")
+@CLASSIFICATION_ARCHI.register("2D", "vgg9")
+@CLASSIFICATION_ARCHI.register("3D", "vgg9")
 def medlp_vgg9_bn(
     spatial_dims: int,
     in_channels: int,
@@ -112,6 +112,33 @@ def medlp_vgg9_bn(
     inkwargs["bottleneck_size"] = kwargs.get("bottleneck_size", 5)
 
     return vgg9_bn(pretrained=False, progress=True, **inkwargs)
+
+
+@CLASSIFICATION_ARCHI.register("2D", "vgg11")
+@CLASSIFICATION_ARCHI.register("3D", "vgg11")
+def medlp_vgg11_bn(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    inkwargs = {}
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["is_prunable"] = is_prunable
+    inkwargs["groups"] = n_group
+    inkwargs["bottleneck_size"] = kwargs.get("bottleneck_size", 2)
+
+    return vgg11_bn(pretrained=False, progress=True, **inkwargs)
 
 
 # @SELFLEARNING_ARCHI.register('2D', 'unet')

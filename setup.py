@@ -66,9 +66,9 @@ setup(
         "numpy",
         "scikit-learn",
         "nibabel",
-        "pytorch-ignite==0.4.4",
+        "pytorch-ignite==0.4.7",
         # "nni",
-        "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex>=0.0.3",
+        # "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex>=0.0.3",
         "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
     ],
     entry_points={

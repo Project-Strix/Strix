@@ -291,7 +291,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    from medlp.models.cnn import ARCHI_MAPPING
+    from medlp.models import ARCHI_MAPPING
 
     archilist = list(
         ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()

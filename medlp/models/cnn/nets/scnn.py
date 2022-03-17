@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .vgg import vgg16_bn
 
-from medlp.models.cnn import SEGMENTATION_ARCHI
-
 
 class SCNN(nn.Module):
     def __init__(
