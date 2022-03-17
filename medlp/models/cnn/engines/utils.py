@@ -1,5 +1,5 @@
-import os
 import re
+import torch
 
 
 def get_best_model(folder, float_regex=r"=(-?\d+\.\d+).pt"):
@@ -50,10 +50,10 @@ def get_models(folders, model_type):
     return best_models
 
 
-
 def get_prepare_batch_fn(
     opts, image_key, label_key, multi_input_keys, multi_output_keys
-):
+): 
+    target_type = torch.FloatTensor
     if opts.criterion in ["BCE", "WBCE", "FocalLoss"]:
         target_type = torch.FloatTensor
     elif opts.criterion in ["CE", "WCE"]:
