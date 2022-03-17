@@ -199,7 +199,7 @@ def create_dataset_from_cfg(
         tensor_dim = opts.get("tensor_dim", None)
         if tensor_dim == "2D":
             dataset_ = DATASETYPE["CacheDataset"]
-            args_ = {"cache_rate": 0.0 if phase is "test" else opts.get("preload", 1)}
+            args_ = {"cache_rate": 0.0 if phase == "test" else opts.get("preload", 1)}
         elif tensor_dim == "3D":
             dataset_ = DATASETYPE["PersistentDataset"]
             args_ = {"cache_dir": opts.get("cache_dir", "./")}

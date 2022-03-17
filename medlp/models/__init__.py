@@ -1,21 +1,40 @@
 from pathlib import Path
 from utils_cw import check_dir
 import torch
-import numpy as np
+from medlp.utilities.registry import NetworkRegistry
 
-from medlp.models.cnn.utils import (
-    print_network,
-    output_onehot_transform,
-    PolynomialLRDecay,
-)
+CLASSIFICATION_ARCHI = NetworkRegistry()
+SEGMENTATION_ARCHI = NetworkRegistry()
+SELFLEARNING_ARCHI = NetworkRegistry()
+MULTITASK_ARCHI = NetworkRegistry()
+SIAMESE_ARCHI = NetworkRegistry()
+
+ARCHI_MAPPING = {
+    "segmentation": SEGMENTATION_ARCHI,
+    "classification": CLASSIFICATION_ARCHI,
+    "selflearning": SELFLEARNING_ARCHI,
+    "multitask": MULTITASK_ARCHI,
+    "siamese": SIAMESE_ARCHI,
+}
+
+from medlp.models.cnn.utils import print_network, PolynomialLRDecay
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.layers.ranger21 import Ranger21
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.models.cnn import ARCHI_MAPPING, SIAMESE_ARCHI
 from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
-from medlp.models.cnn.losses import LOSS_MAPPING, DiceFocalLoss, ContrastiveLoss
+from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
+from medlp.utilities.imports import import_file
+from medlp.configures import config as cfg
+from medlp.models.cnn.cnn_nets import *
+from medlp.models.transformer.transformer_nets import *
+
+
+external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_NETWORK_DIR'))
+if external_dataset_dir.is_dir():
+    for f in external_dataset_dir.glob("*.py"):
+        import_file(f.stem, str(f))
 
 
 def get_rcnn_config(archi, backbone):
@@ -53,7 +72,6 @@ def get_network(opts):
         and hasattr(opts, "tensor_dim")
         and hasattr(opts, "output_nc")
     )
-
     options = vars(opts).copy()
     model_name = options.get("model_name")
     dim = 2 if options.pop("tensor_dim") == "2D" else 3
@@ -137,7 +155,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
 
     if opts.output_nc == 1:
         kwargs = {
-            "include_background": False,
+            "include_background": True,
             "sigmoid": True,
             "softmax": False,
             "to_onehot_y": False,

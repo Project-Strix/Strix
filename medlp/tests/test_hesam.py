@@ -1,6 +1,5 @@
 import torch 
-from medlp.models.cnn import ARCHI_MAPPING
-from monai.data.synthetic import create_test_image_2d
+from medlp.models import ARCHI_MAPPING
 
 
 model_type = ARCHI_MAPPING['classification']['2D']['HESAM']

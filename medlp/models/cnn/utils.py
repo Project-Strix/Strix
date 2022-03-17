@@ -58,6 +58,37 @@ class PolynomialLRDecay(_LRScheduler):
         self._last_lr = [group["lr"] for group in self.optimizer.param_groups]
 
 
+def onehot_(data, n_class, verbose=False):
+    if n_class == 1:
+        return data
+
+    if data.ndimension() == 0:
+        data_ = one_hot(data, n_class).squeeze(0)
+    elif data.ndimension() == 1:
+        data_ = one_hot(data, n_class).squeeze(0)
+    elif data.ndimension() == 2:  # first dim is batch
+        data_ = one_hot(data, n_class, dim=1)
+    elif data.ndimension() == 3 and data.shape[1] == 1:
+        data_ = one_hot(data.squeeze(1), n_class, dim=1)
+    else:
+        raise ValueError(
+            f"Cannot handle data ndim: {data.ndimension()}, shape: {data.shape}"
+        )
+    if verbose:
+        print('\tAfter onehot:', type(data_), data_.shape)
+
+    return data_
+
+
+def onehot_process(n_class=2, verbose=False):
+    def _wrapper(data):
+        if verbose:
+            print('\tBefor onehot:', type(data), data.shape)
+        return onehot_(data, n_class, verbose)
+
+    return _wrapper
+
+
 def output_onehot_transform(output, n_classes=3, verbose=False):
     y_pred, y = output["pred"], output["label"]
     if verbose:
@@ -71,26 +102,13 @@ def output_onehot_transform(output, n_classes=3, verbose=False):
     if n_classes == 1:
         return y_pred, y
 
-    def onehot_(data, n_class):
-        if data.ndimension() == 1:
-            data_ = one_hot(data, n_class)
-        elif data.ndimension() == 2:  # first dim is batch
-            data_ = one_hot(data, n_class, dim=1)
-        elif data.ndimension() == 3 and data.shape[1] == 1:
-            data_ = one_hot(data.squeeze(1), n_class, dim=1)
-        else:
-            raise ValueError(
-                f"Cannot handle data ndim: {data.ndimension()}, shape: {data.shape}"
-            )
-        return data_
-
     pred_ = onehot_(y_pred, n_classes)
     true_ = onehot_(y, n_classes)
 
     assert (
         pred_.shape == true_.shape
     ), f"Pred ({pred_.shape}) and True ({true_.shape}) data have different shape"
-    # print('pred, true:', pred_.cpu().numpy(), true_.cpu().numpy())
+
     return pred_, true_
 
 

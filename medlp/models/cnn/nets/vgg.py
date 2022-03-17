@@ -260,8 +260,6 @@ def vgg11(pretrained=False, progress=True, **kwargs):
     return _vgg("vgg11", "A", False, pretrained, progress, **kwargs)
 
 
-# @CLASSIFICATION_ARCHI.register('2D', 'vgg11_bn')
-# @SIAMESE_ARCHI.register('2D', 'vgg11_bn')
 def vgg11_bn(pretrained=False, progress=True, **kwargs):
     r"""VGG 11-layer model (configuration "A") with batch normalization
     `"Very Deep Convolutional Networks For Large-Scale Image Recognition" <https://arxiv.org/pdf/1409.1556.pdf>`_

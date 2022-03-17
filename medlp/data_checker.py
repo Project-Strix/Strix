@@ -247,6 +247,8 @@ def check_data(ctx, **args):
         overlap_m = draw_segmentation_masks
     elif cargs.contour_overlap:
         overlap_m = draw_segmentation_contour
+    else:
+        overlap_m = draw_segmentation_masks
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {

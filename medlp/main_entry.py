@@ -77,7 +77,7 @@ def train_core(cargs, files_train, files_valid):
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
+    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
     if cargs.compact_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
 
@@ -162,7 +162,7 @@ def train(ctx, **args):
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
-    # dump dataset file
+    # ! dump dataset file
     source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
         cargs.data_list
     ].get("SOURCE")
@@ -171,7 +171,7 @@ def train(ctx, **args):
             source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
         )
 
-    # Manually specified train&valid datalist
+    # ! Manually specified train&valid datalist
     if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
@@ -184,6 +184,16 @@ def train(ctx, **args):
     test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
         "TEST_PATH"
     )
+
+    # ! Synthetic test phase
+    if data_list is None:
+        Print('Using synthetic test data...', color='y')
+        train_core(
+            cargs, 
+            [{"image": None, "label": None}, ] * 60,
+            [{"image": None, "label": None}, ] * 40
+        )
+        return cargs
 
     assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
     train_datalist = get_items_from_file(data_list, format="auto")
@@ -203,6 +213,8 @@ def train(ctx, **args):
     if cargs.partial < 1:
         Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
         train_datalist = train_datalist[: int(len(train_datalist) * cargs.partial)]
+    elif cargs.partial > 1:
+        Print(f"Expect partial < 1, but got'{cargs.partial}'. Ignored.")
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
     if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation

@@ -8,10 +8,10 @@ import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
 from medlp.configures import config as cfg
-from medlp.models.cnn.engines.utils import get_models
+from medlp.models.cnn.engines.utils import get_models, get_prepare_batch_fn
 
 from monai_ex.inferers import (
-    SimpleInferer,
+    SimpleInfererEx as SimpleInferer,
     SlidingWindowInferer,
     SlidingWindowInferer2Dfor3D,
 )
@@ -32,7 +32,7 @@ from monai_ex.transforms import (
 from monai_ex.handlers import (
     StatsHandler,
     TensorBoardStatsHandler,
-    TensorBoardImageHandlerEx,
+    TensorBoardImageHandlerEx as TensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
@@ -43,6 +43,7 @@ from monai_ex.handlers import (
     stopping_fn_from_metric,
     NNIReporterHandler,
     TensorboardDumper,
+    from_engine_ex as from_engine,
 )
 
 
@@ -60,19 +61,22 @@ def build_segmentation_engine(**kwargs):
     device = kwargs["device"]
     model_dir = kwargs["model_dir"]
     logger_name = kwargs.get("logger_name", None)
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
     image_ = cfg.get_key("image")
     label_ = cfg.get_key("label")
     pred_ = cfg.get_key("pred")
     loss_ = cfg.get_key("loss")
+    decollate = True
 
-    val_metric = "val_mean_dice"
+    val_metric_name = "val_mean_dice"
     val_handlers = [
         StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric),
-        TensorBoardImageHandlerEx(
+        TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric_name),
+        TensorBoardImageHandler(
             summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
+            batch_transform=from_engine([image_, label_]),
+            output_transform=from_engine(pred_),
             max_channels=opts.output_nc,
             prefix_name="Val",
         ),
@@ -84,7 +88,7 @@ def build_segmentation_engine(**kwargs):
             CheckpointSaverEx(
                 save_dir=model_dir / "Best_Models",
                 save_dict={"net": net},
-                file_prefix=val_metric,
+                file_prefix=val_metric_name,
                 save_key_metric=True,
                 key_metric_n_saved=opts.save_n_best,
                 key_metric_save_after_epoch=0,
@@ -100,7 +104,7 @@ def build_segmentation_engine(**kwargs):
     if opts.nni:
         val_handlers += [
             NNIReporterHandler(
-                metric_name=val_metric, max_epochs=opts.n_epoch, logger_name=logger_name
+                metric_name=val_metric_name, max_epochs=opts.n_epoch, logger_name=logger_name
             )
         ]
 
@@ -122,41 +126,24 @@ def build_segmentation_engine(**kwargs):
             ]
         )
 
-    if opts.criterion in ["CE", "WCE"]:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_].to(device),
-            x[label_].squeeze(dim=1).to(device),
+    key_metric_transform_fn = from_engine([pred_, label_])
+    if opts.output_nc > 1:
+        ch_dim = 0 if decollate else 1
+        key_metric_transform_fn = from_engine(
+            [pred_, label_],
+            transforms=[
+                lambda x: x,
+                lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
+            ]
         )
-        if opts.output_nc > 1:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                one_hot(x[label_].unsqueeze(dim=1), num_classes=opts.output_nc),
-            )
-    elif opts.criterion in ["BCE", "WBCE"]:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_].to(device),
-            torch.as_tensor(x[label_], dtype=torch.float32).to(device),
-        )
-        if opts.output_nc > 1:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                one_hot(x[label_], num_classes=opts.output_nc),
-            )
-    else:
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_].to(device),
-            x[label_].to(device),
-        )
-        if opts.output_nc > 1:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                one_hot(x[label_], num_classes=opts.output_nc),
-            )
-        else:
-            key_metric_transform_fn = lambda x: (
-                x[pred_],
-                x[label_],
-            )
+
+    prepare_batch_fn = get_prepare_batch_fn(
+        opts, image_, label_, multi_input_keys, multi_output_keys
+    )
+
+    key_val_metric = MeanDice(
+        include_background=False, output_transform=key_metric_transform_fn
+    )
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -167,18 +154,15 @@ def build_segmentation_engine(**kwargs):
         else int(opts.n_epoch_len * len(test_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),  # SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
-        post_transform=trainval_post_transforms,
-        key_val_metric={
-            val_metric: MeanDice(
-                include_background=False, output_transform=key_metric_transform_fn
-            )
-        },
+        postprocessing=trainval_post_transforms,
+        key_val_metric={val_metric_name: key_val_metric},
         val_handlers=val_handlers,
         amp=opts.amp,
+        decollate=decollate,
     )
 
     if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x: evaluator.state.metrics[val_metric]
+        lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
     else:
         lr_step_transform = lambda x: ()
 
@@ -193,7 +177,7 @@ def build_segmentation_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=lambda x: x[loss_],
+            output_transform=from_engine(loss_, first=True),
             name=logger_name,
         ),
         CheckpointSaverEx(
@@ -206,14 +190,14 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=lambda x: x[loss_],
+            output_transform=from_engine(loss_),
         ),
-        TensorBoardImageHandlerEx(
+        TensorBoardImageHandler(
             summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
+            batch_transform=from_engine([image_, label_]),
+            output_transform=from_engine(pred_),
             max_channels=opts.output_nc,
-            prefix_name="train",
+            prefix_name="Train",
         ),
     ]
 
@@ -229,7 +213,7 @@ def build_segmentation_engine(**kwargs):
         else int(opts.n_epoch_len * len(train_loader)),
         prepare_batch=prepare_batch_fn,
         inferer=SimpleInferer(),
-        post_transform=trainval_post_transforms,
+        postprocessing=trainval_post_transforms,
         key_train_metric={
             "train_mean_dice": MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
@@ -237,12 +221,13 @@ def build_segmentation_engine(**kwargs):
         },
         train_handlers=train_handlers,
         amp=opts.amp,
+        decollate=decollate,
     )
 
     if opts.early_stop > 0:
         early_stopper = EarlyStopping(
             patience=opts.early_stop,
-            score_function=stopping_fn_from_metric(val_metric),
+            score_function=stopping_fn_from_metric(val_metric_name),
             trainer=trainer,
         )
         evaluator.add_event_handler(
@@ -262,9 +247,12 @@ def build_segmentation_test_engine(**kwargs):
     n_batch = opts.n_batch
     resample = opts.resample
     use_slidingwindow = opts.slidingwindow
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
     image_ = cfg.get_key("image")
     pred_ = cfg.get_key("pred")
     label_ = cfg.get_key("label")
+    decollate = True
     model_path = (
         opts.model_path[0]
         if isinstance(opts.model_path, (list, tuple))
@@ -302,8 +290,8 @@ def build_segmentation_test_engine(**kwargs):
             output_ext=".nii.gz",
             resample=resample,
             data_root_dir=output_filename_check(test_loader.dataset),
-            batch_transform=lambda x: x[image_ + "_meta_dict"],
-            output_transform=lambda output: output[pred_],
+            batch_transform=from_engine(image_ + "_meta_dict"),
+            output_transform=from_engine(pred_),
         ),
     ]
 
@@ -315,41 +303,44 @@ def build_segmentation_test_engine(**kwargs):
                 output_ext=".nii.gz",
                 resample=resample,
                 data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=lambda x: x[image_ + "_meta_dict"],
-                output_transform=lambda output: output[image_],
+                batch_transform=from_engine(image_ + "_meta_dict"),
+                output_transform=from_engine(image_),
             )
         ]
 
     if opts.phase == "test_wo_label":
-        prepare_batch_fn = lambda x, device, nb: (x[image_].to(device), None)
+        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
+            opts, _image_, multi_input_keys
+        )
         key_metric_transform_fn = lambda x: (x[pred_], None)
         key_val_metric = None
     elif opts.phase == "test":
-        prepare_batch_fn = lambda x, device, nb: (
-            x[image_].to(device),
-            x[label_].to(device),
+        prepare_batch_fn = get_prepare_batch_fn(
+            opts, image_, label_, multi_input_keys, multi_output_keys
         )
-        key_metric_transform_fn = lambda x: (
-            one_hot(x[pred_], num_classes=opts.output_nc),
-            one_hot(x[label_], num_classes=opts.output_nc),
-        )
+        key_metric_transform_fn = from_engine([pred_, label_])
+        if opts.output_nc > 1:
+            ch_dim = 0 if decollate else 1
+            key_metric_transform_fn = from_engine(
+                [pred_, label_],
+                transforms=[
+                    lambda x: x,
+                    lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
+                ]
+            )
         key_val_metric = {
             "val_mean_dice": MeanDice(
                 include_background=False, output_transform=key_metric_transform_fn
             )
         }
 
+    # SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
     if use_slidingwindow:
-        if opts.tensor_dim == "2D":
-            inferer = SlidingWindowInferer2Dfor3D(
-                roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6
-            )
-        elif opts.tensor_dim == "3D":
-            inferer = SlidingWindowInferer(
-                roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
-            )
+        inferer = SlidingWindowInferer(
+            roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
+        )
     else:
-        SimpleInferer()
+        inferer = SimpleInferer()
 
     evaluator = SupervisedEvaluator(
         device=device,
@@ -357,7 +348,7 @@ def build_segmentation_test_engine(**kwargs):
         network=net,
         prepare_batch=prepare_batch_fn,
         inferer=inferer,
-        post_transform=post_transforms,
+        postprocessing=post_transforms,
         key_val_metric=key_val_metric,
         val_handlers=val_handlers,
         amp=opts.amp,
