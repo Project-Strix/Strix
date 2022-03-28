@@ -19,7 +19,8 @@ DIMS = get_enums(Dims)
 class Phases(Enum):
     TRAIN = "train"
     VALID = "valid"
-    TEST = "test"
+    TEST_IN = "test"
+    TEST_EX = "test_wo_label"
 
 
 PHASES = get_enums(Phases)

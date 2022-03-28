@@ -1,4 +1,3 @@
-import os
 import re
 import logging
 import copy
@@ -7,13 +6,13 @@ from pathlib import Path
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
+from medlp.utilities.enum import Phases
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.utils import get_models, get_prepare_batch_fn
 
 from monai_ex.inferers import (
     SimpleInfererEx as SimpleInferer,
-    SlidingWindowInferer,
-    SlidingWindowInferer2Dfor3D,
+    SlidingWindowInferer
 )
 from monai_ex.networks import one_hot
 from ignite.engine import Events
@@ -308,13 +307,13 @@ def build_segmentation_test_engine(**kwargs):
             )
         ]
 
-    if opts.phase == "test_wo_label":
+    if opts.phase == Phases.TEST_EX:
         prepare_batch_fn = get_unsupervised_prepare_batch_fn(
             opts, _image_, multi_input_keys
         )
         key_metric_transform_fn = lambda x: (x[pred_], None)
         key_val_metric = None
-    elif opts.phase == "test":
+    elif opts.phase == Phases.TEST_IN:
         prepare_batch_fn = get_prepare_batch_fn(
             opts, image_, label_, multi_input_keys, multi_output_keys
         )

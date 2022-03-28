@@ -11,6 +11,7 @@ from utils_cw import Print, get_items_from_file, check_dir
 from medlp.models import get_engine
 from medlp.data_io.dataio import get_dataloader, DATASET_MAPPING
 from medlp.utilities.utils import detect_port, parse_nested_data
+from medlp.utilities.enum import Phases
 from medlp.utilities.click_ex import get_nni_exp_name
 
 from torch.utils.tensorboard import SummaryWriter
@@ -76,8 +77,8 @@ def train_nni(**kwargs):
         with open(os.path.join(cargs.experiment_path, "test_files.yml"), "w") as f:
             yaml.dump(files_valid, f)
 
-        train_loader = get_dataloader(cargs, files_train, phase="train")
-        valid_loader = get_dataloader(cargs, files_valid, phase="valid")
+        train_loader = get_dataloader(cargs, files_train, phase=Phases.TRAIN)
+        valid_loader = get_dataloader(cargs, files_valid, phase=Phases.VALID)
 
         # Tensorboard Logger
         writer = SummaryWriter(

@@ -37,30 +37,6 @@ if external_dataset_dir.is_dir():
         import_file(f.stem, str(f))
 
 
-def get_rcnn_config(archi, backbone):
-    folder = Path(__file__).parent.parent.joinpath("misc/config")
-    return {
-        "mask_rcnn": {
-            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
-            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
-        },
-        "faster_rcnn": {
-            "R-50-FPN": folder / "fcos_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "fcos_R_101_FPN_2x.yaml",
-        },
-        "fcos": {
-            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
-            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
-        },
-        "retina": {
-            "R-50-FPN": folder / "retinanet_R-50-FPN_1x.yaml",
-            "R-101-FPN": folder / "retinanet_R-101-FPN_1x.yaml",
-        },
-    }[archi][backbone]
-
-
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
 

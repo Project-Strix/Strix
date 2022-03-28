@@ -16,9 +16,10 @@ from types import SimpleNamespace as sn
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 from medlp.configures import config as cfg
+from medlp.utilities.enum import Phases
 import medlp.utilities.click_callbacks as clb
+from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -57,8 +58,8 @@ def train_core(cargs, files_train, files_valid):
     with open(os.path.join(cargs.experiment_path, "valid_files.yml"), "w") as f:
         yaml.dump(files_valid, f)
 
-    train_loader = get_dataloader(cargs, files_train, phase="train")
-    valid_loader = get_dataloader(cargs, files_valid, phase="valid")
+    train_loader = get_dataloader(cargs, files_train, phase=Phases.TRAIN)
+    valid_loader = get_dataloader(cargs, files_valid, phase=Phases.VALID)
 
     # Tensorboard Logger
     writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, "tensorboard"))
@@ -395,7 +396,7 @@ def test_cfg(**args):
         model_list = [clb.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
-    phase = "test" if args["with_label"] else "test_wo_label"
+    phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
     configures["experiment_path"] = exp_dir

@@ -8,6 +8,7 @@ from functools import partial
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import output_filename_check, get_attr_
+from medlp.utilities.enum import Phases
 from medlp.models.cnn.utils import output_onehot_transform, onehot_process
 from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
 from medlp.configures import config as cfg
@@ -264,7 +265,7 @@ def build_classification_test_engine(**kwargs):
     device = kwargs["device"]
     logger_name = kwargs.get("logger_name", None)
     is_multilabel = opts.output_nc > 1
-    is_supervised = kwargs.get("is_supervised", opts.phase == "test")
+    is_supervised = kwargs.get("is_supervised", opts.phase == Phases.TEST_IN)
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
     output_latent_code = kwargs.get("output_latent_code", False)
@@ -354,7 +355,7 @@ def build_classification_test_engine(**kwargs):
     ]
 
     if get_attr_(opts, "save_results", True):
-        has_label = opts.phase == "test"
+        has_label = opts.phase == Phases.TEST_IN
         val_handlers += [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
@@ -471,7 +472,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     logger_name = kwargs.get("logger_name", None)
     logger = logging.getLogger(logger_name)
     is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase == "test"
+    is_supervised = opts.phase == Phases.TEST_IN
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
     _image_ = cfg.get_key("image")

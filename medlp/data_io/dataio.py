@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader as _TorchDataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
 from medlp.utilities.registry import DatasetRegistry
+from medlp.utilities.enum import Phases
 from monai_ex.data import DataLoader
 from medlp.configures import config as cfg
 import pandas as pd
@@ -22,26 +23,26 @@ DATASET_MAPPING = {
 
 
 def get_default_setting(phase, **kwargs):
-    if phase == "train":  # Todo: move this part to each dataset
+    if phase == Phases.TRAIN:  # Todo: move this part to each dataset
         shuffle = kwargs.get("train_shuffle", True)
         batch_size = kwargs.get("train_n_batch", 5)
         num_workers = kwargs.get("train_n_workers", 10)
         drop_last = kwargs.get("train_drop_last", True)
         pin_memory = kwargs.get("train_pin_memory", True)
-    elif phase == "valid":
+    elif phase == Phases.VALID:
         shuffle = kwargs.get("valid_shuffle", True)
         batch_size = kwargs.get("valid_n_batch", 1)
         num_workers = kwargs.get("valid_n_workers", 1)
         drop_last = kwargs.get("valid_drop_last", False)
         pin_memory = kwargs.get("valid_pin_memory", True)
-    elif phase == "test" or phase == "test_wo_label":
+    elif phase == Phases.TEST_IN or phase == Phases.TEST_EX:
         shuffle = kwargs.get("test_shuffle", False)
         batch_size = kwargs.get("test_n_batch", 1)
         num_workers = kwargs.get("test_n_workers", 1)
         drop_last = kwargs.get("test_drop_last", False)
         pin_memory = kwargs.get("test_pin_memory", True)
     else:
-        raise ValueError(f"phase must be in 'train,valid,test', but got {phase}")
+        raise ValueError(f"Phase must be in 'train,valid,test', but got {phase}")
 
     return {
         "batch_size": batch_size,
@@ -52,7 +53,7 @@ def get_default_setting(phase, **kwargs):
     }
 
 
-def get_dataloader(args, files_list, phase="train"):
+def get_dataloader(args, files_list, phase):
     params = get_default_setting(
         phase, train_n_batch=args.n_batch, valid_n_batch=4
     )  #! How to customize?
