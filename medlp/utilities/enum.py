@@ -123,7 +123,7 @@ class LayerOrders(Enum):
 LAYER_ORDERS = get_enums(LayerOrders)
 
 
-class Optimizers(enum):
+class Optimizers(Enum):
     SGD = "sgd"
     ADAM = "adam"
     ADAMW = "adamw"
@@ -133,19 +133,3 @@ class Optimizers(enum):
 
 OPTIMIZERS = get_enums(Optimizers)
 
-# CNN_MODEL_TYPES = ["vgg9", "vgg13", "vgg16", "resnet18", "resnet34", "resnet50"]
-# FCN_MODEL_TYPES = [
-#     "unet",
-#     "res-unet",
-#     "unetv2",
-#     "res-unetv2",
-#     "scnn",
-#     "highresnet",
-#     "vnet",
-# ]
-# RCNN_MODEL_TYPES = ["mask_rcnn", "faster_rcnn", "fcos", "retina"]
-# NETWORK_TYPES = {
-#     "CNN": CNN_MODEL_TYPES,
-#     "FCN": FCN_MODEL_TYPES,
-#     "RCNN": RCNN_MODEL_TYPES,
-# }

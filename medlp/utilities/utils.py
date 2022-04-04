@@ -20,7 +20,7 @@ import numpy as np
 
 import matplotlib.cm as mpl_color_map
 
-from medlp.utilities.enum import LR_SCHEDULE
+from medlp.utilities.enum import LR_SCHEDULES
 from monai_ex.utils import ensure_list
 import tensorboard.compat.proto.event_pb2 as event_pb2
 
@@ -276,7 +276,7 @@ def parse_nested_data(data):
             value_ = value.copy()
             if key == "lr_policy":
                 policy_name = value_.get("_name", None)
-                if policy_name in LR_SCHEDULE:
+                if policy_name in LR_SCHEDULES:
                     params[key] = policy_name
                     value_.pop("_name")
                     params["lr_policy_params"] = value_

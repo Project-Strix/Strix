@@ -21,7 +21,6 @@ from medlp.models.cnn.utils import print_network, PolynomialLRDecay
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.layers.ranger21 import Ranger21
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
@@ -70,8 +69,6 @@ def get_network(opts):
     if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
         loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
         siamese = "single" if loss_type == ContrastiveLoss else "multi"
-        raise NotImplementedError
-    elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
 
     try:
