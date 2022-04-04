@@ -75,13 +75,13 @@ def build_classification_engine(**kwargs):
     is_multilabel = opts.output_nc > 1
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
-    _image_ = cfg.get_key("image")
-    _label_ = cfg.get_key("label")
-    _pred_ = cfg.get_key("pred")
-    _loss_ = cfg.get_key("loss")
+    _image = cfg.get_key("image")
+    _label = cfg.get_key("label")
+    _pred = cfg.get_key("pred")
+    _loss = cfg.get_key("loss")
 
     prepare_batch_fn = get_prepare_batch_fn(
-        opts, _image_, _label_, multi_input_keys, multi_output_keys
+        opts, _image, _label, multi_input_keys, multi_output_keys
     )
 
     if is_multilabel:
@@ -99,7 +99,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=from_engine(_image_),
+            output_transform=from_engine(_image),
             max_channels=1,
             prefix_name="Val",
         ),
@@ -136,17 +136,17 @@ def build_classification_engine(**kwargs):
     if opts.output_nc == 1:
         train_post_transforms = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, sigmoid=True),
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, sigmoid=True),
                 # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         train_post_transforms = Compose(
             [
-                ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=None),
-                EnsureTypeD(keys=[_pred_, _label_]),
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
+                EnsureTypeD(keys=[_pred, _label]),
             ]
         )
 
@@ -154,7 +154,7 @@ def build_classification_engine(**kwargs):
         key_val_metric = Accuracy(
             # output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
             output_transform=from_engine(
-                [_pred_, _label_],
+                [_pred, _label],
                 onehot_process(opts.output_nc),
             ),
             is_multilabel=is_multilabel,
@@ -162,7 +162,7 @@ def build_classification_engine(**kwargs):
     else:
         key_val_metric = ROCAUC(
             output_transform=from_engine(
-                [_pred_, _label_], onehot_process(opts.output_nc)
+                [_pred, _label], onehot_process(opts.output_nc)
             )
         )
 
@@ -199,13 +199,13 @@ def build_classification_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=from_engine(_loss_, first=True),
+            output_transform=from_engine(_loss, first=True),
             name=logger_name,
         ),
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=from_engine(_loss_),
+            output_transform=from_engine(_loss),
         ),
         CheckpointSaverEx(
             save_dir=model_dir / "Checkpoint",
@@ -217,7 +217,7 @@ def build_classification_engine(**kwargs):
         TensorBoardImageHandlerEx(
             summary_writer=writer,
             batch_transform=lambda x: (None, None),
-            output_transform=from_engine(_image_),
+            output_transform=from_engine(_image),
             max_channels=1,
             prefix_name="Train",
         ),
@@ -272,10 +272,10 @@ def build_classification_test_engine(**kwargs):
     target_latent_layer = kwargs.get("target_latent_layer", None)
     root_dir = output_filename_check(test_loader.dataset)
     decollate = True
-    _image_ = cfg.get_key("image")
-    _label_ = cfg.get_key("label")
-    _pred_ = cfg.get_key("pred")
-    _acti_ = cfg.get_key("forward")
+    _image = cfg.get_key("image")
+    _label = cfg.get_key("label")
+    _pred = cfg.get_key("pred")
+    _acti = cfg.get_key("forward")
 
     model_path = (
         opts.model_path[0]
@@ -285,11 +285,11 @@ def build_classification_test_engine(**kwargs):
 
     if is_supervised:
         prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image_, _label_, multi_input_keys, multi_output_keys
+            opts, _image, _label, multi_input_keys, multi_output_keys
         )
     else:
         prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-            opts, _image_, multi_input_keys
+            opts, _image, multi_input_keys
         )
 
     def debug(data):
@@ -299,53 +299,53 @@ def build_classification_test_engine(**kwargs):
     if not is_multilabel:
         saver_post_transform = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, sigmoid=True),
-                from_engine(_pred_)
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, sigmoid=True),
+                from_engine(_pred)
             ],
             first=False,
         )
         acc_post_transforms = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, sigmoid=True),
-                AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                from_engine([_pred_, _label_], ensure_dim=decollate),
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+                from_engine([_pred, _label], ensure_dim=decollate),
             ],
             first=decollate,
         )
         auc_post_transforms = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, sigmoid=True),
-                from_engine([_pred_, _label_], ensure_dim=decollate),
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, sigmoid=True),
+                from_engine([_pred, _label], ensure_dim=decollate),
             ],
             first=decollate,
         )
     else:
         saver_post_transform = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=None),
-                from_engine(_pred_)
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
+                from_engine(_pred)
             ],
             first=False,
         )
         acc_post_transforms = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                from_engine([_pred_, _label_], onehot_process(opts.output_nc)),
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(keys=_pred, argmax=True, to_onehot=False),
+                from_engine([_pred, _label], onehot_process(opts.output_nc)),
             ]
         )
         auc_post_transforms = Compose(
             [
-                EnsureTypeD(keys=[_pred_, _label_]),
-                ActivationsD(keys=_pred_, softmax=True),
-                AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                from_engine([_pred_, _label_], onehot_process(opts.output_nc)),
+                EnsureTypeD(keys=[_pred, _label]),
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(keys=_pred, argmax=True, to_onehot=False),
+                from_engine([_pred, _label], onehot_process(opts.output_nc)),
             ]
         )
 
@@ -360,16 +360,16 @@ def build_classification_test_engine(**kwargs):
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
                 save_labels=has_label,
-                batch_transform=from_engine([_image_ + "_meta_dict", _label_])
+                batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
-                else from_engine(_image_ + "_meta_dict"),
+                else from_engine(_image + "_meta_dict"),
                 output_transform=saver_post_transform,
             ),
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
                 filename="logits.csv",
-                batch_transform=from_engine(_image_ + "_meta_dict"),
-                output_transform=from_engine(_pred_),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=from_engine(_pred),
             ),
         ]
 
@@ -377,12 +377,12 @@ def build_classification_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaver(
                 output_dir=opts.out_dir,
-                output_postfix=_image_,
+                output_postfix=_image,
                 data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
-                batch_transform=from_engine(_image_ + "_meta_dict"),
-                output_transform=from_engine(_image_),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=from_engine(_image),
             )
         ]
 
@@ -393,8 +393,8 @@ def build_classification_test_engine(**kwargs):
                 filename="latent",
                 data_root_dir=root_dir,
                 overwrite=True,
-                batch_transform=from_engine(_image_ + "_meta_dict"),
-                output_transform=from_engine(_acti_),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=from_engine(_acti),
                 name=logger_name,
                 save_to_np=True,
                 save_as_onefile=True,
@@ -475,9 +475,9 @@ def build_classification_ensemble_test_engine(**kwargs):
     is_supervised = opts.phase == Phases.TEST_IN
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
-    _image_ = cfg.get_key("image")
-    _label_ = cfg.get_key("label")
-    _pred_ = cfg.get_key("pred")
+    _image = cfg.get_key("image")
+    _label = cfg.get_key("label")
+    _pred = cfg.get_key("pred")
 
     cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
     cv_folders = filter(lambda x: x.is_dir(), cv_folders)
@@ -533,15 +533,15 @@ def build_classification_ensemble_test_engine(**kwargs):
             None
         )
 
-    pred_keys = [f"{_pred_}{i}" for i in range(len(model_list))]
+    pred_keys = [f"{_pred}{i}" for i in range(len(model_list))]
 
     if is_supervised:
         prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image_, _label_, multi_input_keys, multi_output_keys
+            opts, _image, _label, multi_input_keys, multi_output_keys
         )
     else:
         prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-            opts, _image_, multi_input_keys
+            opts, _image, multi_input_keys
         )
 
     if opts.output_nc == 1:  # ensemble_type is 'mean':
@@ -551,29 +551,29 @@ def build_classification_ensemble_test_engine(**kwargs):
             w_ = None
         post_transforms = MeanEnsembleD(
             keys=pred_keys,
-            output_key=_pred_,
+            output_key=_pred,
             # in this particular example, we use validation metrics as weights
             weights=w_,
         )
 
         acc_post_transforms = Compose(
             [
-                ActivationsD(keys=_pred_, sigmoid=True),
-                AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
         )
         auc_post_transforms = Compose(
             [
-                ActivationsD(keys=_pred_, sigmoid=True),
+                ActivationsD(keys=_pred, sigmoid=True),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
         )
         ClsSaver_transform = Compose(
             [
-                ActivationsD(keys=_pred_, sigmoid=True),
-                AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                lambda x: x[_pred_].cpu().numpy(),
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+                lambda x: x[_pred].cpu().numpy(),
             ]
         )
 
@@ -586,7 +586,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
                 VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred_, num_classes=opts.output_nc
+                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
                 ),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
@@ -597,7 +597,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
                 VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred_, num_classes=opts.output_nc
+                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
                 ),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
@@ -608,7 +608,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
                 VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred_, num_classes=opts.output_nc
+                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
                 ),
             ]
         )
@@ -617,7 +617,7 @@ def build_classification_ensemble_test_engine(**kwargs):
         StatsHandler(output_transform=lambda x: None, name=logger_name),
         ClassificationSaverEx(
             output_dir=opts.out_dir,
-            batch_transform=lambda x: x[_image_ + "_meta_dict"],
+            batch_transform=lambda x: x[_image + "_meta_dict"],
             output_transform=ClsSaver_transform,
         ),
     ]
@@ -627,12 +627,12 @@ def build_classification_ensemble_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaver(
                 output_dir=opts.out_dir,
-                output_postfix=_image_,
+                output_postfix=_image,
                 data_root_dir=root_dir,
                 resample=False,
                 mode="bilinear",
-                batch_transform=lambda x: x[_image_ + "_meta_dict"],
-                output_transform=lambda x: x[_image_],
+                batch_transform=lambda x: x[_image + "_meta_dict"],
+                output_transform=lambda x: x[_image],
             )
         ]
 
