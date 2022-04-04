@@ -26,4 +26,4 @@ if not cfg_file.is_file():
 
         conf.write(cfgfile)
 
-cfg.init()
+cfg.init(add_path=True)
