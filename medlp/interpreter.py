@@ -14,6 +14,7 @@ from ignite.utils import setup_logger
 from medlp.models import get_test_engine
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.utils import get_specify_file
+from medlp.utilities.enum import Phases
 from medlp.utilities.click_ex import NumericChoice as Choice, parse_input_str
 from medlp.utilities.click_callbacks import get_trained_models
 from monai_ex.handlers import GradCamHandler
@@ -93,7 +94,7 @@ def gradcam(**args):
     elif args["n_sample"] > 0:
         test_files = test_files[: args["n_sample"]]
 
-    phase = "test_wo_label"
+    phase = Phases.TEST_EX
     configures["preload"] = 0.0
     configures["phase"] = phase
     configures["experiment_path"] = exp_dir

@@ -21,7 +21,6 @@ from medlp.models.cnn.utils import print_network, PolynomialLRDecay
 from medlp.models.cnn.layers.radam import RAdam
 from medlp.models.cnn.layers.ranger21 import Ranger21
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.enum import RCNN_MODEL_TYPES
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
@@ -35,30 +34,6 @@ external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_NETWORK_DIR'))
 if external_dataset_dir.is_dir():
     for f in external_dataset_dir.glob("*.py"):
         import_file(f.stem, str(f))
-
-
-def get_rcnn_config(archi, backbone):
-    folder = Path(__file__).parent.parent.joinpath("misc/config")
-    return {
-        "mask_rcnn": {
-            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
-            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
-        },
-        "faster_rcnn": {
-            "R-50-FPN": folder / "fcos_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "fcos_R_101_FPN_2x.yaml",
-        },
-        "fcos": {
-            "R-50-C4": folder / "e2e_mask_rcnn_R_50_C4_1x.yaml",
-            "R-50-FPN": folder / "e2e_mask_rcnn_R_50_FPN_1x.yaml",
-            "R-101-FPN": folder / "e2e_mask_rcnn_R_101_FPN_1x.yaml",
-        },
-        "retina": {
-            "R-50-FPN": folder / "retinanet_R-50-FPN_1x.yaml",
-            "R-101-FPN": folder / "retinanet_R-101-FPN_1x.yaml",
-        },
-    }[archi][backbone]
 
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
@@ -94,8 +69,6 @@ def get_network(opts):
     if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
         loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
         siamese = "single" if loss_type == ContrastiveLoss else "multi"
-        raise NotImplementedError
-    elif model_name in RCNN_MODEL_TYPES:
         raise NotImplementedError
 
     try:

@@ -1,4 +1,3 @@
-import os
 import re
 import logging
 import copy
@@ -7,13 +6,13 @@ from pathlib import Path
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
+from medlp.utilities.enum import Phases
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.utils import get_models, get_prepare_batch_fn
 
 from monai_ex.inferers import (
     SimpleInfererEx as SimpleInferer,
-    SlidingWindowInferer,
-    SlidingWindowInferer2Dfor3D,
+    SlidingWindowInferer
 )
 from monai_ex.networks import one_hot
 from ignite.engine import Events
@@ -63,10 +62,10 @@ def build_segmentation_engine(**kwargs):
     logger_name = kwargs.get("logger_name", None)
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
-    image_ = cfg.get_key("image")
-    label_ = cfg.get_key("label")
-    pred_ = cfg.get_key("pred")
-    loss_ = cfg.get_key("loss")
+    _image = cfg.get_key("image")
+    _label = cfg.get_key("label")
+    _pred = cfg.get_key("pred")
+    _loss = cfg.get_key("loss")
     decollate = True
 
     val_metric_name = "val_mean_dice"
@@ -75,8 +74,8 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric_name),
         TensorBoardImageHandler(
             summary_writer=writer,
-            batch_transform=from_engine([image_, label_]),
-            output_transform=from_engine(pred_),
+            batch_transform=from_engine([_image, _label]),
+            output_transform=from_engine(_pred),
             max_channels=opts.output_nc,
             prefix_name="Val",
         ),
@@ -111,26 +110,26 @@ def build_segmentation_engine(**kwargs):
     if opts.output_nc == 1:
         trainval_post_transforms = Compose(
             [
-                ActivationsD(keys=pred_, sigmoid=True),
-                AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         trainval_post_transforms = Compose(
             [
-                ActivationsD(keys=pred_, softmax=True),
+                ActivationsD(keys=_pred, softmax=True),
                 AsDiscreteD(
-                    keys=pred_, to_onehot=True, argmax=True, n_classes=opts.output_nc
+                    keys=_pred, to_onehot=True, argmax=True, n_classes=opts.output_nc
                 ),
                 # KeepLargestConnectedComponentD(keys=pred_, applied_labels=[1], independent=False),
             ]
         )
 
-    key_metric_transform_fn = from_engine([pred_, label_])
+    key_metric_transform_fn = from_engine([_pred, _label])
     if opts.output_nc > 1:
         ch_dim = 0 if decollate else 1
         key_metric_transform_fn = from_engine(
-            [pred_, label_],
+            [_pred, _label],
             transforms=[
                 lambda x: x,
                 lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
@@ -138,7 +137,7 @@ def build_segmentation_engine(**kwargs):
         )
 
     prepare_batch_fn = get_prepare_batch_fn(
-        opts, image_, label_, multi_input_keys, multi_output_keys
+        opts, _image, _label, multi_input_keys, multi_output_keys
     )
 
     key_val_metric = MeanDice(
@@ -177,7 +176,7 @@ def build_segmentation_engine(**kwargs):
         ),
         StatsHandler(
             tag_name="train_loss",
-            output_transform=from_engine(loss_, first=True),
+            output_transform=from_engine(_loss, first=True),
             name=logger_name,
         ),
         CheckpointSaverEx(
@@ -190,12 +189,12 @@ def build_segmentation_engine(**kwargs):
         TensorBoardStatsHandler(
             summary_writer=writer,
             tag_name="train_loss",
-            output_transform=from_engine(loss_),
+            output_transform=from_engine(_loss),
         ),
         TensorBoardImageHandler(
             summary_writer=writer,
-            batch_transform=from_engine([image_, label_]),
-            output_transform=from_engine(pred_),
+            batch_transform=from_engine([_image, _label]),
+            output_transform=from_engine(_pred),
             max_channels=opts.output_nc,
             prefix_name="Train",
         ),
@@ -249,9 +248,9 @@ def build_segmentation_test_engine(**kwargs):
     use_slidingwindow = opts.slidingwindow
     multi_input_keys = kwargs.get("multi_input_keys", None)
     multi_output_keys = kwargs.get("multi_output_keys", None)
-    image_ = cfg.get_key("image")
-    pred_ = cfg.get_key("pred")
-    label_ = cfg.get_key("label")
+    _image = cfg.get_key("image")
+    _pred = cfg.get_key("pred")
+    _label = cfg.get_key("label")
     decollate = True
     model_path = (
         opts.model_path[0]
@@ -268,16 +267,16 @@ def build_segmentation_test_engine(**kwargs):
     if opts.output_nc == 1:
         post_transforms = Compose(
             [
-                ActivationsD(keys=pred_, sigmoid=True),
-                AsDiscreteD(keys=pred_, threshold_values=True, logit_thresh=0.5),
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
             ]
         )
     else:
         post_transforms = Compose(
             [
-                ActivationsD(keys=pred_, softmax=True),
+                ActivationsD(keys=_pred, softmax=True),
                 AsDiscreteD(
-                    keys=pred_, argmax=True, to_onehot=False, n_classes=opts.output_nc
+                    keys=_pred, argmax=True, to_onehot=False, n_classes=opts.output_nc
                 ),
             ]
         )
@@ -290,8 +289,8 @@ def build_segmentation_test_engine(**kwargs):
             output_ext=".nii.gz",
             resample=resample,
             data_root_dir=output_filename_check(test_loader.dataset),
-            batch_transform=from_engine(image_ + "_meta_dict"),
-            output_transform=from_engine(pred_),
+            batch_transform=from_engine(_image + "_meta_dict"),
+            output_transform=from_engine(_pred),
         ),
     ]
 
@@ -299,30 +298,30 @@ def build_segmentation_test_engine(**kwargs):
         val_handlers += [
             SegmentationSaver(
                 output_dir=opts.out_dir,
-                output_postfix=image_,
+                output_postfix=_image,
                 output_ext=".nii.gz",
                 resample=resample,
                 data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=from_engine(image_ + "_meta_dict"),
-                output_transform=from_engine(image_),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=from_engine(_image),
             )
         ]
 
-    if opts.phase == "test_wo_label":
+    if opts.phase == Phases.TEST_EX:
         prepare_batch_fn = get_unsupervised_prepare_batch_fn(
             opts, _image_, multi_input_keys
         )
-        key_metric_transform_fn = lambda x: (x[pred_], None)
+        key_metric_transform_fn = lambda x: (x[_pred], None)
         key_val_metric = None
-    elif opts.phase == "test":
+    elif opts.phase == Phases.TEST_IN:
         prepare_batch_fn = get_prepare_batch_fn(
-            opts, image_, label_, multi_input_keys, multi_output_keys
+            opts, _image, _label, multi_input_keys, multi_output_keys
         )
-        key_metric_transform_fn = from_engine([pred_, label_])
+        key_metric_transform_fn = from_engine([_pred, _label])
         if opts.output_nc > 1:
             ch_dim = 0 if decollate else 1
             key_metric_transform_fn = from_engine(
-                [pred_, label_],
+                [_pred, _label],
                 transforms=[
                     lambda x: x,
                     lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)

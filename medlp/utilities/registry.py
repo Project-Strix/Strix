@@ -84,7 +84,7 @@ class DimRegistry(dict):
         self["3D"] = {}
 
     def register(self, dim, module_name, module=None):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
+        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
@@ -113,7 +113,7 @@ class NetworkRegistry(DimRegistry):
                 )
 
     def register(self, dim, module_name, module=None):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
+        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
@@ -142,7 +142,7 @@ class DatasetRegistry(DimRegistry):
         test_filepath: Optional[str] = None,
         module=None,
     ):
-        assert dim in DIMS, "Only support 2D&3D dataset now"
+        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:

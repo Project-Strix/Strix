@@ -1,86 +1,135 @@
 # All enum variables
+from enum import Enum
 
 BUILTIN_TYPES = [dict, list, tuple, str, int, float, bool]
 
-DIMS = ["2D", "3D", "2", "3", 2, 3]
-PHASES = ["train", "valid", "test"]
-NORM_TYPES = ["batch", "instance", "group"]
-ACT_TYPES = [
-    "relu",
-    "leakyrelu",
-    "prelu",
-    "selu",
-    "celu",
-    "gelu",
-    "sigmoid",
-    "tanh",
-    "softmax",
-    "logsoftmax",
-    "swish",
-    "mish"
-]
-LOSSES = [
-    "CE",
-    "WCE",
-    "BCE",
-    "WBCE",
-    "MSE",
-    "DCE",
-    "GDL",
-    "CE-DCE",
-    "WCE-DCE",
-    "FocalLoss",
-    "DiceFocalLoss",
-]
-LR_SCHEDULE = ["const", "poly", "step", 'multistep', "SGDR", "plateau"]
-FRAMEWORK_TYPES = [
-    "segmentation",
-    "classification",
-    "siamese",
-    "selflearning",
-    "detection",
-    "multitask",
-]
 
-NETWORK_ARGS = [
-    "spatial_dims",
-    "in_channels",
-    "out_channels",
-    "act",
-    "norm",
-    "n_depth",
-    "n_group",
-    "drop_out",
-    "is_prunable",
-    "pretrained",
-    "pretrained_model_path"
-]
+def get_enums(enum_class):
+    return [item.value for item in enum_class.__members__.values()]
 
-LAYER_ORDERS = ["crb", "cbr", "cgr", "cbe", "abn"]
-OPTIM_TYPES = ["sgd", "adam", "adamw", "radam", "ranger"]
 
-CNN_MODEL_TYPES = ["vgg9", "vgg13", "vgg16", "resnet18", "resnet34", "resnet50"]
-FCN_MODEL_TYPES = [
-    "unet",
-    "res-unet",
-    "unetv2",
-    "res-unetv2",
-    "scnn",
-    "highresnet",
-    "vnet",
-]
-RCNN_MODEL_TYPES = ["mask_rcnn", "faster_rcnn", "fcos", "retina"]
-NETWORK_TYPES = {
-    "CNN": CNN_MODEL_TYPES,
-    "FCN": FCN_MODEL_TYPES,
-    "RCNN": RCNN_MODEL_TYPES,
-}
-RCNN_BACKBONE = [
-    "R-50-C4",
-    "R-50-C5",
-    "R-101-C4",
-    "R-101-C5",
-    "R-50-FPN",
-    "R-101-FPN",
-    "R-152-FPN",
-]
+class Dims(Enum):
+    TWO = "2D"
+    THREE = "3D"
+
+
+DIMS = get_enums(Dims)
+
+
+class Phases(Enum):
+    TRAIN = "train"
+    VALID = "valid"
+    TEST_IN = "test"
+    TEST_EX = "test_wo_label"
+
+
+PHASES = get_enums(Phases)
+
+
+class Norms(Enum):
+    BATCH = "batch"
+    INSTANCE = "instance"
+    LAYER = "layer"
+    GROUP = "group"
+
+
+NORMS = get_enums(Norms)
+
+
+class Activations(Enum):
+    RELU = "relu"
+    LEAKYRELU = "leakyrelu"
+    PRELU = "prelu"
+    SELU = "selu"
+    CELU = "celu"
+    GELU = "gelu"
+    SIGMOID = "sigmoid"
+    TANH = "tanh"
+    SOFTMAX = "softmax"
+    LOGSOFTMAX = "logsoftmax"
+    SWISH = "swish"
+    MISH = "mish"
+
+
+ACTIVATIONS = get_enums(Activations)
+
+
+class Losses(Enum):
+    CE = "CE"
+    WCE = "WCE"
+    BCE = "BCE"
+    WBCE = "WBCE"
+    MSE = "MSE"
+    DCE = "DCE"
+    GDL = "GDL"
+    CE_DCE = "CE-DCE"
+    WCE_DCE = "WCE-DCE"
+    FOCAL = "FocalLoss"
+    DICE_FOCAL = "DiceFocalLoss"
+
+
+LOSSES = get_enums(Losses)
+
+
+class LrSchedule(Enum):
+    CONST = "const"
+    POLY = "poly"
+    STEP = "step"
+    MULTISTEP = "multistep"
+    SGDR = "SGDR"
+    PLATEAU = "plateau"
+
+
+LR_SCHEDULES = get_enums(LrSchedule)
+
+
+class Frameworks(Enum):
+    SEGMENTATION = "segmentation"
+    CLASSIFICATION = "classification"
+    SIAMESE = "siamese"
+    SELFLEARNING = "selflearning"
+    DETECTION = "detection"
+    MULTITASK = "multitask"
+
+
+FRAMEWORKS = get_enums(Frameworks)
+
+
+class NetworkArgs(Enum):
+    SPATIAL_DIMS = "spatial_dims"
+    IN_CHANNELS = "in_channels"
+    OUT_CHANNELS = "out_channels"
+    ACT = "act"
+    NORM = "norm"
+    N_DEPTH = "n_depth"
+    N_GROUP = "n_group"
+    DROP_OUT = "drop_out"
+    IS_PRUNABLE = "is_prunable"
+    PRETRAINED = "pretrained"
+    PRETRAINED_MODEL_PATH = "pretrained_model_path"
+
+
+NETWORK_ARGS = get_enums(NetworkArgs)
+
+
+class LayerOrders(Enum):
+    CRB = "crb"
+    CBR = "cbr"
+    CGR = "cgr"
+    CBE = "cbe"
+    ABN = "abn"
+
+
+LAYER_ORDERS = get_enums(LayerOrders)
+
+
+class Optimizers(Enum):
+    SGD = "sgd"
+    ADAM = "adam"
+    ADAMW = "adamw"
+    RADAM = "radam"
+    RANGER = "ranger"
+
+
+OPTIMIZERS = get_enums(Optimizers)
+

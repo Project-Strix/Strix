@@ -12,7 +12,13 @@ from medlp.utilities.click_ex import (
     data_select,
     parse_input_str,
 )
-from medlp.utilities.enum import *
+from medlp.utilities.enum import (
+    NORMS,
+    LR_SCHEDULES,
+    FRAMEWORKS,
+    OPTIMIZERS,
+    ACTIVATIONS,
+)
 from utils_cw import prompt_when
 
 
@@ -67,7 +73,7 @@ def common_params(func):
     @option(
         "--framework",
         prompt=True,
-        type=Choice(FRAMEWORK_TYPES),
+        type=Choice(FRAMEWORKS),
         default=1,
         help="Choose your framework type",
     )
@@ -110,7 +116,13 @@ def common_params(func):
     )
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
-    @option("--output-nc", type=int, default=1, prompt=True, help="output channels (classes)")
+    @option(
+        "--output-nc",
+        type=int,
+        default=1,
+        prompt=True,
+        help="output channels (classes)",
+    )
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default="", help="Specified training datalist")
     @option("--valid-list", type=str, default="", help="Specified validation datalist")
@@ -168,7 +180,9 @@ def common_params(func):
         "--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp"
     )
     @option("--debug", is_flag=True, help="Enter debug mode")
-    @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
+    @option(
+        "--image-size", callback=partial(parse_input_str, dtype=int), help="Image size"
+    )
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -178,7 +192,7 @@ def common_params(func):
 
 def solver_params(func):
     @option(
-        "--optim", type=Choice(OPTIM_TYPES), default="sgd", help="Optimizer for network"
+        "--optim", type=Choice(OPTIMIZERS), default="sgd", help="Optimizer for network"
     )
     @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
     @option("--nesterov", type=bool, default=False, help="Nesterov for SGD")
@@ -193,7 +207,7 @@ def solver_params(func):
     @option(
         "--lr-policy",
         prompt=True,
-        type=Choice(LR_SCHEDULE),
+        type=Choice(LR_SCHEDULES),
         callback=lr_schedule_params,
         default="plateau",
         help="learning rate strategy",
@@ -224,13 +238,13 @@ def network_params(func):
     @option(
         "--layer-norm",
         prompt=True,
-        type=Choice(NORM_TYPES),
+        type=Choice(NORMS),
         default=1,
         help="Layer norm type",
     )
     @option(
         "--layer-act",
-        type=Choice(ACT_TYPES),
+        type=Choice(ACTIVATIONS),
         default="relu",
         help="Layer activation type",
     )
@@ -291,22 +305,6 @@ def latent_auxilary_params(func):
         hidden=True,
         help="Automatically do test after training",
     )
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
-def rcnn_params(func):
-    @option(
-        "--model-type", type=Choice(RCNN_MODEL_TYPES), default=1, help="RCNN model type"
-    )
-    @option(
-        "--backbone", type=Choice(RCNN_BACKBONE), default=1, help="RCNN backbone net"
-    )
-    @option("--min-size", type=int, default=800)
-    @option("--max-size", type=int, default=1000)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

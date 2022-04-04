@@ -6,7 +6,7 @@ from monai_ex.transforms import *
 from monai_ex.data import *
 from monai_ex.utils import ensure_tuple, first
 import medlp.utilities.oyaml as yaml
-from medlp.utilities.enum import DIMS, FRAMEWORK_TYPES, PHASES
+from medlp.utilities.enum import DIMS, FRAMEWORKS, PHASES
 from medlp.data_io.dataio import DATASET_MAPPING
 from utils_cw import get_items_from_file
 
@@ -64,7 +64,7 @@ def parse_dataset_config(configs):
     # necessary keys
     check_config(configs, key=["ATTRIBUTE", "DIM"], candidates=DIMS)
     check_config(configs, key=["ATTRIBUTE", "NAME"])
-    check_config(configs, key=["ATTRIBUTE", "FRAMEWORK"], candidates=FRAMEWORK_TYPES)
+    check_config(configs, key=["ATTRIBUTE", "FRAMEWORK"], candidates=FRAMEWORKS)
     check_config(configs, key=["ATTRIBUTE", "KEYS"])
     check_config(
         configs, key=["ATTRIBUTE", "PHASE"], candidates=["train", "valid", "test"]
