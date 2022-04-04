@@ -51,7 +51,7 @@ from setuptools import setup, find_namespace_packages
 setup(
     name="medlp",
     packages=find_namespace_packages(include=["medlp", "medlp.*"]),
-    version="0.0.6",
+    version="0.0.7",
     description="Medical Deep Learning Platform",
     author="Chenglong Wang",
     author_email="clwang@phy.ecnu.edu.cn",
@@ -68,7 +68,7 @@ setup(
         "nibabel",
         "pytorch-ignite==0.4.7",
         # "nni",
-        # "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex>=0.0.3",
+        "monai_ex==0.0.4",
         "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
     ],
     entry_points={
