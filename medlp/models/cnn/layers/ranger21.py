@@ -46,7 +46,11 @@ import collections
 import matplotlib.pyplot as plt
 
 import copy
-from torch import linalg as LA
+
+from monai_ex.utils import optional_import
+
+LA, _ = optional_import("torch", name="linalg")
+
 
 import numpy as np
 
@@ -706,7 +710,7 @@ class Ranger21(TO.Optimizer):
 
         # stable weight decay
         if self.use_madgrad:
-            variance_normalized = torch.pow(variance_ma_sum / param_size, 1/3)
+            variance_normalized = torch.pow(variance_ma_sum / param_size, 1 / 3)
         else:
             variance_normalized = math.sqrt(variance_ma_sum / param_size)
         # variance_mean = variance_ma_sum / param_size

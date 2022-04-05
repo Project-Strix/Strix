@@ -1,6 +1,7 @@
 # import os
 # import torch
 from setuptools import setup, find_namespace_packages
+
 # from pathlib import Path
 # from torch.utils.cpp_extension import CUDA_HOME
 # from torch.utils.cpp_extension import CppExtension
@@ -47,40 +48,46 @@ from setuptools import setup, find_namespace_packages
 #     return ext_modules
 
 
-setup(name='medlp',
-      packages=find_namespace_packages(include=["medlp", "medlp.*"]),
-      version='0.0.5',
-      description='Medical Deep Learning Platform',
-      author='Chenglong Wang',
-      author_email='clwang@phy.ecnu.edu.cn',
-      license='Apache License Version 2.0, January 2004',
-      install_requires=[
-            "torch>=1.6.0",
-            "tb-nightly",
-            "click",
-            "tqdm",
-            "scikit-image>=0.14",
-            "scipy",
-            "numpy",
-            "scikit-learn",
-            "nibabel",
-            "pytorch-ignite==0.4.4",
-            # "nni",
-            "monai_ex @ git+https://gitlab.com/project-medlp/MONAI_EX@master#egg=monai_ex>=0.0.3",
-            "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
-      ],
-      entry_points={
-          'console_scripts': [
-              'medlp-train = medlp.main_entry:train',
-              'medlp-train-from-cfg = medlp.main_entry:train_cfg',
-              'medlp-test-from-cfg = medlp.main_entry:test_cfg',
-              'medlp-nni-search = medlp.nni_search:nni_search',
-              'medlp-check-data = medlp.data_checker:check_data',
-              'medlp-gradcam-from-cfg = medlp.interpreter:gradcam',
-          ],
-      },
-      # ext_modules=get_extensions(),
-      # cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
-      keywords=['deep learning', 'medical image classification',
-                'medical image analysis', 'medical image segmentation']
-      )
+setup(
+    name="medlp",
+    packages=find_namespace_packages(include=["medlp", "medlp.*"]),
+    version="0.0.7",
+    description="Medical Deep Learning Platform",
+    author="Chenglong Wang",
+    author_email="clwang@phy.ecnu.edu.cn",
+    license="Apache License Version 2.0, January 2004",
+    install_requires=[
+        "torch>=1.6.0",
+        "tb-nightly",
+        "click",
+        "tqdm",
+        "scikit-image>=0.14",
+        "scipy",
+        "numpy",
+        "scikit-learn",
+        "nibabel",
+        "pytorch-ignite==0.4.7",
+        # "nni",
+        "monai_ex==0.0.4",
+        "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
+    ],
+    entry_points={
+        "console_scripts": [
+            "medlp-train = medlp.main_entry:train",
+            "medlp-train-from-cfg = medlp.main_entry:train_cfg",
+            "medlp-train-and-test = medlp.main_entry:train_and_test",
+            "medlp-test-from-cfg = medlp.main_entry:test_cfg",
+            "medlp-nni-search = medlp.nni_search:nni_search",
+            "medlp-check-data = medlp.data_checker:check_data",
+            "medlp-gradcam-from-cfg = medlp.interpreter:gradcam",
+        ],
+    },
+    # ext_modules=get_extensions(),
+    # cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
+    keywords=[
+        "deep learning",
+        "medical image classification",
+        "medical image analysis",
+        "medical image segmentation",
+    ],
+)

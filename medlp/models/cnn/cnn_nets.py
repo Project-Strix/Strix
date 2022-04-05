@@ -3,18 +3,17 @@ from typing import Any
 import os
 import torch
 
-from medlp.models.cnn import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
+from medlp.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
 from medlp.models.cnn.nets.resnet import resnet18, resnet34, resnet50
-from medlp.models.cnn.nets.vgg import vgg9_bn
+from medlp.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from medlp.models.cnn.nets.dynunet import DynUNet
 from medlp.models.cnn.nets.drn import drn_a_50
 from medlp.models.cnn.nets.hesam import HESAM
 from medlp.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
-from medlp.models.cnn.nets.vgg_aag import vgg9_aag
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet18')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet18')
+@CLASSIFICATION_ARCHI.register("2D", "resnet18")
+@CLASSIFICATION_ARCHI.register("3D", "resnet18")
 def medlp_resnet18(
     spatial_dims: int,
     in_channels: int,
@@ -30,16 +29,16 @@ def medlp_resnet18(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["groups"] = n_group
 
     return resnet18(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet34')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet34')
+@CLASSIFICATION_ARCHI.register("2D", "resnet34")
+@CLASSIFICATION_ARCHI.register("3D", "resnet34")
 def medlp_resnet50(
     spatial_dims: int,
     in_channels: int,
@@ -55,16 +54,16 @@ def medlp_resnet50(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["groups"] = n_group
 
     return resnet34(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet50')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet50')
+@CLASSIFICATION_ARCHI.register("2D", "resnet50")
+@CLASSIFICATION_ARCHI.register("3D", "resnet50")
 def medlp_resnet50(
     spatial_dims: int,
     in_channels: int,
@@ -80,16 +79,16 @@ def medlp_resnet50(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["groups"] = n_group
 
     return resnet50(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'vgg9_bn')
-@CLASSIFICATION_ARCHI.register('3D', 'vgg9_bn')
+@CLASSIFICATION_ARCHI.register("2D", "vgg9")
+@CLASSIFICATION_ARCHI.register("3D", "vgg9")
 def medlp_vgg9_bn(
     spatial_dims: int,
     in_channels: int,
@@ -105,19 +104,47 @@ def medlp_vgg9_bn(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['is_prunable'] = is_prunable
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["is_prunable"] = is_prunable
+    inkwargs["groups"] = n_group
+    inkwargs["bottleneck_size"] = kwargs.get("bottleneck_size", 5)
 
     return vgg9_bn(pretrained=False, progress=True, **inkwargs)
 
 
+@CLASSIFICATION_ARCHI.register("2D", "vgg11")
+@CLASSIFICATION_ARCHI.register("3D", "vgg11")
+def medlp_vgg11_bn(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    inkwargs = {}
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["is_prunable"] = is_prunable
+    inkwargs["groups"] = n_group
+    inkwargs["bottleneck_size"] = kwargs.get("bottleneck_size", 2)
+
+    return vgg11_bn(pretrained=False, progress=True, **inkwargs)
+
+
 # @SELFLEARNING_ARCHI.register('2D', 'unet')
 # @SELFLEARNING_ARCHI.register('3D', 'unet')
-@SEGMENTATION_ARCHI.register('2D', 'unet')
-@SEGMENTATION_ARCHI.register('3D', 'unet')
+@SEGMENTATION_ARCHI.register("2D", "unet")
+@SEGMENTATION_ARCHI.register("3D", "unet")
 def medlp_dyn_unet(
     spatial_dims: int,
     in_channels: int,
@@ -133,9 +160,9 @@ def medlp_dyn_unet(
     **kwargs: Any
 ):
     n_depth = 5 if n_depth == -1 else n_depth
-    kernel_size = kwargs.get("kernel_size", (3,)+(3,)*n_depth)
-    strides = kwargs.get("strides", (1,)+(2,)*n_depth)
-    upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,)+(2,)*n_depth)
+    kernel_size = kwargs.get("kernel_size", (3,) + (3,) * n_depth)
+    strides = kwargs.get("strides", (1,) + (2,) * n_depth)
+    upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,) + (2,) * n_depth)
     deep_supervision = kwargs.get("deep_supervision", False)
     deep_supr_num = kwargs.get("deep_supr_num", 1)
     res_block = False
@@ -157,12 +184,12 @@ def medlp_dyn_unet(
         last_activation,
         is_prunable,
         filters,
-        output_bottleneck
+        output_bottleneck,
     )
 
 
-@SEGMENTATION_ARCHI.register('2D', 'res-unet')
-@SEGMENTATION_ARCHI.register('3D', 'res-unet')
+@SEGMENTATION_ARCHI.register("2D", "res-unet")
+@SEGMENTATION_ARCHI.register("3D", "res-unet")
 def medlp_dyn_resunet(
     spatial_dims: int,
     in_channels: int,
@@ -178,9 +205,9 @@ def medlp_dyn_resunet(
     **kwargs: Any
 ):
     n_depth = 5 if n_depth == -1 else n_depth
-    kernel_size = kwargs.get("kernel_size", (3,)+(3,)*n_depth)
-    strides = kwargs.get("strides", (1,)+(2,)*n_depth)
-    upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,)+(2,)*n_depth)
+    kernel_size = kwargs.get("kernel_size", (3,) + (3,) * n_depth)
+    strides = kwargs.get("strides", (1,) + (2,) * n_depth)
+    upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,) + (2,) * n_depth)
     deep_supervision = kwargs.get("deep_supervision", False)
     deep_supr_num = kwargs.get("deep_supr_num", 1)
     res_block = True
@@ -202,12 +229,12 @@ def medlp_dyn_resunet(
         last_activation,
         is_prunable,
         filters,
-        output_bottleneck
+        output_bottleneck,
     )
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'DRN_a50')
-@CLASSIFICATION_ARCHI.register('3D', 'DRN_a50')
+@CLASSIFICATION_ARCHI.register("2D", "DRN_a50")
+@CLASSIFICATION_ARCHI.register("3D", "DRN_a50")
 def medlp_drn_a_50(
     spatial_dims: int,
     in_channels: int,
@@ -223,14 +250,14 @@ def medlp_drn_a_50(
     **kwargs: Any
 ):
     inkwargs = {}
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
 
     return drn_a_50(pretrained=False, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'HESAM')
-@CLASSIFICATION_ARCHI.register('3D', 'HESAM')
+@CLASSIFICATION_ARCHI.register("2D", "HESAM")
+@CLASSIFICATION_ARCHI.register("3D", "HESAM")
 def medlp_hesam(
     spatial_dims: int,
     in_channels: int,
@@ -248,6 +275,7 @@ def medlp_hesam(
     features = kwargs.get("features", (64, 128, 256, 256))
     last_feature = kwargs.get("last_feature", 64)
     upsample = kwargs.get("upsample", "deconv")
+    sam_size = kwargs.get("sam_size", 6)
 
     net = HESAM(
         spatial_dims,
@@ -255,6 +283,7 @@ def medlp_hesam(
         out_channels,
         features,
         last_feature,
+        sam_size,
         act,
         norm,
         drop_out,
@@ -272,8 +301,8 @@ def medlp_hesam(
     return net
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet_aag_34')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet_aag_34')
+@CLASSIFICATION_ARCHI.register("2D", "resnet_aag_34")
+@CLASSIFICATION_ARCHI.register("3D", "resnet_aag_34")
 def medlp_resnetaag_34(
     spatial_dims: int,
     in_channels: int,
@@ -296,10 +325,10 @@ def medlp_resnetaag_34(
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["groups"] = n_group
     # inkwargs["pretrained_model_path"] = pretrained_model_path
     inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
     inkwargs["freeze_backbone"] = kwargs.get("freeze_backbone", False)
@@ -309,8 +338,8 @@ def medlp_resnetaag_34(
     return resnet34_aag(pretrained_model_path, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register('2D', 'resnet_aag_50')
-@CLASSIFICATION_ARCHI.register('3D', 'resnet_aag_50')
+@CLASSIFICATION_ARCHI.register("2D", "resnet_aag_50")
+@CLASSIFICATION_ARCHI.register("3D", "resnet_aag_50")
 def medlp_resnetaag_50(
     spatial_dims: int,
     in_channels: int,
@@ -333,10 +362,10 @@ def medlp_resnetaag_50(
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     inkwargs = {}
-    inkwargs['dim'] = spatial_dims
-    inkwargs['in_channels'] = in_channels
-    inkwargs['num_classes'] = out_channels
-    inkwargs['groups'] = n_group
+    inkwargs["dim"] = spatial_dims
+    inkwargs["in_channels"] = in_channels
+    inkwargs["num_classes"] = out_channels
+    inkwargs["groups"] = n_group
     # inkwargs["pretrained_model_path"] = pretrained_model_path
     inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 3))
     inkwargs["freeze_backbone"] = kwargs.get("freeze_backbone", False)
@@ -344,25 +373,3 @@ def medlp_resnetaag_50(
         print("Freeze backbone for fine-tune!")
 
     return resnet50_aag(pretrained_model_path, **inkwargs)
-
-
-@CLASSIFICATION_ARCHI.register('2D', 'vgg9_aag')
-@CLASSIFICATION_ARCHI.register('3D', 'vgg9_aag')
-def medlp_vggaag_34(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    inkwargs = {}
-    inkwargs["roi_classes"] = int(kwargs.get("roi_classes", 2))
-
-    return vgg9_aag(spatial_dims, in_channels, out_channels, **inkwargs)

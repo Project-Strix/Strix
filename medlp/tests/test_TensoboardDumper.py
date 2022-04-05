@@ -1,4 +1,4 @@
-import os, glob
+import os
 import shutil
 import tempfile
 import unittest
@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from monai.handlers import TensorBoardStatsHandler
 from medlp.models.cnn import *
-from medlp.utilities.handlers import TensorboardDumper
+from monai_ex.handlers import TensorboardDumper
 
 
 class TestTensorboardDumper(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestTensorboardDumper(unittest.TestCase):
             stats_handler = TensorBoardStatsHandler(
                 writer,
                 output_transform=lambda x: {"loss": x},
-                global_epoch_transform=lambda x: x
+                global_epoch_transform=lambda x: x,
             )
             stats_handler.attach(engine)
 
@@ -45,7 +45,10 @@ class TestTensorboardDumper(unittest.TestCase):
             writer.close()
             # check logging output
             print("Saved files:", os.listdir(tempdir))
-            shutil.copyfile(os.path.join(tempdir, 'summary.png'), '/homes/clwang/test_tb_summary.png')
+            shutil.copyfile(
+                os.path.join(tempdir, "summary.png"),
+                "/homes/clwang/test_tb_summary.png",
+            )
             self.assertTrue(len(os.listdir(tempdir)) == 2)
 
 

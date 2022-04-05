@@ -1,13 +1,14 @@
+import sys
 from pathlib import Path
 from configparser import ConfigParser
 
 
 DEFAULT_MEDLP_CONFIG = {
-    "MODE": 'dev',  # release
-    "CONFIG_FNAME": 'medlp_configures.cfg',
-    "OUTPUT_DIR": str(Path.home()/'MeDLP'/'medlp_exp'),
-    "EXTERNAL_DATASET_DIR": str(Path.home()/'MeDLP'/'medlp_datasets'),
-    "EXTERNAL_NETWORK_DIR": str(Path.home()/'MeDLP'/'medlp_networks'),
+    "MODE": "dev",  # release
+    "CONFIG_FNAME": "medlp_configures.cfg",
+    "OUTPUT_DIR": str(Path.home() / "MeDLP" / "medlp_exp"),
+    "EXTERNAL_DATASET_DIR": str(Path.home() / "MeDLP" / "medlp_datasets"),
+    "EXTERNAL_NETWORK_DIR": str(Path.home() / "MeDLP" / "medlp_networks"),
 }
 
 
@@ -18,11 +19,11 @@ def __config_to_dict(config: ConfigParser):
     return d
 
 
-def init():
+def init(add_path=True):
     global _config_dict
 
     try:
-        fname = DEFAULT_MEDLP_CONFIG['CONFIG_FNAME']
+        fname = DEFAULT_MEDLP_CONFIG["CONFIG_FNAME"]
         cfg_file = Path(__file__).parent.joinpath(fname)
         conf = ConfigParser()
         conf.optionxform = str
@@ -33,6 +34,10 @@ def init():
         raise FileNotFoundError(f"Missing config file {cfg_file}")
     except Exception as e:
         raise Exception(f"Error occured during reading config: {e}")
+
+    if add_path:
+        sys.path.append(_config_dict["MEDLP_CONFIG"]["EXTERNAL_DATASET_DIR"])
+        sys.path.append(_config_dict["MEDLP_CONFIG"]["EXTERNAL_NETWORK_DIR"])
 
 
 def get_cfg(section_name, keyword):

@@ -1,4 +1,3 @@
-from typing import Optional, Callable
 import re
 import logging
 import copy
@@ -13,14 +12,13 @@ from medlp.models.cnn.engines.utils import (
     get_dice_metric_transform_fn,
 )
 from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
+from medlp.utilities.enum import Phases
 from medlp.configures import config as cfg
-from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
-from medlp.models.cnn.engines.utils import get_models
+from medlp.models.cnn.engines.utils import get_models, get_prepare_batch_fn
 
 from monai_ex.inferers import (
-    SimpleInferer,
-    SlidingWindowInferer,
-    SlidingWindowInferer2Dfor3D,
+    SimpleInfererEx as SimpleInferer,
+    SlidingWindowInferer
 )
 from monai_ex.networks import one_hot
 from ignite.engine import Events
@@ -28,9 +26,18 @@ from ignite.handlers import EarlyStopping
 
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 
-from monai_ex.transforms import Compose, ActivationsD, AsDiscreteD, MeanEnsembleD
+# from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
+
+from monai_ex.transforms import (
+    Compose,
+    ActivationsD,
+    AsDiscreteD,
+    MeanEnsembleD,
+)
 from monai_ex.handlers import (
     StatsHandler,
+    TensorBoardStatsHandler,
+    TensorBoardImageHandlerEx as TensorBoardImageHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
     CheckpointSaverEx,
@@ -39,172 +46,193 @@ from monai_ex.handlers import (
     MeanDice,
     ROCAUC,
     stopping_fn_from_metric,
+    NNIReporterHandler,
+    TensorboardDumper,
+    from_engine_ex as from_engine,
 )
 
 
 @TRAIN_ENGINES.register("segmentation")
-class SegmentationTrainEngine(MedlpTrainEngine):
-    def __new__(
-        self,
-        opts,
-        train_loader,
-        test_loader,
-        net,
-        loss,
-        optim,
-        lr_scheduler,
-        writer,
-        device,
-        model_dir,
-        logger_name,
-        **kwargs,
-    ):
-        valid_interval = kwargs.get("valid_interval", 1)
-        multi_input_keys = kwargs.get("multi_input_keys", None)
-        multi_output_keys = kwargs.get("multi_output_keys", None)
-        _image_ = cfg.get_key("image")
-        _label_ = cfg.get_key("label")
-        _pred_ = cfg.get_key("pred")
-        _loss_ = cfg.get_key("loss")
+def build_segmentation_engine(**kwargs):
+    opts = kwargs["opts"]
+    train_loader = kwargs["train_loader"]
+    test_loader = kwargs["test_loader"]
+    net = kwargs["net"]
+    loss = kwargs["loss"]
+    optim = kwargs["optim"]
+    lr_scheduler = kwargs["lr_scheduler"]
+    writer = kwargs["writer"]
+    valid_interval = kwargs["valid_interval"]
+    device = kwargs["device"]
+    model_dir = kwargs["model_dir"]
+    logger_name = kwargs.get("logger_name", None)
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
+    _image = cfg.get_key("image")
+    _label = cfg.get_key("label")
+    _pred = cfg.get_key("pred")
+    _loss = cfg.get_key("loss")
+    decollate = True
 
-        val_metric = SegmentationTrainEngine.get_key_metric(
-            phase="val", output_nc=opts.output_nc, criterion=opts.criterion
-        )
-        train_metric = SegmentationTrainEngine.get_key_metric(
-            phase="train", output_nc=opts.output_nc, criterion=opts.criterion
-        )
-        val_metric_name = list(val_metric.keys())[0]
+    val_metric_name = "val_mean_dice"
+    val_handlers = [
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
+        TensorBoardStatsHandler(summary_writer=writer, tag_name=val_metric_name),
+        TensorBoardImageHandler(
+            summary_writer=writer,
+            batch_transform=from_engine([_image, _label]),
+            output_transform=from_engine(_pred),
+            max_channels=opts.output_nc,
+            prefix_name="Val",
+        ),
+    ]
 
-        val_handlers = MedlpTrainEngine.get_extra_handlers(
-            phase="val",
-            model_dir=model_dir,
-            net=net,
-            optimizer=optim,
-            tb_summary_writer=writer,
-            logger_name=logger_name,
-            stats_dicts={val_metric_name: lambda x: None},
-            save_bestmodel=True,
-            model_file_prefix=val_metric_name,
-            bestmodel_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=lambda x: (x["image"], x["label"]),
-            tb_image_output_transform=lambda x: x["pred"],
-            dump_tensorboard=True,
-            record_nni=opts.nni,
-            nni_kwargs={
-                "metric_name": val_metric_name,
-                "max_epochs": opts.n_epoch,
-                "logger_name": logger_name,
-            },
-        )
-
-        if opts.output_nc == 1:
-            trainval_post_transforms = Compose(
-                [
-                    ActivationsD(keys=_pred_, sigmoid=True),
-                    AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                ]
-            )
-        else:
-            trainval_post_transforms = Compose(
-                [
-                    ActivationsD(keys=_pred_, softmax=True),
-                    AsDiscreteD(
-                        keys=_pred_,
-                        to_onehot=True,
-                        argmax=True,
-                        n_classes=opts.output_nc,
-                    ),
-                    # KeepLargestConnectedComponentD(keys=_pred_, applied_labels=[1], independent=False),
-                ]
-            )
-
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image_, _label_, multi_input_keys, multi_output_keys
-        )
-
-        evaluator = SupervisedEvaluator(
-            device=device,
-            val_data_loader=test_loader,
-            network=net,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(test_loader)),
-            prepare_batch=prepare_batch_fn,
-            inferer=SimpleInferer(),  # SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
-            post_transform=trainval_post_transforms,
-            key_val_metric=val_metric,
-            val_handlers=val_handlers,
-            amp=opts.amp,
-        )
-
-        if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
-        else:
-            lr_step_transform = lambda x: ()
-
-        train_handlers = [
-            ValidationHandler(
-                validator=evaluator, interval=valid_interval, epoch_level=True
+    # save N best model handler
+    if opts.save_n_best > 0:
+        val_handlers += [
+            CheckpointSaverEx(
+                save_dir=model_dir / "Best_Models",
+                save_dict={"net": net},
+                file_prefix=val_metric_name,
+                save_key_metric=True,
+                key_metric_n_saved=opts.save_n_best,
+                key_metric_save_after_epoch=0,
             ),
-            LrScheduleTensorboardHandler(
-                lr_scheduler=lr_scheduler,
-                summary_writer=writer,
-                step_transform=lr_step_transform,
+            TensorboardDumper(
+                log_dir=writer.log_dir,
+                epoch_level=True,
+                logger_name=logger_name,
             ),
         ]
-        train_handlers += MedlpTrainEngine.get_extra_handlers(
-            phase="train",
-            model_dir=model_dir,
-            net=net,
-            optimizer=optim,
-            tb_summary_writer=writer,
-            logger_name=logger_name,
-            stats_dicts={"train_loss": lambda x: x[_loss_]},
-            save_checkpoint=True,
-            checkpoint_save_interval=opts.save_epoch_freq,
-            ckeckpoint_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=lambda x: (x["image"], x["label"]),
-            tb_image_output_transform=lambda x: x["pred"],
+
+    # If in nni search mode
+    if opts.nni:
+        val_handlers += [
+            NNIReporterHandler(
+                metric_name=val_metric_name, max_epochs=opts.n_epoch, logger_name=logger_name
+            )
+
+    if opts.output_nc == 1:
+        trainval_post_transforms = Compose(
+            [
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+            ]
+        )
+    else:
+        trainval_post_transforms = Compose(
+            [
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(
+                    keys=_pred, to_onehot=True, argmax=True, n_classes=opts.output_nc
+                ),
+                # KeepLargestConnectedComponentD(keys=pred_, applied_labels=[1], independent=False),
+            ]
         )
 
-        trainer = SupervisedTrainer(
-            device=device,
-            max_epochs=opts.n_epoch,
-            train_data_loader=train_loader,
-            network=net,
-            optimizer=optim,
-            loss_function=loss,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(train_loader)),
-            prepare_batch=prepare_batch_fn,
-            inferer=SimpleInferer(),
-            post_transform=trainval_post_transforms,
-            key_train_metric=train_metric,
-            train_handlers=train_handlers,
-            amp=opts.amp,
+    key_metric_transform_fn = from_engine([_pred, _label])
+    if opts.output_nc > 1:
+        ch_dim = 0 if decollate else 1
+        key_metric_transform_fn = from_engine(
+            [_pred, _label],
+            transforms=[
+                lambda x: x,
+                lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
+            ]
         )
 
-        if opts.early_stop > 0:
-            early_stopper = EarlyStopping(
-                patience=opts.early_stop,
-                score_function=stopping_fn_from_metric(val_metric_name),
-                trainer=trainer,
-            )
-            evaluator.add_event_handler(
-                event_name=Events.EPOCH_COMPLETED, handler=early_stopper
-            )
-        return trainer
+    prepare_batch_fn = get_prepare_batch_fn(
+        opts, _image, _label, multi_input_keys, multi_output_keys
+    )
 
-    @staticmethod
-    def get_key_metric(phase: str, output_nc: int, criterion: str):
-        dice_metric_transform_fn = get_dice_metric_transform_fn(
-            output_nc,
-            criterion,
-            pred_key=cfg.get_key("pred"),
-            label_key=cfg.get_key("label"),
+    key_val_metric = MeanDice(
+        include_background=False, output_transform=key_metric_transform_fn
+    )
+
+    evaluator = SupervisedEvaluator(
+        device=device,
+        val_data_loader=test_loader,
+        network=net,
+        epoch_length=int(opts.n_epoch_len)
+        if opts.n_epoch_len > 1.0
+        else int(opts.n_epoch_len * len(test_loader)),
+        prepare_batch=prepare_batch_fn,
+        inferer=SimpleInferer(),  # SlidingWindowInferer(roi_size=(96, 96, 96), sw_batch_size=4, overlap=0.5),
+        postprocessing=trainval_post_transforms,
+        key_val_metric={val_metric_name: key_val_metric},
+        val_handlers=val_handlers,
+        amp=opts.amp,
+        decollate=decollate,
+    )
+
+    if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+        lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
+    else:
+        lr_step_transform = lambda x: ()
+
+    train_handlers = [
+        LrScheduleTensorboardHandler(
+            lr_scheduler=lr_scheduler,
+            summary_writer=writer,
+            step_transform=lr_step_transform,
+        ),
+        ValidationHandler(
+            validator=evaluator, interval=valid_interval, epoch_level=True
+        ),
+        StatsHandler(
+            tag_name="train_loss",
+            output_transform=from_engine(_loss, first=True),
+            name=logger_name,
+        ),
+        CheckpointSaverEx(
+            save_dir=model_dir / "Checkpoint",
+            save_dict={"net": net, "optim": optim},
+            save_interval=opts.save_epoch_freq,
+            epoch_level=True,
+            n_saved=opts.save_n_best,
+        ),
+        TensorBoardStatsHandler(
+            summary_writer=writer,
+            tag_name="train_loss",
+            output_transform=from_engine(_loss),
+        ),
+        TensorBoardImageHandler(
+            summary_writer=writer,
+            batch_transform=from_engine([_image, _label]),
+            output_transform=from_engine(_pred),
+            max_channels=opts.output_nc,
+            prefix_name="Train",
+        ),
+    ]
+
+    trainer = SupervisedTrainer(
+        device=device,
+        max_epochs=opts.n_epoch,
+        train_data_loader=train_loader,
+        network=net,
+        optimizer=optim,
+        loss_function=loss,
+        epoch_length=int(opts.n_epoch_len)
+        if opts.n_epoch_len > 1.0
+        else int(opts.n_epoch_len * len(train_loader)),
+        prepare_batch=prepare_batch_fn,
+        inferer=SimpleInferer(),
+        postprocessing=trainval_post_transforms,
+        key_train_metric={
+            "train_mean_dice": MeanDice(
+                include_background=False, output_transform=key_metric_transform_fn
+            )
+        },
+        train_handlers=train_handlers,
+        amp=opts.amp,
+        decollate=decollate,
+    )
+
+    if opts.early_stop > 0:
+        early_stopper = EarlyStopping(
+            patience=opts.early_stop,
+            score_function=stopping_fn_from_metric(val_metric_name),
+            trainer=trainer,
         )
 
         key_metric = MeanDice(
@@ -214,124 +242,122 @@ class SegmentationTrainEngine(MedlpTrainEngine):
 
 
 @TEST_ENGINES.register("segmentation")
-class SegmentationTestEngine(MedlpTestEngine):
-    def __new__(
-        self,
-        opts,
-        test_loader,
-        net,
-        device,
-        logger_name,
-        **kwargs,
-    ):
-        crop_size = get_attr_(opts, "crop_size", None)
-        multi_input_keys = kwargs.get("multi_input_keys", None)
-        multi_output_keys = kwargs.get("multi_output_keys", None)
-        n_batch = opts.n_batch
-        resample = opts.resample
-        use_slidingwindow = opts.slidingwindow
-        is_multilabel = opts.output_nc > 1
-        is_supervised = opts.phase == "test"
-        _image_ = cfg.get_key("image")
-        _pred_ = cfg.get_key("pred")
-        _label_ = cfg.get_key("label")
-        model_path = (
-            opts.model_path[0]
-            if isinstance(opts.model_path, (list, tuple))
-            else opts.model_path
+def build_segmentation_test_engine(**kwargs):
+    opts = kwargs["opts"]
+    test_loader = kwargs["test_loader"]
+    net = kwargs["net"]
+    device = kwargs["device"]
+    logger_name = kwargs.get("logger_name", None)
+    crop_size = get_attr_(opts, "crop_size", None)
+    n_batch = opts.n_batch
+    resample = opts.resample
+    use_slidingwindow = opts.slidingwindow
+    multi_input_keys = kwargs.get("multi_input_keys", None)
+    multi_output_keys = kwargs.get("multi_output_keys", None)
+    _image = cfg.get_key("image")
+    _pred = cfg.get_key("pred")
+    _label = cfg.get_key("label")
+    decollate = True
+    model_path = (
+        opts.model_path[0]
+        if isinstance(opts.model_path, (list, tuple))
+        else opts.model_path
+    )
+
+    if use_slidingwindow:
+        print("---Use slidingwindow infer!---")
+        print("patch size:", crop_size)
+    else:
+        print("---Use simple infer!---")
+
+    if opts.output_nc == 1:
+        post_transforms = Compose(
+            [
+                ActivationsD(keys=_pred, sigmoid=True),
+                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+            ]
+        )
+    else:
+        post_transforms = Compose(
+            [
+                ActivationsD(keys=_pred, softmax=True),
+                AsDiscreteD(
+                    keys=_pred, argmax=True, to_onehot=False, n_classes=opts.output_nc
+                ),
+            ]
         )
 
-        key_val_metric = SegmentationTestEngine.get_key_metric(
-            opts.phase, opts.output_nc
-        )
-        val_metric_name = list(key_val_metric.keys())[0]
+    val_handlers = [
+        StatsHandler(output_transform=lambda x: None, name=logger_name),
+        CheckpointLoader(load_path=model_path, load_dict={"net": net}),
+        SegmentationSaver(
+            output_dir=opts.out_dir,
+            output_ext=".nii.gz",
+            resample=resample,
+            data_root_dir=output_filename_check(test_loader.dataset),
+            batch_transform=from_engine(_image + "_meta_dict"),
+            output_transform=from_engine(_pred),
+        ),
+    ]
 
-        if use_slidingwindow:
-            print("---Use slidingwindow infer!---")
-            print("patch size:", crop_size)
-        else:
-            print("---Use simple infer!---")
-
-        saver_post_transform = (
-            Compose(
-                [
-                    ActivationsD(keys=_pred_, sigmoid=True),
-                    AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                    lambda output: output[_pred_],
-                ]
-            )
-            if opts.output_nc == 1
-            else Compose(
-                [
-                    ActivationsD(keys=_pred_, softmax=True),
-                    AsDiscreteD(
-                        keys=_pred_,
-                        argmax=True,
-                        to_onehot=False,
-                        n_classes=opts.output_nc,
-                    ),
-                    lambda output: output[_pred_],
-                ]
-            )
-        )
-
-        val_handlers = [
+    if opts.save_image:
+        val_handlers += [
             SegmentationSaver(
                 output_dir=opts.out_dir,
+                output_postfix=_image,
                 output_ext=".nii.gz",
                 resample=resample,
                 data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=lambda x: x[_image_ + "_meta_dict"],
-                output_transform=saver_post_transform,
-            ),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=from_engine(_image),
+            )
         ]
 
-        val_handlers += MedlpTestEngine.get_extra_handlers(
-            phase=opts.phase,
-            out_dir=opts.out_dir,
-            model_path=model_path,
-            net=net,
-            logger_name=logger_name,
-            stats_dicts={val_metric_name: lambda x: None},
-            save_image=opts.save_image,
-            image_resample=resample,
-            test_loader=test_loader,
-            image_batch_transform=lambda x: x[_image_ + "_meta_dict"],
-            image_output_transform=lambda output: output[_image_],
+    if opts.phase == Phases.TEST_EX:
+        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
+            opts, _image_, multi_input_keys
         )
-
-        if is_supervised:
-            prepare_batch_fn = get_prepare_batch_fn(
-                opts, _image_, _label_, multi_input_keys, multi_output_keys
-            )
-        else:
-            prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-                opts, _image_, multi_input_keys
-            )
-
-        if use_slidingwindow:
-            if opts.tensor_dim == "2D":
-                inferer = SlidingWindowInferer2Dfor3D(
-                    roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6
-                )
-            elif opts.tensor_dim == "3D":
-                inferer = SlidingWindowInferer(
-                    roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
-                )
-        else:
-            inferer = SimpleInferer()
-
-        evaluator = SupervisedEvaluator(
-            device=device,
-            val_data_loader=test_loader,
-            network=net,
-            prepare_batch=prepare_batch_fn,
-            inferer=inferer,
-            post_transform=None,
-            key_val_metric=key_val_metric,
-            val_handlers=val_handlers,
-            amp=opts.amp,
+        key_metric_transform_fn = lambda x: (x[_pred], None)
+        key_val_metric = None
+    elif opts.phase == Phases.TEST_IN:
+        prepare_batch_fn = get_prepare_batch_fn(
+            opts, _image, _label, multi_input_keys, multi_output_keys
         )
+        key_metric_transform_fn = from_engine([_pred, _label])
+        if opts.output_nc > 1:
+            ch_dim = 0 if decollate else 1
+            key_metric_transform_fn = from_engine(
+                [_pred, _label],
+                transforms=[
+                    lambda x: x,
+                    lambda x: one_hot(x, num_classes=opts.output_nc, dim=ch_dim)
+                ]
+            )
+        key_val_metric = {
+            "val_mean_dice": MeanDice(
+                include_background=False, output_transform=key_metric_transform_fn
+            )
+        }
+
+    # SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
+    if use_slidingwindow:
+        inferer = SlidingWindowInferer(
+            roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
+        )
+    else:
+        inferer = SimpleInferer()
+
+    evaluator = SupervisedEvaluator(
+        device=device,
+        val_data_loader=test_loader,
+        network=net,
+        prepare_batch=prepare_batch_fn,
+        inferer=inferer,
+        postprocessing=post_transforms,
+        key_val_metric=key_val_metric,
+        val_handlers=val_handlers,
+        amp=opts.amp,
+    )
 
         return evaluator
 

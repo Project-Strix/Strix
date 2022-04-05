@@ -10,19 +10,27 @@ from medlp.utilities.click_ex import (
     loss_select,
     model_select,
     data_select,
+    parse_input_str,
 )
-from medlp.utilities.enum import *
+from medlp.utilities.enum import (
+    NORMS,
+    LR_SCHEDULES,
+    FRAMEWORKS,
+    OPTIMIZERS,
+    ACTIVATIONS,
+)
 from utils_cw import prompt_when
 
 
-def get_best_trained_models(exp_folder):
-    model_dir = Path(exp_folder) / "Models"
-    assert model_dir.is_dir(), f"Model dir is not found! {model_dir}"
+def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
+    model_rootdir = Path(exp_folder)
+    assert model_rootdir.is_dir(), f"Model dir is not found! {model_rootdir}"
 
-    subcategories = list(filter(lambda x: x.is_dir(), model_dir.iterdir()))
+    subcategories = list(filter(lambda x: x.is_dir(), model_rootdir.iterdir()))
     best_models = []
-    for subdir in subcategories:
-        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], subdir.iterdir()))
+
+    for model_dir in list(model_rootdir.rglob(best_model_dirname)):
+        files = list(filter(lambda x: x.suffix in [".pt", ".pth"], model_dir.iterdir()))
         if len(files) > 0:
             best_model = sorted(files, key=lambda x: float(x.stem.split("=")[-1]))[-1]
             best_models.append(best_model)
@@ -65,7 +73,7 @@ def common_params(func):
     @option(
         "--framework",
         prompt=True,
-        type=Choice(FRAMEWORK_TYPES),
+        type=Choice(FRAMEWORKS),
         default=1,
         help="Choose your framework type",
     )
@@ -107,9 +115,14 @@ def common_params(func):
         help="Use imbalanced dataset sampling",
     )
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
-    @option("--smooth", type=float, default=0, help="Smooth rate, disable:0")
-    @option("--input-nc", type=int, default=1, help="input data channels")
-    @option("--output-nc", type=int, default=3, help="output channels (classes)")
+    @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
+    @option(
+        "--output-nc",
+        type=int,
+        default=1,
+        prompt=True,
+        help="output channels (classes)",
+    )
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default="", help="Specified training datalist")
     @option("--valid-list", type=str, default="", help="Specified validation datalist")
@@ -135,16 +148,16 @@ def common_params(func):
     @option(
         "--valid-interval",
         type=int,
-        default=4,
+        default=2,
         help="Interval of validation during training",
     )
     @option(
         "--early-stop",
         type=int,
-        default=200,
-        help="Patience of early stopping. default: 200epochs",
+        default=100,
+        help="Patience of early stopping. default: 100epochs",
     )
-    @option("--save-epoch-freq", type=int, default=5, help="Save model freq")
+    @option("--save-epoch-freq", type=int, default=100, help="Save model freq")
     @option("--save-n-best", type=int, default=3, help="Save best N models")
     @option("--amp", is_flag=True, help="Flag of using amp. Need pytorch1.6")
     @option(
@@ -167,6 +180,9 @@ def common_params(func):
         "--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp"
     )
     @option("--debug", is_flag=True, help="Enter debug mode")
+    @option(
+        "--image-size", callback=partial(parse_input_str, dtype=int), help="Image size"
+    )
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -176,7 +192,7 @@ def common_params(func):
 
 def solver_params(func):
     @option(
-        "--optim", type=Choice(OPTIM_TYPES), default="sgd", help="Optimizer for network"
+        "--optim", type=Choice(OPTIMIZERS), default="sgd", help="Optimizer for network"
     )
     @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
     @option("--nesterov", type=bool, default=False, help="Nesterov for SGD")
@@ -191,7 +207,7 @@ def solver_params(func):
     @option(
         "--lr-policy",
         prompt=True,
-        type=Choice(LR_SCHEDULE),
+        type=Choice(LR_SCHEDULES),
         callback=lr_schedule_params,
         default="plateau",
         help="learning rate strategy",
@@ -222,13 +238,13 @@ def network_params(func):
     @option(
         "--layer-norm",
         prompt=True,
-        type=Choice(NORM_TYPES),
+        type=Choice(NORMS),
         default=1,
         help="Layer norm type",
     )
     @option(
         "--layer-act",
-        type=Choice(ACT_TYPES),
+        type=Choice(ACTIVATIONS),
         default="relu",
         help="Layer activation type",
     )
@@ -282,23 +298,13 @@ def latent_auxilary_params(func):
     )
     @option("--config", type=click.Path(exists=True))
     @option("--n-group", type=int, default=1, help="Num of conv groups")
-    # @option("--bott leneck-size", type=int, default=1, help='Size of bottleneck size of VGG net')
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
-def rcnn_params(func):
     @option(
-        "--model-type", type=Choice(RCNN_MODEL_TYPES), default=1, help="RCNN model type"
+        "--do-test",
+        type=bool,
+        default=False,
+        hidden=True,
+        help="Automatically do test after training",
     )
-    @option(
-        "--backbone", type=Choice(RCNN_BACKBONE), default=1, help="RCNN backbone net"
-    )
-    @option("--min-size", type=int, default=800)
-    @option("--max-size", type=int, default=1000)
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

@@ -6,7 +6,7 @@ from monai_ex.transforms import *
 from monai_ex.data import *
 from monai_ex.utils import ensure_tuple, first
 import medlp.utilities.oyaml as yaml
-from medlp.utilities.enum import DIMS, FRAMEWORK_TYPES, PHASES
+from medlp.utilities.enum import DIMS, FRAMEWORKS, PHASES
 from medlp.data_io.dataio import DATASET_MAPPING
 from utils_cw import get_items_from_file
 
@@ -64,7 +64,7 @@ def parse_dataset_config(configs):
     # necessary keys
     check_config(configs, key=["ATTRIBUTE", "DIM"], candidates=DIMS)
     check_config(configs, key=["ATTRIBUTE", "NAME"])
-    check_config(configs, key=["ATTRIBUTE", "FRAMEWORK"], candidates=FRAMEWORK_TYPES)
+    check_config(configs, key=["ATTRIBUTE", "FRAMEWORK"], candidates=FRAMEWORKS)
     check_config(configs, key=["ATTRIBUTE", "KEYS"])
     check_config(
         configs, key=["ATTRIBUTE", "PHASE"], candidates=["train", "valid", "test"]
@@ -93,7 +93,11 @@ def parse_dataset_config(configs):
                 f"args must be dict, but got {args} ({type(args)})"
             arguments.update(args)
 
-            func = mapping[processor][step]
+            try:
+                func = mapping[processor][step]
+            except KeyError as e:
+                print(f"Error: Cannot find key: {step} in {processor}")
+                sys.exit(1)
 
             try:  # TODO extract to function?
                 fn = func(**arguments)
@@ -195,7 +199,7 @@ def create_dataset_from_cfg(
         tensor_dim = opts.get("tensor_dim", None)
         if tensor_dim == "2D":
             dataset_ = DATASETYPE["CacheDataset"]
-            args_ = {"cache_rate": 0.0 if phase is "test" else opts.get("preload", 1)}
+            args_ = {"cache_rate": 0.0 if phase == "test" else opts.get("preload", 1)}
         elif tensor_dim == "3D":
             dataset_ = DATASETYPE["PersistentDataset"]
             args_ = {"cache_dir": opts.get("cache_dir", "./")}
@@ -249,7 +253,7 @@ def test_dataset_from_config(config_path, phase, opts):
             keys=configs["ATTRIBUTE"]["KEYS"],
             prefix=configs["ATTRIBUTE"]["KEYS"],
             logger_handler=logging.StreamHandler(sys.stdout) #! No output!
-            )
+        )
     )
     dataset = create_dataset_from_cfg(
         get_items_from_file(configs["ATTRIBUTE"]["FILES_LIST"], format='auto'),

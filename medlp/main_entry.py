@@ -16,25 +16,27 @@ from types import SimpleNamespace as sn
 from medlp.models import get_engine, get_test_engine
 from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.handlers import SNIP_prune_handler
-from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 from medlp.configures import config as cfg
+from medlp.utilities.enum import Phases
 import medlp.utilities.click_callbacks as clb
+from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
     Print,
+    prompt_when,
     print_smi,
     PathlibEncoder,
     confirmation,
     check_dir,
     get_items_from_file,
+    split_train_test,
 )
 
 import click
 from ignite.engine import Events
 from ignite.utils import setup_logger
-from monai_ex.handlers import TensorboardGraphHandler
+from monai_ex.handlers import TensorboardGraphHandler, SNIP_prune_handler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 
@@ -56,8 +58,8 @@ def train_core(cargs, files_train, files_valid):
     with open(os.path.join(cargs.experiment_path, "valid_files.yml"), "w") as f:
         yaml.dump(files_valid, f)
 
-    train_loader = get_dataloader(cargs, files_train, phase="train")
-    valid_loader = get_dataloader(cargs, files_valid, phase="valid")
+    train_loader = get_dataloader(cargs, files_train, phase=Phases.TRAIN)
+    valid_loader = get_dataloader(cargs, files_valid, phase=Phases.VALID)
 
     # Tensorboard Logger
     writer = SummaryWriter(log_dir=os.path.join(cargs.experiment_path, "tensorboard"))
@@ -76,7 +78,7 @@ def train_core(cargs, files_train, files_valid):
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
 
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level)
+    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
     if cargs.compact_log and not cargs.debug:
         logging.StreamHandler.terminator = "\r"
 
@@ -161,33 +163,62 @@ def train(ctx, **args):
 
     cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
 
-    if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
-        files_train = get_items_from_file(cargs.train_list, format="auto")
-        files_valid = get_items_from_file(cargs.valid_list, format="auto")
-        train_core(cargs, files_train, files_valid)
-        os.sys.exit()
-
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
-        "PATH"
-    ]
-    assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-    files_list = get_items_from_file(data_list, format="auto")
-
-    # dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list][
-        "SOURCE"
-    ]
+    # ! dump dataset file
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
+        cargs.data_list
+    ].get("SOURCE")
     if source_file and os.path.isfile(source_file):
         shutil.copyfile(
             source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
         )
 
+    # ! Manually specified train&valid datalist
+    if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
+        files_train = get_items_from_file(cargs.train_list, format="auto")
+        files_valid = get_items_from_file(cargs.valid_list, format="auto")
+        train_core(cargs, files_train, files_valid)
+        return cargs
+
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
+        "PATH", ""
+    )
+    test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
+        "TEST_PATH"
+    )
+
+    # ! Synthetic test phase
+    if data_list is None:
+        Print('Using synthetic test data...', color='y')
+        train_core(
+            cargs, 
+            [{"image": None, "label": None}, ] * 60,
+            [{"image": None, "label": None}, ] * 40
+        )
+        return cargs
+
+    assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
+    train_datalist = get_items_from_file(data_list, format="auto")
+    test_datalist = []
+
+    if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
+        Print(
+            "Test datalist is not found, split test cohort from "
+            f"training data with split ratio of {cargs.split}",
+            color="y",
+        )
+        train_test_cohort = split_train_test(
+            train_datalist, cargs.split, cfg.get_key("label"), 1, random_seed=cargs.seed
+        )
+        train_datalist, test_datalist = train_test_cohort[0]
+
     if cargs.partial < 1:
-        Print("Use {} data".format(int(len(files_list) * cargs.partial)), color="y")
-        files_list = files_list[: int(len(files_list) * cargs.partial)]
+        Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
+        train_datalist = train_datalist[: int(len(train_datalist) * cargs.partial)]
+    elif cargs.partial > 1:
+        Print(f"Expect partial < 1, but got'{cargs.partial}'. Ignored.")
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
-    if cargs.n_fold > 1 or cargs.n_repeat > 1:  #! K-fold cross-validation
+    if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
         if cargs.n_fold > 1:
             folds = cargs.n_fold
             kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
@@ -201,13 +232,13 @@ def train(ctx, **args):
                 f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})"
             )
 
-        for i, (train_index, test_index) in enumerate(kf.split(files_list)):
+        for i, (train_index, test_index) in enumerate(kf.split(train_datalist)):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
             Print(f"Processing {i+1}/{folds} cross-validation", color="g")
-            files_train = list(np.array(files_list)[train_index])
-            files_valid = list(np.array(files_list)[test_index])
+            train_data = list(np.array(train_datalist)[train_index])
+            valid_data = list(np.array(train_datalist)[test_index])
 
             if "-th" in os.path.basename(cargs.experiment_path):
                 cargs.experiment_path = check_dir(
@@ -216,21 +247,49 @@ def train(ctx, **args):
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
 
-            # copy param.list to fold dir
+            # copy param.list to i-fold dir
             with cargs.experiment_path.joinpath("param.list").open("w") as f:
-                args["n_fold"] = args["n_repeat"] = 0
-                args["experiment_path"] = str(cargs.experiment_path)
-                json.dump(args, f, indent=2)
+                fold_args = args.copy()
+                fold_args["n_fold"] = fold_args["n_repeat"] = 0
+                fold_args["experiment_path"] = str(cargs.experiment_path)
+                json.dump(fold_args, f, indent=2)
 
-            train_core(cargs, files_train, files_valid)
+            train_core(cargs, train_data, valid_data)
             Print("Cleaning CUDA cache...", color="g")
             gc.collect()
             torch.cuda.empty_cache()
-    else:  #! Plain training
-        files_train, files_valid = train_test_split(
-            files_list, test_size=cargs.split, random_state=cargs.seed
+    else:  # ! Plain training
+        train_data, valid_data = train_test_split(
+            train_datalist, test_size=cargs.split, random_state=cargs.seed
         )
-        train_core(cargs, files_train, files_valid)
+        train_core(cargs, train_data, valid_data)
+
+    # ! Do testing
+    if cargs.do_test > 0:
+        if test_file and os.path.isfile(test_file):
+            test_datalist = get_items_from_file(test_file, format="auto")
+        elif len(test_datalist) > 0:
+            test_file = cargs.experiment_path.joinpath("test_files.yml")
+            with test_file.open("w") as f:
+                yaml.dump(test_datalist, f)
+        else:
+            return cargs
+
+        has_labels = np.all([cfg.get_key("label") in item for item in test_datalist])
+
+        if len(test_datalist) > 0:
+            configures = {
+                "config": os.path.join(args["experiment_path"], "param.list"),
+                "test_files": test_file,
+                "with_label": has_labels,
+                "use_best_model": True,
+                "smi": False,
+                "gpus": args["gpus"],
+            }
+            print("****configure:", configures)
+            test_cfg(default_map=configures)
+
+    return cargs
 
 
 @click.command(
@@ -258,7 +317,10 @@ def train_cfg(**args):
     # ctx.invoke(train, **configures)
 
 
-@click.command("test-from-cfg")
+@click.command(
+    "test-from-cfg",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
 @click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
 @click.option(
     "--test-files", type=str, default="", help="External files (json/yaml) for testing"
@@ -274,6 +336,13 @@ def train_cfg(**args):
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--save-latent", is_flag=True, help="Save the latent code")
+@click.option(
+    "--target-layer",
+    type=str,
+    callback=partial(prompt_when, keyword="save_latent"),
+    help="Target layer of saving latent code",
+)
 @click.option(
     "--use-best-model", is_flag=True, help="Automatically select best model for testing"
 )
@@ -318,18 +387,23 @@ def test_cfg(**args):
 
     if args["use_best_model"]:
         model_list = clb.get_best_trained_models(exp_dir)
+        if is_crossvalid:
+            configures["n_fold"] = configures["n_repeat"] = 0
+            is_crossvalid = False
     elif is_crossvalid:
         model_list = [""]
     else:
         model_list = [clb.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
-    phase = "test" if args["with_label"] else "test_wo_label"
+    phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
     configures["experiment_path"] = exp_dir
     configures["resample"] = True  # ! departure
     configures["slidingwindow"] = args["slidingwindow"]
+    configures["save_latent"] = args["save_latent"]
+    configures["target_layer"] = args["target_layer"]
     if args.get("crop_size", None):
         configures["crop_size"] = args["crop_size"]
     configures["out_dir"] = (
@@ -347,7 +421,7 @@ def test_cfg(**args):
         engine = get_test_engine(sn(**configures), test_loader)
         engine.logger = setup_logger(
             f"{configures['tensor_dim']}-Tester", level=logging.INFO
-        )  #! not work
+        )
 
         if isinstance(engine, SupervisedEvaluator):
             Print("Begin testing...", color="g")
@@ -367,38 +441,25 @@ def test_cfg(**args):
                 configures["out_dir"],
                 str(configures["out_dir"]) + "-intra-ensemble",
             )
-        else:
+        elif is_crossvalid:
             os.rename(
                 configures["out_dir"],
-                str(configures["out_dir"]) + "-" + model_path[0].stem,
+                str(configures["out_dir"]) + "-ensemble",
             )
+        else:
+            postfix = (
+                model_path[0].stem
+                if isinstance(model_path, (list, tuple))
+                else model_path.stem
+            )
+            os.rename(configures["out_dir"], str(configures["out_dir"]) + "-" + postfix)
 
 
-@click.command("unlink")
-@click.option(
-    "--root-dir", type=click.Path(exists=True), help="Root dir contains symbolic dirs"
+@click.command(
+    "train-and-test",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
-@click.option(
-    "-a",
-    "--all-dir",
-    is_flag=True,
-    help="Unlink all dirs including both avalible and unavailable dirs",
-)
-def unlink_dirs(root_dir, all_dir):
-    """Utility for unlink invalid symbolic tensorboard dir.
-
-    Args:
-        root_dir (str): Root dir contains symbolic dirs.
-        all_dir (bool): whether unlink both invalid and valid sym dirs.
-    """
-    for d in os.listdir(root_dir):
-        d = os.path.join(root_dir, d)
-        if os.path.islink(d):
-            if not os.path.isdir(d):
-                os.unlink(d)
-                print("Unlinked unavailable symbolic dir:", d)
-            elif all_dir:
-                os.unlink(d)
-                print("Unlinked symbolic dir:", d)
-            else:
-                pass
+@click.pass_context
+def train_and_test(ctx, **args):
+    args.update({"do_test": 1})
+    train_args = train(default_map=args)
