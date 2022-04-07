@@ -6,7 +6,6 @@ import click
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
-from PIL import ImageColor
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
 from utils_cw import get_items_from_file, Print, check_dir
@@ -17,7 +16,7 @@ from torchvision.utils import save_image
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
-from medlp.utilities.enum import FRAMEWORKS
+from medlp.utilities.enum import FRAMEWORKS, Phases
 from medlp.utilities.utils import (
     draw_segmentation_masks,
     draw_segmentation_contour,
@@ -172,7 +171,7 @@ def save_3d_image_grid(
 @click.option(
     "--framework",
     prompt=True,
-    type=Choice(FRAMEWORK_TYPES),
+    type=Choice(FRAMEWORKS),
     default="segmentation",
     help="Choose your framework type",
 )
@@ -205,8 +204,8 @@ def check_data(ctx, **args):
     )
 
     try:
-        train_ds = dataset_fn(files_train, "train", auxilary_params)
-        valid_ds = dataset_fn(files_valid, "valid", auxilary_params)
+        train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)
+        valid_ds = dataset_fn(files_valid, Phases.VALID, auxilary_params)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         Print(
@@ -252,8 +251,8 @@ def check_data(ctx, **args):
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
@@ -274,8 +273,8 @@ def check_data(ctx, **args):
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
@@ -314,8 +313,8 @@ def check_data(ctx, **args):
     elif len(shape) == 3 and channel == 1:
         z_axis = np.argmin(shape)
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
