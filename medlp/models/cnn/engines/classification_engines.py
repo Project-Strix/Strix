@@ -1,4 +1,5 @@
 from typing import Optional, Callable
+from monai.config import KeysCollection
 
 import re
 import logging
@@ -16,7 +17,10 @@ from medlp.models.cnn.engines.utils import (
 from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.utilities.enum import Phases
 from medlp.models.cnn.utils import output_onehot_transform, onehot_process
-from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
+from medlp.models.cnn.engines.utils import (
+    get_prepare_batch_fn,
+    get_unsupervised_prepare_batch_fn,
+)
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
 
@@ -37,11 +41,12 @@ from monai_ex.engines import (
 from monai_ex.transforms import (
     ComposeEx as Compose,
     ActivationsD,
-    AsDiscreteD,
+    AsDiscreteExD as AsDiscreteD,
     MeanEnsembleD,
     VoteEnsembleD,
     SqueezeDimD,
     EnsureTypeD,
+    AddChannelD,
 )
 
 from monai_ex.handlers import (
@@ -59,58 +64,52 @@ from monai_ex.handlers import (
     TensorboardDumper,
     LatentCodeSaver,
     from_engine_ex as from_engine,
+    MetricHandler,
 )
 
 
 @TRAIN_ENGINES.register("classification")
-def build_classification_engine(**kwargs):
-    opts = kwargs["opts"]
-    train_loader = kwargs["train_loader"]
-    test_loader = kwargs["test_loader"]
-    net = kwargs["net"]
-    loss = kwargs["loss"]
-    optim = kwargs["optim"]
-    lr_scheduler = kwargs["lr_scheduler"]
-    writer = kwargs["writer"]
-    valid_interval = kwargs["valid_interval"]
-    device = kwargs["device"]
-    model_dir = kwargs["model_dir"]
-    logger_name = kwargs.get("logger_name", None)
-    decollate = True
-    is_multilabel = opts.output_nc > 1
-    multi_input_keys = kwargs.get("multi_input_keys", None)
-    multi_output_keys = kwargs.get("multi_output_keys", None)
-    _image = cfg.get_key("image")
-    _label = cfg.get_key("label")
-    _pred = cfg.get_key("pred")
-    _loss = cfg.get_key("loss")
+class ClassificationTrainEngine(MedlpTrainEngine):
+    def __new__(
+        self,
+        opts,
+        train_loader,
+        test_loader,
+        net,
+        loss,
+        optim,
+        lr_scheduler,
+        writer,
+        device,
+        model_dir,
+        logger_name,
+        **kwargs,
+    ):
+        valid_interval = kwargs.get("valid_interval", 1)
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        decollate = True
+        is_multilabel = opts.output_nc > 1
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _pred = cfg.get_key("pred")
+        _loss = cfg.get_key("loss")
 
-    prepare_batch_fn = get_prepare_batch_fn(
-        opts, _image, _label, multi_input_keys, multi_output_keys
-    )
+        key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc)
+        val_metric_name = list(key_val_metric.keys())[0]
+        key_train_metric = ClassificationTrainEngine.get_metric("train", opts.output_nc)
+        train_metric_name = list(key_train_metric.keys())[0]
 
-    if is_multilabel:
-        val_metric_name = "val_acc"
-    else:
-        val_metric_name = "val_auc"
+        prepare_batch_fn = get_prepare_batch_fn(
+            opts, _image, _label, multi_input_keys, multi_output_keys
+        )
 
-    val_handlers = [
-        StatsHandler(output_transform=lambda x: None, name=logger_name),
-        TensorBoardStatsHandler(
-            summary_writer=writer,
-            tag_name=val_metric_name,
-            output_transform=lambda x: None,
-        ),
-        TensorBoardImageHandlerEx(
-            summary_writer=writer,
-            batch_transform=lambda x: (None, None),
-            output_transform=from_engine(_image),
-            max_channels=1,
-            prefix_name="Val",
-        ),
-        TensorboardDumper(
-            log_dir=writer.log_dir,
-            epoch_level=True,
+        val_handlers = MedlpTrainEngine.get_extra_handlers(
+            phase="val",
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
+            tb_summary_writer=writer,
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
             save_bestmodel=True,
@@ -118,7 +117,7 @@ def build_classification_engine(**kwargs):
             bestmodel_n_saved=opts.save_n_best,
             tb_show_image=True,
             tb_image_batch_transform=lambda x: (None, None),
-            tb_image_output_transform=lambda x: x["image"],
+            tb_image_output_transform=from_engine(_image),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -131,68 +130,41 @@ def build_classification_engine(**kwargs):
         if opts.output_nc == 1:
             train_post_transforms = Compose(
                 [
-                    ActivationsD(keys=_pred_, sigmoid=True),
+                    EnsureTypeD(keys=[_pred, _label]),
+                    ActivationsD(keys=_pred, sigmoid=True),
                     # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
                 ]
             )
         else:
             train_post_transforms = Compose(
                 [
-                    ActivationsD(keys=_pred_, softmax=True),
-                    AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False),
-                    SqueezeDimD(keys=_pred_),
+                    ActivationsD(keys=_pred, softmax=True),
+                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
+                    EnsureTypeD(keys=[_pred, _label]),
                 ]
             )
 
-    if opts.output_nc == 1:
-        train_post_transforms = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, sigmoid=True),
-                # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-            ]
-        )
-    else:
-        train_post_transforms = Compose(
-            [
-                ActivationsD(keys=_pred, softmax=True),
-                AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
-                EnsureTypeD(keys=[_pred, _label]),
-            ]
-        )
-
-    if is_multilabel:
-        key_val_metric = Accuracy(
-            # output_transform=partial(output_onehot_transform, n_classes=opts.output_nc),
-            output_transform=from_engine(
-                [_pred, _label],
-                onehot_process(opts.output_nc),
-            ),
-            is_multilabel=is_multilabel,
-        )
-    else:
-        key_val_metric = ROCAUC(
-            output_transform=from_engine(
-                [_pred, _label], onehot_process(opts.output_nc)
-            )
+        evaluator = SupervisedEvaluatorEx(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            epoch_length=int(opts.n_epoch_len)
+            if opts.n_epoch_len > 1.0
+            else int(opts.n_epoch_len * len(test_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(),
+            postprocessing=train_post_transforms,
+            key_val_metric=key_val_metric,
+            val_handlers=val_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
         )
 
-    evaluator = SupervisedEvaluatorEx(
-        device=device,
-        val_data_loader=test_loader,
-        network=net,
-        epoch_length=int(opts.n_epoch_len)
-        if opts.n_epoch_len > 1.0
-        else int(opts.n_epoch_len * len(test_loader)),
-        prepare_batch=prepare_batch_fn,
-        inferer=SimpleInfererEx(),
-        postprocessing=train_post_transforms,
-        key_val_metric={val_metric_name: key_val_metric},
-        val_handlers=val_handlers,
-        amp=opts.amp,
-        decollate=decollate,
-        custom_keys=cfg.get_keys_dict(),
-    )
+        if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
+        else:
+            lr_step_transform = lambda x: ()
 
         train_handlers = [
             ValidationHandler(
@@ -211,232 +183,183 @@ def build_classification_engine(**kwargs):
             optimizer=optim,
             tb_summary_writer=writer,
             logger_name=logger_name,
-            stats_dicts={"train_loss": lambda x: x[_loss_]},
+            stats_dicts={"train_loss": from_engine(_loss, first=True)},
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=opts.save_n_best,
             tb_show_image=True,
             tb_image_batch_transform=lambda x: (None, None),
-            tb_image_output_transform=lambda x: x["image"],
+            tb_image_output_transform=from_engine(_image),
         )
 
-    train_handlers = [
-        LrScheduleTensorboardHandler(
-            lr_scheduler=lr_scheduler,
-            summary_writer=writer,
-            step_transform=lr_step_transform,
-        ),
-        ValidationHandler(
-            validator=evaluator, interval=valid_interval, epoch_level=True
-        ),
-        StatsHandler(
-            tag_name="train_loss",
-            output_transform=from_engine(_loss, first=True),
-            name=logger_name,
-        ),
-        TensorBoardStatsHandler(
-            summary_writer=writer,
-            tag_name="train_loss",
-            output_transform=from_engine(_loss),
-        ),
-        CheckpointSaverEx(
-            save_dir=model_dir / "Checkpoint",
-            save_dict={"net": net, "optim": optim},
-            save_interval=opts.save_epoch_freq,
-            epoch_level=True,
-            n_saved=opts.save_n_best,
-        ),  #!n_saved=None
-        TensorBoardImageHandlerEx(
-            summary_writer=writer,
-            batch_transform=lambda x: (None, None),
-            output_transform=from_engine(_image),
-            max_channels=1,
-            prefix_name="Train",
-        ),
-    ]
+        trainer = SupervisedTrainerEx(
+            device=device,
+            max_epochs=opts.n_epoch,
+            train_data_loader=train_loader,
+            network=net,
+            optimizer=optim,
+            loss_function=loss,
+            epoch_length=int(opts.n_epoch_len)
+            if opts.n_epoch_len > 1.0
+            else int(opts.n_epoch_len * len(train_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(logger_name),
+            postprocessing=train_post_transforms,
+            key_train_metric=key_train_metric,
+            # additional_metrics={"roccurve": add_roc_metric},
+            train_handlers=train_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+        )
 
-    trainer = SupervisedTrainerEx(
-        device=device,
-        max_epochs=opts.n_epoch,
-        train_data_loader=train_loader,
-        network=net,
-        optimizer=optim,
-        loss_function=loss,
-        epoch_length=int(opts.n_epoch_len)
-        if opts.n_epoch_len > 1.0
-        else int(opts.n_epoch_len * len(train_loader)),
-        prepare_batch=prepare_batch_fn,
-        inferer=SimpleInfererEx(logger_name),
-        postprocessing=train_post_transforms,
-        key_train_metric={"train_auc": key_val_metric},
-        # additional_metrics={"roccurve": add_roc_metric},
-        train_handlers=train_handlers,
-        amp=opts.amp,
-        decollate=decollate,
-        custom_keys=cfg.get_keys_dict(),
-    )
+        if opts.early_stop > 0:
+            early_stopper = EarlyStopping(
+                patience=opts.early_stop,
+                score_function=stopping_fn_from_metric(val_metric_name),
+                trainer=trainer,
+            )
+            evaluator.add_event_handler(
+                event_name=Events.EPOCH_COMPLETED, handler=early_stopper
+            )
 
         return trainer
 
     @staticmethod
     def get_metric(phase: str, output_nc: int):
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
         if output_nc > 1:
             key_val_metric = Accuracy(
-                output_transform=partial(output_onehot_transform, n_classes=output_nc),
-                is_multilabel=is_multilabel,
+                output_transform=from_engine(
+                    [_pred, _label],
+                    onehot_process(output_nc),
+                ),
+                is_multilabel=True,
             )
             return {phase + "_acc": key_val_metric}
         else:
             key_val_metric = ROCAUC(
-                output_transform=partial(output_onehot_transform, n_classes=output_nc)
+                output_transform=from_engine([_pred, _label], onehot_process(output_nc))
             )
             return {phase + "_auc": key_val_metric}
 
 
 @TEST_ENGINES.register("classification")
-def build_classification_test_engine(**kwargs):
-    opts = kwargs["opts"]
-    test_loader = kwargs["test_loader"]
-    net = kwargs["net"]
-    device = kwargs["device"]
-    logger_name = kwargs.get("logger_name", None)
-    is_multilabel = opts.output_nc > 1
-    is_supervised = kwargs.get("is_supervised", opts.phase == Phases.TEST_IN)
-    multi_input_keys = kwargs.get("multi_input_keys", None)
-    multi_output_keys = kwargs.get("multi_output_keys", None)
-    output_latent_code = kwargs.get("output_latent_code", False)
-    target_latent_layer = kwargs.get("target_latent_layer", None)
-    root_dir = output_filename_check(test_loader.dataset)
-    decollate = True
-    _image = cfg.get_key("image")
-    _label = cfg.get_key("label")
-    _pred = cfg.get_key("pred")
-    _acti = cfg.get_key("forward")
+class ClassificationTestEngine(MedlpTestEngine):
+    def __new__(
+        self,
+        opts,
+        test_loader,
+        net,
+        device,
+        logger_name,
+        **kwargs,
+    ):
+        is_multilabel = opts.output_nc > 1
+        is_supervised = kwargs.get("is_supervised", opts.phase == Phases.TEST_IN)
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        output_latent_code = kwargs.get("output_latent_code", False)
+        target_latent_layer = kwargs.get("target_latent_layer", None)
+        root_dir = output_filename_check(test_loader.dataset)
+        decollate = False
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _pred = cfg.get_key("pred")
+        _acti = cfg.get_key("forward")
 
-    model_path = (
-        opts.model_path[0]
-        if isinstance(opts.model_path, (list, tuple))
-        else opts.model_path
-    )
-
-    if is_supervised:
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image, _label, multi_input_keys, multi_output_keys
-        )
-    else:
-        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-            opts, _image, multi_input_keys
+        model_path = (
+            opts.model_path[0]
+            if isinstance(opts.model_path, (list, tuple))
+            else opts.model_path
         )
 
-    def debug(data):
-        print("--debug:", type(data), len(data), data)
-        return data
-
-    if not is_multilabel:
-        saver_post_transform = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, sigmoid=True),
-                from_engine(_pred)
-            ],
-            first=False,
-        )
-        acc_post_transforms = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, sigmoid=True),
-                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
-                from_engine([_pred, _label], ensure_dim=decollate),
-            ],
-            first=decollate,
-        )
-        auc_post_transforms = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, sigmoid=True),
-                from_engine([_pred, _label], ensure_dim=decollate),
-            ],
-            first=decollate,
-        )
-    else:
-        saver_post_transform = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, softmax=True),
-                AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
-                from_engine(_pred)
-            ],
-            first=False,
-        )
-        acc_post_transforms = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, softmax=True),
-                AsDiscreteD(keys=_pred, argmax=True, to_onehot=False),
-                from_engine([_pred, _label], onehot_process(opts.output_nc)),
-            ]
-        )
-        auc_post_transforms = Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                ActivationsD(keys=_pred, softmax=True),
-                AsDiscreteD(keys=_pred, argmax=True, to_onehot=False),
-                from_engine([_pred, _label], onehot_process(opts.output_nc)),
-            ]
-
-    val_handlers = [
-        StatsHandler(name=logger_name),
-        CheckpointLoader(load_path=model_path, load_dict={"net": net}),
-    ]
-
-    if get_attr_(opts, "save_results", True):
-        has_label = opts.phase == Phases.TEST_IN
-        val_handlers += [
-            ClassificationSaverEx(
-                output_dir=opts.out_dir,
-                save_labels=has_label,
-                batch_transform=from_engine([_image + "_meta_dict", _label])
-                if has_label
-                else from_engine(_image + "_meta_dict"),
-                output_transform=saver_post_transform,
-            ),
-            ClassificationSaverEx(
-                output_dir=opts.out_dir,
-                filename="logits.csv",
-                batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=from_engine(_pred),
-            ),
-        ]
-
-    if get_attr_(opts, "save_image", False):
-        val_handlers += [
-            SegmentationSaver(
-                output_dir=opts.out_dir,
-                output_postfix=_image,
-                data_root_dir=root_dir,
-                resample=False,
-                mode="bilinear",
-                batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=from_engine(_image),
+        if is_supervised:
+            prepare_batch_fn = get_prepare_batch_fn(
+                opts, _image, _label, multi_input_keys, multi_output_keys
             )
-        ]
-
-    if output_latent_code:
-        val_handlers += [
-            LatentCodeSaver(
-                output_dir=opts.out_dir,
-                filename="latent",
-                data_root_dir=root_dir,
-                overwrite=True,
-                batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=from_engine(_acti),
-                name=logger_name,
-                save_to_np=True,
-                save_as_onefile=True,
+        else:
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(
+                opts, _image, multi_input_keys
             )
-        ]
 
-    if is_supervised:
+        if not is_multilabel:
+            saver_post_transform = Compose(
+                [
+                    EnsureTypeD(keys=[_pred, _label]),
+                    ActivationsD(keys=_pred, sigmoid=True),
+                    from_engine(_pred),
+                ],
+                first=False,
+            )
+        else:
+            saver_post_transform = Compose(
+                [
+                    EnsureTypeD(keys=[_pred, _label]),
+                    ActivationsD(keys=_pred, softmax=True),
+                    AsDiscreteD(keys=_pred, argmax=True),
+                    from_engine(_pred),
+                ],
+                first=False,
+            )
+
+        key_val_metric = ClassificationTestEngine.get_metric("acc", opts.output_nc, decollate)
+        key_metric_name = list(key_val_metric.keys())
+        additional_val_metrics = ClassificationTestEngine.get_metric(
+            ["auc", "prec", "recall", "roc"], opts.output_nc, decollate, opts.out_dir
+        )
+        additional_metric_names = list(additional_val_metrics.keys())
+
+        val_handlers = MedlpTestEngine.get_extra_handlers(
+            phase=opts.phase,
+            out_dir=opts.out_dir,
+            model_path=model_path,
+            net=net,
+            logger_name=logger_name,
+            stats_dicts={'Metrics': lambda x: None},
+            save_image=opts.save_image,
+            image_resample=False,
+            test_loader=test_loader,
+            image_batch_transform=from_engine(_image + "_meta_dict"),
+            image_output_transform=from_engine(_image),
+        )
+
+        if get_attr_(opts, "save_results", True):
+            has_label = opts.phase == Phases.TEST_IN
+            val_handlers += [
+                ClassificationSaverEx(
+                    output_dir=opts.out_dir,
+                    save_labels=has_label,
+                    batch_transform=from_engine([_image + "_meta_dict", _label])
+                    if has_label
+                    else from_engine(_image + "_meta_dict"),
+                    output_transform=saver_post_transform,
+                ),
+                ClassificationSaverEx(
+                    output_dir=opts.out_dir,
+                    filename="logits.csv",
+                    batch_transform=from_engine(_image + "_meta_dict"),
+                    output_transform=from_engine(_pred),
+                ),
+            ]
+
+        if output_latent_code:
+            val_handlers += [
+                LatentCodeSaver(
+                    output_dir=opts.out_dir,
+                    filename="latent",
+                    data_root_dir=root_dir,
+                    overwrite=True,
+                    batch_transform=from_engine(_image + "_meta_dict"),
+                    output_transform=from_engine(_acti),
+                    name=logger_name,
+                    save_to_np=True,
+                    save_as_onefile=True,
+                )
+            ]
+
         evaluator = SupervisedEvaluatorEx(
             device=device,
             val_data_loader=test_loader,
@@ -446,28 +369,7 @@ def build_classification_test_engine(**kwargs):
             postprocessing=None,  # post_transforms,
             val_handlers=val_handlers,
             key_val_metric=key_val_metric if is_supervised else None,
-            additional_metrics=ClassificationTestEngine.get_metric(
-                ["auc", "prec", "recall", "roc"], opts.output_nc, opts.out_dir
-            )
-            if is_supervised
-            else None,
-            amp=opts.amp,
-            decollate=decollate,
-            custom_keys=cfg.get_keys_dict(),
-            output_latent_code=output_latent_code,
-            target_latent_layer=target_latent_layer,
-        )
-    else:
-        evaluator = SupervisedEvaluatorEx(
-            device=device,
-            val_data_loader=test_loader,
-            network=net,
-            prepare_batch=prepare_batch_fn,
-            inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-            postprocessing=None,
-            val_handlers=val_handlers,
-            key_val_metric=None,
-            additional_metrics=None,
+            additional_metrics=additional_val_metrics if is_supervised else None,
             amp=opts.amp,
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
@@ -475,48 +377,139 @@ def build_classification_test_engine(**kwargs):
             target_latent_layer=target_latent_layer,
         )
 
-        discrete_tsf = (
-            AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False)
+        return evaluator
+
+    @staticmethod
+    def get_metric(metric_names, output_nc, decollate, output_dir=None):
+        metric_names = ensure_tuple(metric_names)
+        is_multilabel = output_nc > 1
+        metrics = {}
+        for name in metric_names:
+            if name == "acc":
+                transform = ClassificationTestEngine.get_acc_post_transform(
+                    output_nc, decollate
+                )
+                m = {
+                    f"test_{name}": Accuracy(
+                        output_transform=transform, is_multilabel=is_multilabel
+                    )
+                }
+            elif name == "auc":
+                transform = ClassificationTestEngine.get_auc_post_transform(
+                    output_nc, decollate
+                )
+                m = {
+                    f"test_{name}": ROCAUC(output_transform=transform),
+                }
+            elif name == "prec":
+                transform = ClassificationTestEngine.get_acc_post_transform(
+                    output_nc, decollate
+                )
+                m = {
+                    f"test_{name}": Precision(
+                        output_transform=transform,
+                        average=is_multilabel,
+                        is_multilabel=is_multilabel,
+                    )
+                }
+            elif name == "recall":
+                transform = ClassificationTestEngine.get_acc_post_transform(
+                    output_nc, decollate
+                )
+                m = {
+                    f"test_{name}": Recall(
+                        output_transform=transform,
+                        average=is_multilabel,
+                        is_multilabel=is_multilabel,
+                    ),
+                }
+            elif name == "roc":
+                transform = ClassificationTestEngine.get_auc_post_transform(
+                    output_nc, decollate
+                )
+                m = {
+                    f"test_{name}": DrawRocCurve(
+                        save_dir=output_dir,
+                        output_transform=transform,
+                        is_multilabel=is_multilabel,
+                    ),
+                }
+            else:
+                raise NotImplementedError(
+                    "Currently only support 'acc, auc, prec, recall, roc' as metric",
+                    f"but got {name}.",
+                )
+            metrics.update(m)
+        return metrics
+
+    @staticmethod
+    def get_acc_post_transform(output_nc, decollate):
+        is_multilabel = output_nc > 1
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        activate_transform = (
+            ActivationsD(keys=_pred, softmax=True)
             if is_multilabel
-            else AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5)
+            else ActivationsD(keys=_pred, sigmoid=True)
         )
 
-        squeeze_tsf = SqueezeDimD(keys=_pred_) if is_multilabel else lambda x: x
+        discrete_transform = (
+            AsDiscreteD(
+                keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True
+            )
+            if is_multilabel
+            else AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)
+        )
+
+        onehot_transform = (
+            from_engine(
+                [_pred, _label], [lambda x: x, onehot_process(output_nc, verbose=True)]
+            )
+            if is_multilabel
+            else from_engine([_pred, _label], ensure_dim=decollate)
+        )
 
         return Compose(
             [
-                activation_tsf,
-                discrete_tsf,
-                squeeze_tsf,
-                partial(output_onehot_transform, n_classes=output_nc),
-            ]
+                EnsureTypeD(keys=[_pred, _label]),
+                activate_transform,
+                discrete_transform,
+                onehot_transform,
+            ],
+            first=decollate,
         )
 
     @staticmethod
-    def get_auc_post_transform(output_nc):
+    def get_auc_post_transform(output_nc, decollate):
         is_multilabel = output_nc > 1
-        _pred_ = cfg.get_key("pred")
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
 
-        activation_tsf = (
-            ActivationsD(keys=_pred_, softmax=True)
+        activate_transform = (
+            ActivationsD(keys=_pred, softmax=True)
             if is_multilabel
-            else ActivationsD(keys=_pred_, sigmoid=True)
+            else ActivationsD(keys=_pred, sigmoid=True)
         )
 
-        discrete_tsf = (
-            AsDiscreteD(keys=_pred_, argmax=True, to_onehot=False)
+        discrete_transform = (
+            AsDiscreteD(keys=_pred, argmax=True, to_onehot=False)
             if is_multilabel
             else lambda x: x
         )
 
-        squeeze_tsf = SqueezeDimD(keys=_pred_) if is_multilabel else lambda x: x
+        onehot_transform = (
+            from_engine([_pred, _label], onehot_process(output_nc, verbose=True))
+            if is_multilabel
+            else from_engine([_pred, _label], ensure_dim=decollate)
+        )
 
         return Compose(
             [
-                activation_tsf,
-                discrete_tsf,
-                squeeze_tsf,
-                partial(output_onehot_transform, n_classes=output_nc),
+                EnsureTypeD(keys=[_pred, _label]),
+                activate_transform,
+                discrete_transform,
+                onehot_transform,
             ]
         )
 
