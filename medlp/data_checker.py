@@ -17,7 +17,7 @@ from torchvision.utils import save_image
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
-from medlp.utilities.enum import FRAMEWORK_TYPES
+from medlp.utilities.enum import FRAMEWORKS
 from medlp.utilities.utils import (
     draw_segmentation_masks,
     draw_segmentation_contour,
