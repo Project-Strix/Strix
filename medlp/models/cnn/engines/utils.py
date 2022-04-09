@@ -1,7 +1,7 @@
 import re
 from monai.networks import one_hot
 import torch
-
+from monai_ex.handlers import from_engine_ex as from_engine
 
 def get_best_model(folder, float_regex=r"=(-?\d+\.\d+).pt"):
     models = list(
@@ -132,22 +132,17 @@ def get_unsupervised_prepare_batch_fn(opts, image_key, multi_input_keys):
     return prepare_batch_fn
 
 
-def get_dice_metric_transform_fn(output_nc, criterion, pred_key, label_key):
-    multiclass = output_nc > 1
-    if criterion in ["CE", "WCE"] and multiclass:
-        key_metric_transform_fn = lambda x: (
-            x[pred_key],
-            one_hot(x[label_key].unsqueeze(dim=1), num_classes=output_nc),
-        )
-    elif multiclass:
-        key_metric_transform_fn = lambda x: (
-            x[pred_key],
-            one_hot(x[label_key], num_classes=output_nc),
+def get_dice_metric_transform_fn(output_nc, pred_key, label_key, decollate):
+    if output_nc > 1:
+        ch_dim = 0 if decollate else 1
+        key_metric_transform_fn = from_engine(
+            [pred_key, label_key],
+            transforms=[
+                lambda x: x,
+                lambda x: one_hot(x, num_classes=output_nc, dim=ch_dim)
+            ]
         )
     else:
-        key_metric_transform_fn = lambda x: (
-            x[pred_key],
-            x[label_key],
-        )
+        key_metric_transform_fn = from_engine([pred_key, label_key])
 
     return key_metric_transform_fn
