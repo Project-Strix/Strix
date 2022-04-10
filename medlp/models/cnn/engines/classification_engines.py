@@ -64,7 +64,6 @@ from monai_ex.handlers import (
     TensorboardDumper,
     LatentCodeSaver,
     from_engine_ex as from_engine,
-    MetricHandler,
 )
 
 
@@ -285,27 +284,9 @@ class ClassificationTestEngine(MedlpTestEngine):
                 opts, _image, multi_input_keys
             )
 
-        if not is_multilabel:
-            saver_post_transform = Compose(
-                [
-                    EnsureTypeD(keys=[_pred, _label]),
-                    ActivationsD(keys=_pred, sigmoid=True),
-                    from_engine(_pred),
-                ],
-                first=False,
-            )
-        else:
-            saver_post_transform = Compose(
-                [
-                    EnsureTypeD(keys=[_pred, _label]),
-                    ActivationsD(keys=_pred, softmax=True),
-                    AsDiscreteD(keys=_pred, argmax=True),
-                    from_engine(_pred),
-                ],
-                first=False,
-            )
-
-        key_val_metric = ClassificationTestEngine.get_metric("acc", opts.output_nc, decollate)
+        key_val_metric = ClassificationTestEngine.get_metric(
+            "acc", opts.output_nc, decollate
+        )
         key_metric_name = list(key_val_metric.keys())
         additional_val_metrics = ClassificationTestEngine.get_metric(
             ["auc", "prec", "recall", "roc"], opts.output_nc, decollate, opts.out_dir
@@ -318,7 +299,7 @@ class ClassificationTestEngine(MedlpTestEngine):
             model_path=model_path,
             net=net,
             logger_name=logger_name,
-            stats_dicts={'Metrics': lambda x: None},
+            stats_dicts={"Metrics": lambda x: None},
             save_image=opts.save_image,
             image_resample=False,
             test_loader=test_loader,
@@ -326,23 +307,30 @@ class ClassificationTestEngine(MedlpTestEngine):
             image_output_transform=from_engine(_image),
         )
 
-        if get_attr_(opts, "save_results", True):
-            has_label = opts.phase == Phases.TEST_IN
+        has_label = opts.phase == Phases.TEST_IN
+        val_handlers += [
+            ClassificationSaverEx(
+                output_dir=opts.out_dir,
+                save_labels=has_label,
+                batch_transform=from_engine([_image + "_meta_dict", _label])
+                if has_label
+                else from_engine(_image + "_meta_dict"),
+                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
+                    opts.output_nc
+                ),
+            )
+        ]
+
+        if opts.save_prob:
             val_handlers += [
                 ClassificationSaverEx(
                     output_dir=opts.out_dir,
-                    save_labels=has_label,
-                    batch_transform=from_engine([_image + "_meta_dict", _label])
-                    if has_label
-                    else from_engine(_image + "_meta_dict"),
-                    output_transform=saver_post_transform,
-                ),
-                ClassificationSaverEx(
-                    output_dir=opts.out_dir,
-                    filename="logits.csv",
+                    filename="prob.csv",
                     batch_transform=from_engine(_image + "_meta_dict"),
-                    output_transform=from_engine(_pred),
-                ),
+                    output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
+                        opts.output_nc, discrete=False
+                    ),
+                )
             ]
 
         if output_latent_code:
@@ -512,6 +500,40 @@ class ClassificationTestEngine(MedlpTestEngine):
                 onehot_transform,
             ]
         )
+
+    @staticmethod
+    def get_cls_saver_post_transform(
+        output_nc: int, discrete: bool = True, logit_thresh: float = 0.5
+    ):
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        if output_nc == 1:
+            return Compose(
+                [
+                    EnsureTypeD(keys=[_pred, _label]),
+                    ActivationsD(keys=_pred, sigmoid=True),
+                    AsDiscreteD(
+                        keys=_pred, threshold_values=True, logit_thresh=logit_thresh
+                    )
+                    if discrete
+                    else lambda x: x,
+                    from_engine(_pred),
+                ],
+                first=False,
+            )
+        else:
+            return Compose(
+                [
+                    EnsureTypeD(keys=[_pred, _label]),
+                    ActivationsD(keys=_pred, softmax=True),
+                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)
+                    if discrete
+                    else lambda x: x,
+                    from_engine(_pred),
+                ],
+                first=False,
+            )
 
 
 @ENSEMBLE_TEST_ENGINES.register("classification")

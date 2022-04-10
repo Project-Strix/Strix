@@ -278,6 +278,21 @@ class SegmentationTestEngine(MedlpTestEngine):
             ),
         ]
 
+        if opts.save_prob:
+            val_handlers += [
+                SegmentationSaver(
+                    output_dir=opts.out_dir,
+                    output_ext=".nii.gz",
+                    output_postfix="prob",
+                    resample=resample,
+                    data_root_dir=output_filename_check(test_loader.dataset),
+                    batch_transform=from_engine(_image + "_meta_dict"),
+                    output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
+                        opts.output_nc, decollate, discrete=False
+                    ),
+                ),
+            ]   
+
         val_handlers += MedlpTestEngine.get_extra_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
