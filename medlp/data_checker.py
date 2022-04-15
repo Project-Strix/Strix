@@ -17,7 +17,7 @@ from torchvision.utils import save_image
 from medlp.utilities.click_callbacks import data_select
 from medlp.utilities.click_ex import NumericChoice as Choice
 from medlp.utilities.click_ex import get_unknown_options
-from medlp.utilities.enum import FRAMEWORK_TYPES
+from medlp.utilities.enum import FRAMEWORKS, Phases
 from medlp.utilities.utils import (
     draw_segmentation_masks,
     draw_segmentation_contour,
@@ -43,10 +43,7 @@ def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index):
 
 
 def save_fnames(data, img_meta_key, image_fpath):
-    fnames = {
-        idx + 1: fname
-        for idx, fname in enumerate(data[img_meta_key]["filename_or_obj"])
-    }
+    fnames = {idx + 1: fname for idx, fname in enumerate(data[img_meta_key]["filename_or_obj"])}
     image_fpath = str(image_fpath).split("-chn")[0]
     output_path = os.path.splitext(image_fpath)[0] + "-fnames.yml"
     with open(output_path, "w") as f:
@@ -72,16 +69,13 @@ def save_2d_image_grid(
             mask = torch.index_select(mask, dim=axis, index=torch.tensor(chn_idx))
 
     if mask is not None:
-        data_slice = (
-            norm_tensor(images, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
-        )
+        data_slice = norm_tensor(images, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
         mask_slice = mask.to(torch.bool)
+        mask_num_classes = len(mask_slice.unique())
 
         images = torch.cat(
             [
-                overlap_method(
-                    img, msk, 0.6, colors=get_colors(msk.size()[0])
-                ).unsqueeze(0)
+                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.size()[0], mask_num_classes))).unsqueeze(0)
                 for img, msk in zip(data_slice, mask_slice)
             ]
         ).float()
@@ -95,9 +89,7 @@ def save_2d_image_grid(
         isFile=True,
     )
 
-    save_image(
-        images, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True
-    )
+    save_image(images, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True)
 
     return output_path
 
@@ -115,29 +107,18 @@ def save_3d_image_grid(
     overlap_method=draw_segmentation_masks,
     mask=None,
 ):
-    data_slice = torch.index_select(
-        images, dim=axis, index=torch.tensor(slice_index)
-    ).squeeze(axis)
+    data_slice = torch.index_select(images, dim=axis, index=torch.tensor(slice_index)).squeeze(axis)
 
     if mask is not None:
-        mask_slice = torch.index_select(
-            mask, dim=axis, index=torch.tensor(slice_index)
-        ).squeeze(axis)
+        mask_slice = torch.index_select(mask, dim=axis, index=torch.tensor(slice_index)).squeeze(axis)
 
-        data_slice = (
-            norm_tensor(data_slice, None)
-            .mul(255)
-            .add_(0.5)
-            .clamp_(0, 255)
-            .to(torch.uint8)
-        )
+        data_slice = norm_tensor(data_slice, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
         mask_slice = mask_slice.to(torch.bool)
+        mask_num_classes = len(mask_slice.unique())
 
         data_slice = torch.cat(
             [
-                overlap_method(
-                    img, msk, 0.6, colors=get_colors(msk.size()[0])
-                ).unsqueeze(0)
+                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.size()[0], mask_num_classes))).unsqueeze(0)
                 for img, msk in zip(data_slice, mask_slice)
             ]
         ).float()
@@ -147,48 +128,26 @@ def save_3d_image_grid(
     else:
         output_fname = f"slice{slice_index}.png"
 
-    output_path = check_dir(
-        out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True
-    )
-
-    save_image(
-        data_slice, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True
-    )
+    output_path = check_dir(out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True)
+    save_image(data_slice, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True)
 
     return output_path
 
 
-@click.command(
-    "check-data",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
+@click.command("check-data", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@click.option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
 @click.option(
-    "--tensor-dim",
-    prompt=True,
-    type=Choice(["2D", "3D"]),
-    default="2D",
-    help="2D or 3D",
+    "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
-@click.option(
-    "--framework",
-    prompt=True,
-    type=Choice(FRAMEWORK_TYPES),
-    default="segmentation",
-    help="Choose your framework type",
-)
-@click.option(
-    "--data-list", type=str, callback=data_select, default=None, help="Data file list"
-)
+@click.option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
 @click.option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
 @click.option("--split", type=float, default=0.2, help="Training/testing split ratio")
 @click.option("--save-raw", is_flag=True, help="Save processed raw image to local")
 @click.option("--mask-overlap", is_flag=True, help="Overlapping mask if exists")
 @click.option("--contour-overlap", is_flag=True, help="Overlapping mask's contour")
-@click.option("--mask-key", type=str, help="Specify mask key, default is 'mask'")
+@click.option("--mask-key", type=str, default="mask", help="Specify mask key, default is 'mask'")
 @click.option("--seed", type=int, default=101, help="random seed")
-@click.option(
-    "--out-dir", type=str, prompt=True, default=cfg.get_medlp_cfg("OUTPUT_DIR")
-)
+@click.option("--out-dir", type=str, prompt=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
 @click.pass_context
 def check_data(ctx, **args):
     cargs = sn(**args)
@@ -200,18 +159,14 @@ def check_data(ctx, **args):
     dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
     files_list = get_items_from_file(dataset_list, format="auto")
 
-    files_train, files_valid = train_test_split(
-        files_list, test_size=cargs.split, random_state=cargs.seed
-    )
+    files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
 
     try:
-        train_ds = dataset_fn(files_train, "train", auxilary_params)
-        valid_ds = dataset_fn(files_valid, "valid", auxilary_params)
+        train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)
+        valid_ds = dataset_fn(files_valid, Phases.VALID, auxilary_params)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
-        Print(
-            f"Creating dataset '{cargs.data_list}' failed! \nMsg: {repr(e)}", color="r"
-        )
+        Print(f"Creating dataset '{cargs.data_list}' failed! \nMsg: {repr(e)}", color="r")
         Print("Exception trace:", color="r")
         print("\n".join(traceback.format_tb(exc_tb)))
         return
@@ -220,12 +175,8 @@ def check_data(ctx, **args):
 
     train_num = min(cargs.n_batch, len(train_ds))
     valid_num = min(cargs.n_batch, len(valid_ds))
-    train_dataloader = DataLoader(
-        train_ds, num_workers=1, batch_size=train_num, shuffle=True
-    )
-    valid_dataloader = DataLoader(
-        valid_ds, num_workers=1, batch_size=valid_num, shuffle=False
-    )
+    train_dataloader = DataLoader(train_ds, num_workers=1, batch_size=train_num, shuffle=True)
+    valid_dataloader = DataLoader(valid_ds, num_workers=1, batch_size=valid_num, shuffle=False)
     train_data = first(train_dataloader)
     # valid_data = first(valid_dataloader)
 
@@ -237,11 +188,11 @@ def check_data(ctx, **args):
     print("Channel:", channel, "Shape:", shape)
 
     if cargs.mask_overlap and cargs.contour_overlap:
-        raise ValueError('mask_overlap/contour_overlap can only choose one!')
+        raise ValueError("mask_overlap/contour_overlap can only choose one!")
     overlap = cargs.mask_overlap or cargs.contour_overlap
 
     if overlap and not exist_mask:
-        Print(f"{msk_key} is not found in datalist.", color='y')
+        Print(f"{msk_key} is not found in datalist.", color="y")
 
     if cargs.mask_overlap:
         overlap_m = draw_segmentation_masks
@@ -268,6 +219,21 @@ def check_data(ctx, **args):
                     overlap_method=overlap_m,
                     mask=msk,
                 )
+
+                if cargs.save_raw:
+                    if isinstance(data[img_key], torch.Tensor):
+                        out_data = data[img_key].cpu().numpy()
+                    else:
+                        out_data = data[img_key]
+
+                    save_raw_image(
+                        out_data,
+                        data[f"{img_key}_meta_dict"],
+                        cargs.out_dir,
+                        phase,
+                        cargs.data_list,
+                        i,
+                    )
 
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
 
@@ -338,6 +304,4 @@ def check_data(ctx, **args):
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
 
     else:
-        raise NotImplementedError(
-            f"Not implement data-checking for shape of {shape}, channel of {channel}"
-        )
+        raise NotImplementedError(f"Not implement data-checking for shape of {shape}, channel of {channel}")
