@@ -1,28 +1,27 @@
 from __future__ import print_function
-from typing import Union, Optional, List, Tuple
 
 import os
-import struct
-import pylab
-import torch
-from pathlib import Path
-from PIL import Image, ImageColor, ImageDraw
 import socket
+import struct
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 import matplotlib
+import pylab
+import torch
+from PIL import Image, ImageColor, ImageDraw
 
 matplotlib.use("Agg")
+import matplotlib.cm as mpl_color_map
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.ticker import ScalarFormatter
-import matplotlib.colors as mcolors
 import numpy as np
-
-import matplotlib.cm as mpl_color_map
-
-from medlp.utilities.enum import LR_SCHEDULES
-from monai_ex.utils import ensure_list
 import tensorboard.compat.proto.event_pb2 as event_pb2
+from matplotlib.ticker import ScalarFormatter
+from medlp.utilities.enum import LR_SCHEDULES
+from monai.networks import one_hot
+from monai_ex.utils import ensure_list
 
 
 def get_attr_(obj, name, default):
@@ -439,8 +438,15 @@ def __check_image_mask(image, masks):
             raise ValueError(
                 f"Pass an RGB image. Other Image formats are not supported, got {image.size()}"
             )
+
+    mask_value_range = masks.unique()
     if masks.ndim == 2:
         masks = masks[None, :, :]
+        if len(mask_value_range) > 1:
+            masks = one_hot(masks, len(mask_value_range)).type(torch.bool)
+    if masks.ndim == 3:
+        if len(mask_value_range) > 1 and masks.shape[0] == 1:
+            masks = one_hot(masks, len(mask_value_range), dim=0).type(torch.bool)
     if masks.ndim != 3:
         raise ValueError("masks must be of shape (H, W) or (batch_size, H, W)")
     if masks.dtype != torch.bool:
