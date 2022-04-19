@@ -3,10 +3,12 @@ from functools import partial, wraps
 from pathlib import Path
 
 import click
-from click import option, prompt
+from click import option, prompt, UNPROCESSED
 from medlp.configures import config as cfg
-from medlp.utilities.click_ex import NumericChoice as Choice
-from medlp.utilities.click_ex import data_select, loss_select, lr_schedule_params, model_select, parse_input_str
+from medlp.utilities.click_ex import NumericChoice as Choice, framework_select
+from medlp.utilities.click_ex import (
+    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc
+)
 from medlp.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
 from utils_cw import prompt_when
 
@@ -51,7 +53,10 @@ def get_trained_models(exp_folder):
 
 def common_params(func):
     @option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
-    @option("--framework", prompt=True, type=Choice(FRAMEWORKS), default=1, help="Choose your framework type")
+    @option(
+        "--framework", prompt=True, type=Choice(FRAMEWORKS), default=1,
+        callback=framework_select, help="Choose your framework type"
+    )
     @option("--data-list", type=str, callback=data_select, default=None, help="Data file list (json/yaml)")
     @option("--preload", type=float, default=1.0, help="Ratio of preload data")
     @option("--n-epoch", prompt=True, show_default=True, type=int, default=1000, help="Epoch number")
@@ -62,8 +67,8 @@ def common_params(func):
     @option("--n-batch", prompt=True, show_default=True, type=int, default=10, help="Batch size")
     @option("-IS", "--imbalance-sample", is_flag=True, help="Use imbalanced dataset sampling")
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
-    @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
-    @option("--output-nc", type=int, default=1, prompt=True, help="output channels (classes)")
+    @option("--input-nc", type=int, default=1, prompt=True, help="Input data channels")
+    @option("--output-nc", type=UNPROCESSED, default=1, prompt=True, callback=multi_ouputnc, help="Output channels")
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=str, default="", help="Specified training datalist")
     @option("--valid-list", type=str, default="", help="Specified validation datalist")
