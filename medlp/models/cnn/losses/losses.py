@@ -144,3 +144,24 @@ class DeepSupervisionLoss(Module):
             losses.append(w*self.base_loss(ret, gt))
         return torch.mean(torch.stack(losses))
 
+
+class CombinationLoss(Module):
+    def __init__(self, loss1, loss2, aggregate="sum"):
+        super(CombinationLoss, self).__init__()
+        self.aggregate = aggregate
+        self.loss1 = loss1
+        self.loss2 = loss2
+
+    def forward(self, net_output, target):
+        if not isinstance(net_output, tuple) or len(net_output) != 2:
+            raise ValueError(
+                "The network output must be tuple w/ size of 2, "
+                f"but got {type(net_output)} w/ size of {len(net_output)}."
+            )
+        loss1_output = self.loss1(net_output[0], target[0])
+        loss2_output = self.loss2(net_output[1], target[1])
+        if self.aggregate == "sum":
+            result = loss1_output + loss2_output
+        else:
+            raise NotImplementedError
+        return result
