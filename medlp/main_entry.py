@@ -48,10 +48,8 @@ def train_core(cargs, files_train, files_valid):
         files_train (list): Train file list.
         files_valid (list): Valid file list.
     """
-    Print(
-        f"Get {len(files_train)} training data, {len(files_valid)} validation data",
-        color="g",
-    )
+    Print(f"Get {len(files_train)} training data, {len(files_valid)} validation data", color="g")
+    
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
         yaml.dump(files_train, f)
@@ -124,17 +122,13 @@ def train_core(cargs, files_train, files_valid):
     trainer.run()
 
 
-@click.command(
-    "train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @clb.latent_auxilary_params
 @clb.common_params
-@clb.solver_params
 @clb.network_params
+@clb.solver_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option(
-    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
-)
+@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm",
