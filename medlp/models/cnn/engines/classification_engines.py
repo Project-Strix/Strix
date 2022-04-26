@@ -1,71 +1,52 @@
-from typing import Optional, Callable, Sequence
-
-import re
-import logging
 import copy
-from pathlib import Path
+import logging
+import re
 from functools import partial
+from pathlib import Path
+from typing import Callable, Optional, Sequence
 
 import torch
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from ignite.engine import Events
+from ignite.handlers import EarlyStopping
+from ignite.metrics import Accuracy, Precision, Recall
+from medlp.configures import config as cfg
+from medlp.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
+from medlp.models.cnn.engines.engine import MedlpTestEngine, MedlpTrainEngine
 from medlp.models.cnn.engines.utils import (
-    output_onehot_transform,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
+    output_onehot_transform,
 )
-from medlp.utilities.utils import output_filename_check, get_attr_
+from medlp.models.cnn.utils import onehot_process, output_onehot_transform
 from medlp.utilities.enum import Phases
 from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.models.cnn.utils import output_onehot_transform, onehot_process
-from medlp.models.cnn.engines.utils import (
-    get_prepare_batch_fn,
-    get_unsupervised_prepare_batch_fn,
-)
-from medlp.configures import config as cfg
-from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
-
-from monai_ex.utils import ensure_tuple
-from monai_ex.inferers import SimpleInfererEx
-from monai_ex.metrics import DrawRocCurve
-from ignite.engine import Events
-from ignite.metrics import Accuracy, Precision, Recall
-from ignite.handlers import EarlyStopping
-
-from monai_ex.engines import (
-    SupervisedTrainerEx,
-    SupervisedEvaluator,
-    SupervisedEvaluatorEx,
-    EnsembleEvaluator,
-)
-
-from monai_ex.transforms import (
-    ComposeEx as Compose,
-    ActivationsD,
-    AsDiscreteExD as AsDiscreteD,
-    MeanEnsembleD,
-    VoteEnsembleD,
-    SqueezeDimD,
-    EnsureTypeD,
-    GetItemD,
-)
-
+from medlp.utilities.utils import get_attr_, output_filename_check
+from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
 from monai_ex.handlers import (
+    ROCAUC,
+    CheckpointLoaderEx,
+    ClassificationSaverEx,
+    LatentCodeSaver,
+    LrScheduleTensorboardHandler,
+    SegmentationSaver,
     StatsHandler,
     ValidationHandler,
-    LrScheduleTensorboardHandler,
-    CheckpointLoaderEx,
-    SegmentationSaver,
-    ClassificationSaverEx,
-    ROCAUC,
-    stopping_fn_from_metric,
-    LatentCodeSaver,
-    from_engine_ex as from_engine,
+    EarlyStopHandler,
 )
+from monai_ex.handlers import from_engine_ex as from_engine
+from monai_ex.handlers import stopping_fn_from_metric
+from monai_ex.inferers import SimpleInfererEx
+from monai_ex.metrics import DrawRocCurve
+from monai_ex.transforms import ActivationsD
+from monai_ex.transforms import AsDiscreteExD as AsDiscreteD
+from monai_ex.transforms import ComposeEx as Compose
+from monai_ex.transforms import EnsureTypeD, GetItemD, MeanEnsembleD, SqueezeDimD, VoteEnsembleD
+from monai_ex.utils import ensure_tuple
 
 
 @TRAIN_ENGINES.register("classification")
-class ClassificationTrainEngine(MedlpTrainEngine):
-    def __new__(
+class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
+    def __init__(
         self,
         opts,
         train_loader,
@@ -89,9 +70,9 @@ class ClassificationTrainEngine(MedlpTrainEngine):
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
 
-        key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc)
+        key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
-        key_train_metric = ClassificationTrainEngine.get_metric("train", opts.output_nc)
+        key_train_metric = ClassificationTrainEngine.get_metric("train", opts.output_nc, decollate)
         train_metric_name = list(key_train_metric.keys())[0]
 
         prepare_batch_fn = get_prepare_batch_fn(
@@ -118,6 +99,17 @@ class ClassificationTrainEngine(MedlpTrainEngine):
                 "logger_name": logger_name,
             },
         )
+
+        if opts.early_stop > 0:
+            val_handlers += [
+                EarlyStopHandler(
+                    patience=opts.early_stop,
+                    score_function=stopping_fn_from_metric(val_metric_name),
+                    trainer=self,
+                    min_delta=0.0001,
+                    epoch_level=True,
+                ),
+            ]
 
         evaluator = SupervisedEvaluatorEx(
             device=device,
@@ -151,6 +143,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
                 step_transform=lr_step_transform,
             ),
         ]
+
         train_handlers += MedlpTrainEngine.get_extra_handlers(
             phase="train",
             model_dir=model_dir,
@@ -165,7 +158,8 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform()
         )
 
-        trainer = SupervisedTrainerEx(
+        SupervisedTrainerEx.__init__(
+            self,
             device=device,
             max_epochs=opts.n_epoch,
             train_data_loader=train_loader,
@@ -185,18 +179,6 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
         )
-
-        if opts.early_stop > 0:
-            early_stopper = EarlyStopping(
-                patience=opts.early_stop,
-                score_function=stopping_fn_from_metric(val_metric_name),
-                trainer=trainer,
-            )
-            evaluator.add_event_handler(
-                event_name=Events.EPOCH_COMPLETED, handler=early_stopper
-            )
-
-        return trainer
 
     @staticmethod
     def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
