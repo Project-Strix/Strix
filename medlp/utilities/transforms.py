@@ -12,5 +12,7 @@ def decollate_transform_adaptor(transfrom_fn: Callable):
         if isinstance(input_data, Sequence):
             return [apply_transform(transfrom_fn, data) for data in input_data]
         else:
-            apply_transform(transfrom_fn, input_data)
+            # if isinstance(input_data, dict) and 'pred' in input_data:
+            #     print(type(input_data.get('pred')), input_data.get('pred'))
+            return apply_transform(transfrom_fn, input_data)
     return _inner

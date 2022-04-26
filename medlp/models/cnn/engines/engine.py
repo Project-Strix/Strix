@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Callable, Sequence
+from typing import Optional, Callable, Sequence, Union
 
 import os
 import torch
@@ -16,6 +16,7 @@ from monai_ex.handlers import (
     TensorboardDumper,
     from_engine,
 )
+from monai_ex.utils import ensure_list
 from medlp.utilities.utils import output_filename_check
 
 
@@ -23,7 +24,7 @@ class MedlpTrainEngine(ABC):
     """A base class for medlp inner train engines."""
 
     @abstractmethod
-    def __new__(
+    def __init__(
         self,
         opts,
         train_loader,
@@ -57,9 +58,8 @@ class MedlpTrainEngine(ABC):
         save_bestmodel: bool = False,
         model_file_prefix: str = "",
         bestmodel_n_saved: int = 1,
-        tb_show_image: bool = False,
-        tb_image_batch_transform: Callable = lambda x: (),
-        tb_image_output_transform: Callable = lambda x: (),
+        tensorboard_image_kwargs: Optional[Union[dict, Sequence[dict]]] = None,
+        tensorboard_image_names: Optional[Union[dict, Sequence[dict]]] = "",
         dump_tensorboard: bool = False,
         record_nni: bool = False,
         nni_kwargs: Optional[dict] = None,
@@ -101,15 +101,21 @@ class MedlpTrainEngine(ABC):
                 )
             ]
 
-        if tb_show_image:
+        if tensorboard_image_kwargs is not None:
+            tb_img_kwargs = ensure_list(tensorboard_image_kwargs)
+            tb_img_names = ensure_list(tensorboard_image_names)
+            if len(tb_img_kwargs) != len(tb_img_names):
+                raise ValueError(
+                    f"Length of 'tensorboard_image_kwargs' ({len(tb_img_kwargs)}) "
+                    f"should equal to 'tensorboard_image_names' ({len(tb_img_names)})."
+                )
+
             handlers += [
                 TensorBoardImageHandlerEx(
                     summary_writer=tb_summary_writer,
-                    batch_transform=tb_image_batch_transform,
-                    output_transform=tb_image_output_transform,
-                    max_channels=3,
-                    prefix_name=phase,
-                ),
+                    prefix_name=name + "-" + phase,
+                    **kwargs,
+                ) for kwargs, name in zip(tb_img_kwargs, tb_img_names) if kwargs is not None
             ]
 
         if dump_tensorboard:

@@ -1,7 +1,10 @@
+from typing import Optional, Sequence, Union
 import re
 import logging
 import copy
 from pathlib import Path
+
+from matplotlib import transforms
 
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
@@ -30,6 +33,7 @@ from monai_ex.transforms import (
     ActivationsD,
     AsDiscreteD,
     MeanEnsembleD,
+    GetItemD,
 )
 from monai_ex.handlers import (
     ValidationHandler,
@@ -67,14 +71,10 @@ class SegmentationTrainEngine(MedlpTrainEngine):
         _label = cfg.get_key("label")
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
-        decollate = True
+        decollate = False
 
-        val_metric = SegmentationTrainEngine.get_metric(
-            phase="val", output_nc=opts.output_nc, decollate=decollate
-        )
-        train_metric = SegmentationTrainEngine.get_metric(
-            phase="train", output_nc=opts.output_nc, decollate=decollate
-        )
+        val_metric = SegmentationTrainEngine.get_metric(phase="val", output_nc=opts.output_nc, decollate=decollate)
+        train_metric = SegmentationTrainEngine.get_metric(phase="train", output_nc=opts.output_nc, decollate=decollate)
         val_metric_name = list(val_metric.keys())[0]
 
         val_handlers = MedlpTrainEngine.get_extra_handlers(
@@ -88,9 +88,7 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             save_bestmodel=True,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=from_engine([_image, _label]),
-            tb_image_output_transform=from_engine(_pred),
+            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -100,40 +98,16 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             },
         )
 
-        if opts.output_nc == 1:
-            trainval_post_transforms = Compose(
-                [
-                    ActivationsD(keys=_pred, sigmoid=True),
-                    AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
-                ]
-            )
-        else:
-            trainval_post_transforms = Compose(
-                [
-                    ActivationsD(keys=_pred, softmax=True),
-                    AsDiscreteD(
-                        keys=_pred,
-                        to_onehot=True,
-                        argmax=True,
-                        n_classes=opts.output_nc,
-                    ),
-                ]
-            )
-
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image, _label, multi_input_keys, multi_output_keys
-        )
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         evaluator = SupervisedEvaluator(
             device=device,
             val_data_loader=test_loader,
             network=net,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(test_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(),
-            postprocessing=trainval_post_transforms,
+            postprocessing=None,
             key_val_metric=val_metric,
             val_handlers=val_handlers,
             amp=opts.amp,
@@ -146,9 +120,7 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             lr_step_transform = lambda x: ()
 
         train_handlers = [
-            ValidationHandler(
-                validator=evaluator, interval=valid_interval, epoch_level=True
-            ),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
@@ -165,10 +137,8 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             stats_dicts={"train_loss": from_engine(_loss, first=True)},
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
-            ckeckpoint_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=from_engine([_image, _label]),
-            tb_image_output_transform=from_engine(_pred),
+            ckeckpoint_n_saved=1,
+            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(),
         )
 
         trainer = SupervisedTrainer(
@@ -178,12 +148,10 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             network=net,
             optimizer=optim,
             loss_function=loss,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(train_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(train_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(),
-            postprocessing=trainval_post_transforms,
+            postprocessing=None,
             key_train_metric=train_metric,
             train_handlers=train_handlers,
             amp=opts.amp,
@@ -197,25 +165,78 @@ class SegmentationTrainEngine(MedlpTrainEngine):
                 trainer=trainer,
             )
 
-            evaluator.add_event_handler(
-                event_name=Events.EPOCH_COMPLETED, handler=early_stopper
-            )
+            evaluator.add_event_handler(event_name=Events.EPOCH_COMPLETED, handler=early_stopper)
 
         return trainer
 
     @staticmethod
-    def get_metric(phase: str, output_nc: int, decollate: bool):
-        dice_metric_transform_fn = get_dice_metric_transform_fn(
-            output_nc,
-            pred_key=cfg.get_key("pred"),
-            label_key=cfg.get_key("label"),
-            decollate=decollate,
-        )
-
-        key_metric = MeanDice(
-            include_background=False, output_transform=dice_metric_transform_fn
-        )
+    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
+        # dice_metric_transform_fn = get_dice_metric_transform_fn(
+        #     output_nc,
+        #     pred_key=cfg.get_key("pred"),
+        #     label_key=cfg.get_key("label"),
+        #     decollate=decollate,
+        # )
+        transform = SegmentationTrainEngine.get_dice_post_transform(output_nc, decollate, item_index)
+        key_metric = MeanDice(include_background=False, output_transform=transform)
         return {phase + "_mean_dice": key_metric}
+
+    @staticmethod
+    def get_dice_post_transform(output_nc: int, decollate: bool, item_index: Optional[int] = None):
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+
+        if output_nc == 1:
+            return Compose(
+                select_item_transform
+                + [
+                    #! DTA is a tmp solution for decollate
+                    DTA(ActivationsD(keys=_pred, sigmoid=True)),
+                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)),
+                    get_dice_metric_transform_fn(
+                        output_nc,
+                        pred_key=_pred,
+                        label_key=_label,
+                        decollate=decollate,
+                    ),
+                ],
+                map_items=not decollate,
+            )
+        else:
+            return Compose(
+                select_item_transform
+                + [
+                    DTA(ActivationsD(keys=_pred, softmax=True)),
+                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
+                    get_dice_metric_transform_fn(
+                        output_nc,
+                        pred_key=_pred,
+                        label_key=_label,
+                        decollate=decollate,
+                    ),
+                ],
+                map_items=not decollate,
+            )
+
+    @staticmethod
+    def get_tensorboard_image_transform(item_index: Optional[int] = None, label_key: Optional[str] = None):
+        _image = cfg.get_key("image")
+        _label = label_key if label_key else cfg.get_key("label")
+        _pred = cfg.get_key("pred")
+        if item_index is None:
+            return {
+                "batch_transform": from_engine([_image, _label]),
+                "output_transform": from_engine(_pred),
+                "max_channels": 3,
+            }
+        else:
+            return {
+                "batch_transform": from_engine([_image, _label]),
+                "output_transform": from_engine(_pred, transforms=lambda x: x[item_index]),
+                "max_channels": 3,
+            }
 
 
 @TEST_ENGINES.register("segmentation")
@@ -239,11 +260,7 @@ class SegmentationTestEngine(MedlpTestEngine):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
         decollate = True
-        model_path = (
-            opts.model_path[0]
-            if isinstance(opts.model_path, (list, tuple))
-            else opts.model_path
-        )
+        model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
 
         if use_slidingwindow:
             print("---Use slidingwindow infer!---")
@@ -251,9 +268,7 @@ class SegmentationTestEngine(MedlpTestEngine):
         else:
             print("---Use simple infer!---")
 
-        key_val_metric = SegmentationTestEngine.get_metric(
-            opts.phase, opts.output_nc, decollate
-        )
+        key_val_metric = SegmentationTestEngine.get_metric(opts.phase, opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
 
         val_handlers = [
@@ -263,9 +278,7 @@ class SegmentationTestEngine(MedlpTestEngine):
                 resample=resample,
                 data_root_dir=output_filename_check(test_loader.dataset),
                 batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
-                    opts.output_nc, decollate
-                ),
+                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(opts.output_nc, decollate),
             ),
         ]
 
@@ -282,7 +295,7 @@ class SegmentationTestEngine(MedlpTestEngine):
                         opts.output_nc, decollate, discrete=False
                     ),
                 ),
-            ]   
+            ]
 
         val_handlers += MedlpTestEngine.get_extra_handlers(
             phase=opts.phase,
@@ -299,20 +312,14 @@ class SegmentationTestEngine(MedlpTestEngine):
         )
 
         if opts.phase == Phases.TEST_EX:
-            prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-                opts, _image, multi_input_keys
-            )
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
             key_val_metric = None
         elif opts.phase == Phases.TEST_IN:
-            prepare_batch_fn = get_prepare_batch_fn(
-                opts, _image, _label, multi_input_keys, multi_output_keys
-            )
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         # SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
         if use_slidingwindow:
-            inferer = SlidingWindowInferer(
-                roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5
-            )
+            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5)
         else:
             inferer = SimpleInferer()
 
@@ -336,52 +343,11 @@ class SegmentationTestEngine(MedlpTestEngine):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
-        transform = SegmentationTestEngine.get_dice_post_transform(output_nc, decollate)
+        transform = SegmentationTrainEngine.get_dice_post_transform(output_nc, decollate)
         if phase == Phases.TEST_EX:
             return {"val_mean_dice": None}
         elif phase == Phases.TEST_IN:
-            return {
-                "val_mean_dice": MeanDice(
-                    include_background=False, output_transform=transform
-                )
-            }
-
-    @staticmethod
-    def get_dice_post_transform(output_nc: int, decollate: bool):
-        _pred = cfg.get_key("pred")
-        _label = cfg.get_key("label")
-
-        if output_nc == 1:
-            return Compose(
-                [
-                    #! DTA is a tmp solution for decollate
-                    DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)),
-                    get_dice_metric_transform_fn(
-                        output_nc,
-                        pred_key=_pred,
-                        label_key=_label,
-                        decollate=decollate,
-                    ),
-                ],
-                map_items=not decollate,
-            )
-        else:
-            return Compose(
-                [
-                    DTA(ActivationsD(keys=_pred, softmax=True)),
-                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
-                    get_dice_metric_transform_fn(
-                        output_nc,
-                        pred_key=_pred,
-                        label_key=_label,
-                        decollate=decollate,
-                    ),
-                ],
-                map_items=not decollate,
-            )
-
-        return post_transforms
+            return {"val_mean_dice": MeanDice(include_background=False, output_transform=transform)}
 
     @staticmethod
     def get_seg_saver_post_transform(
@@ -397,11 +363,7 @@ class SegmentationTestEngine(MedlpTestEngine):
             return Compose(
                 [
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(
-                        AsDiscreteD(
-                            keys=_pred, threshold_values=True, logit_thresh=logit_thresh
-                        )
-                    )
+                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=logit_thresh))
                     if discrete
                     else lambda x: x,
                     from_engine(_pred),
@@ -412,9 +374,7 @@ class SegmentationTestEngine(MedlpTestEngine):
             return Compose(
                 [
                     DTA(ActivationsD(keys=_pred, softmax=True)),
-                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=None))
-                    if discrete
-                    else lambda x: x,
+                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)) if discrete else lambda x: x,
                     from_engine(_pred),
                 ],
                 map_items=not decollate,
@@ -457,9 +417,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
         copy.deepcopy(net),
     ] * len(best_models)
     for net, m in zip(nets, best_models):
-        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(
-            None
-        )
+        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
     pred_keys = [f"pred{i}" for i in range(len(best_models))]
 
@@ -483,11 +441,7 @@ def build_segmentation_ensemble_test_engine(**kwargs):
         inferer=SimpleInferer(),
         post_transform=post_transforms,
         val_handlers=val_handlers,
-        key_val_metric={
-            "test_acc": Accuracy(
-                output_transform=acc_post_transforms, is_multilabel=is_multilabel
-            )
-        },
+        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
         additional_metrics={
             "test_auc": ROCAUC(output_transform=auc_post_transforms),
             "Prec": Precision(output_transform=acc_post_transforms),

@@ -224,10 +224,10 @@ def lr_schedule_params(ctx, param, value):
 def multi_ouputnc(ctx, param, value):
     if isinstance(value, str) and value.isnumeric():
         value = int(value)
-    
+
     if ctx.params['framework'] != Frameworks.MULTITASK.value:
         return value
-    
+
     if ctx.params['framework'] == Frameworks.MULTITASK.value and\
        not isinstance(value, list):
         subtask1_nc = prompt(f"Output nc for {colored('task1', 'yellow')}", type=int, default=value)
@@ -301,13 +301,16 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         return value
 
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
-        loss1 = _single_loss_select(
-            ctx, ctx.params["subtask1"], value, prompt_all_args, '_task1'
-        )
-        loss2 = _single_loss_select(
-            ctx, ctx.params["subtask2"], value, prompt_all_args, '_task2'
-        )
-        return [loss1, loss2]
+        if not isinstance(value, list):
+            loss1 = _single_loss_select(
+                ctx, ctx.params["subtask1"], value, prompt_all_args, '_task1'
+            )
+            loss2 = _single_loss_select(
+                ctx, ctx.params["subtask2"], value, prompt_all_args, '_task2'
+            )
+            return [loss1, loss2]
+        else:
+            return value
     else:
         return _single_loss_select(ctx, ctx.params["framework"], value, prompt_all_args)
 

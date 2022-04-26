@@ -118,7 +118,7 @@ def solver_params(func):
 
 def network_params(func):
     @option("--model-name", type=str, callback=model_select, default=None, help="Select deeplearning model")
-    @option("-L", "--criterion", type=str, callback=loss_select, default=None, help="loss criterion type")
+    @option("-L", "--criterion", type=UNPROCESSED, callback=loss_select, default=None, help="loss criterion type")
     @option("--layer-norm", prompt=True, type=Choice(NORMS), default=1, help="Layer norm type")
     @option("--layer-act", type=Choice(ACTIVATIONS), default="relu", help="Layer activation type")
     @option("--n-features", type=int, default=64, help="Feature num of first layer")
@@ -136,10 +136,12 @@ def network_params(func):
 
 
 # Put these auxilary params to the top of click.options for
-# successfully loading auxilary params.
+# successfully loading auxilary params when `train-from-cfg`
 def latent_auxilary_params(func):
     @option("--lr-policy-params", type=dict, default=None, help="Auxilary params for lr schedule")
     @option("--loss-params", type=dict, default={}, help="Auxilary params for loss")
+    @option("--loss-params-task1", type=dict, default={}, hidden=True, help="Auxilary params for task1's loss")
+    @option("--loss-params-task2", type=dict, default={}, hidden=True, help="Auxilary params for task2's loss")
     @option("--pretrained", type=bool, default=False, help="Load pretrained model which have hard-coded model path")
     @option("--deep-supervision", type=bool, default=False, help="Use deep supervision module")
     @option("--deep-supr-num", type=int, default=1, help="Num of features will be output")
@@ -150,6 +152,8 @@ def latent_auxilary_params(func):
     @option("--config", type=click.Path(exists=True))
     @option("--n-group", type=int, default=1, help="Num of conv groups")
     @option("--do-test", type=bool, default=False, hidden=True, help="Automatically do test after training")
+    @option("--subtask1", type=str, default=None, hidden=True, help="Subtask 1 in multitask framework")
+    @option("--subtask2", type=str, default=None, hidden=True, help="Subtask 2 in multitask framework")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

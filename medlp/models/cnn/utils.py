@@ -1,3 +1,4 @@
+from pickletools import read_uint1
 import numpy as np
 import torch
 import importlib.util
@@ -147,6 +148,17 @@ def initialize_weights(net, init_type="normal", gain=0.02):
 
     print("initialize network with %s" % init_type)
     net.apply(init_func)
+
+
+def ensure_same_dim(tensor1, tensor2):
+    tensor1_dim, tensor2_dim = tensor1.dim(), tensor2.dim()
+
+    if tensor1_dim > tensor2_dim:
+        return tensor1.squeeze(), tensor2
+    elif tensor1_dim < tensor2_dim:
+        return tensor1, tensor2.squeeze()
+    else:
+        return tensor1, tensor2
 
 
 ############################################################

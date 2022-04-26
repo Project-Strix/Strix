@@ -1,5 +1,4 @@
-from typing import Optional, Callable
-from monai.config import KeysCollection
+from typing import Optional, Callable, Sequence
 
 import re
 import logging
@@ -16,6 +15,7 @@ from medlp.models.cnn.engines.utils import (
 )
 from medlp.utilities.utils import output_filename_check, get_attr_
 from medlp.utilities.enum import Phases
+from medlp.utilities.transforms import decollate_transform_adaptor as DTA
 from medlp.models.cnn.utils import output_onehot_transform, onehot_process
 from medlp.models.cnn.engines.utils import (
     get_prepare_batch_fn,
@@ -46,22 +46,18 @@ from monai_ex.transforms import (
     VoteEnsembleD,
     SqueezeDimD,
     EnsureTypeD,
-    AddChannelD,
+    GetItemD,
 )
 
 from monai_ex.handlers import (
     StatsHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
-    CheckpointSaverEx,
-    CheckpointLoader,
     CheckpointLoaderEx,
     SegmentationSaver,
     ClassificationSaverEx,
     ROCAUC,
     stopping_fn_from_metric,
-    NNIReporterHandler,
-    TensorboardDumper,
     LatentCodeSaver,
     from_engine_ex as from_engine,
 )
@@ -87,8 +83,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
         valid_interval = kwargs.get("valid_interval", 1)
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
-        decollate = True
-        is_multilabel = opts.output_nc > 1
+        decollate = False
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _pred = cfg.get_key("pred")
@@ -114,9 +109,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             save_bestmodel=True,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=lambda x: (None, None),
-            tb_image_output_transform=from_engine(_image),
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -125,23 +118,6 @@ class ClassificationTrainEngine(MedlpTrainEngine):
                 "logger_name": logger_name,
             },
         )
-
-        if opts.output_nc == 1:
-            train_post_transforms = Compose(
-                [
-                    EnsureTypeD(keys=[_pred, _label]),
-                    ActivationsD(keys=_pred, sigmoid=True),
-                    # AsDiscreteD(keys=_pred_, threshold_values=True, logit_thresh=0.5),
-                ]
-            )
-        else:
-            train_post_transforms = Compose(
-                [
-                    ActivationsD(keys=_pred, softmax=True),
-                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None),
-                    EnsureTypeD(keys=[_pred, _label]),
-                ]
-            )
 
         evaluator = SupervisedEvaluatorEx(
             device=device,
@@ -152,7 +128,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             else int(opts.n_epoch_len * len(test_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(),
-            postprocessing=train_post_transforms,
+            postprocessing=None,
             key_val_metric=key_val_metric,
             val_handlers=val_handlers,
             amp=opts.amp,
@@ -186,9 +162,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=opts.save_n_best,
-            tb_show_image=True,
-            tb_image_batch_transform=lambda x: (None, None),
-            tb_image_output_transform=from_engine(_image),
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform()
         )
 
         trainer = SupervisedTrainerEx(
@@ -203,7 +177,7 @@ class ClassificationTrainEngine(MedlpTrainEngine):
             else int(opts.n_epoch_len * len(train_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(logger_name),
-            postprocessing=train_post_transforms,
+            postprocessing=None,
             key_train_metric=key_train_metric,
             # additional_metrics={"roccurve": add_roc_metric},
             train_handlers=train_handlers,
@@ -225,24 +199,106 @@ class ClassificationTrainEngine(MedlpTrainEngine):
         return trainer
 
     @staticmethod
-    def get_metric(phase: str, output_nc: int):
+    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
+        """Return classification engine's metrics.
+
+        Args:
+            phase (str): phase name.
+            output_nc (int): output channel number.
+            decollate (bool): whether use decollate.
+            item_index (Optional[int], optional): If network's output and label is tuple, specifiy its index,
+                design for multitask compatiblity. Defaults to None.
+
+        Returns:
+            dict: {metric_name: metric_fn}
+        """
+        if output_nc > 1:
+            transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate, item_index)
+            key_val_metric = Accuracy(output_transform=transform, is_multilabel=True)
+            return {phase + "_acc": key_val_metric}
+        else:
+            transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate, item_index)
+            key_val_metric = ROCAUC(output_transform=transform)
+            return {phase + "_auc": key_val_metric}
+
+    @staticmethod
+    def get_acc_post_transform(output_nc, decollate, item_index):
+        is_multilabel = output_nc > 1
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
-        if output_nc > 1:
-            key_val_metric = Accuracy(
-                output_transform=from_engine(
-                    [_pred, _label],
-                    onehot_process(output_nc),
-                ),
-                is_multilabel=True,
-            )
-            return {phase + "_acc": key_val_metric}
-        else:
-            key_val_metric = ROCAUC(
-                output_transform=from_engine([_pred, _label], onehot_process(output_nc))
-            )
-            return {phase + "_auc": key_val_metric}
+        activate_transform = (
+            ActivationsD(keys=_pred, softmax=True)
+            if is_multilabel
+            else ActivationsD(keys=_pred, sigmoid=True)
+        )
+
+        discrete_transform = (
+            AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True)
+            if is_multilabel
+            else AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)
+        )
+
+        onehot_transform = (
+            from_engine([_pred, _label], [lambda x: x, onehot_process(output_nc, verbose=True)])
+            if is_multilabel
+            else from_engine([_pred, _label], ensure_dim=decollate)
+        )
+
+        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        transforms = select_item_transform + [
+            DTA(EnsureTypeD(keys=[_pred, _label], device='cpu')),
+            DTA(activate_transform),
+            DTA(discrete_transform),
+            onehot_transform,
+        ]
+
+        return Compose(transforms, map_items=not decollate)
+
+    @staticmethod
+    def get_auc_post_transform(output_nc, decollate, item_index):
+        is_multilabel = output_nc > 1
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        activate_transform = (
+            ActivationsD(keys=_pred, softmax=True)
+            if is_multilabel
+            else ActivationsD(keys=_pred, sigmoid=True)
+        )
+
+        discrete_transform = (
+            AsDiscreteD(keys=_pred, argmax=True, to_onehot=False)
+            if is_multilabel
+            else lambda x: x
+        )
+
+        onehot_transform = (
+            from_engine([_pred, _label], onehot_process(output_nc, verbose=True))
+            if is_multilabel
+            else from_engine([_pred, _label], ensure_dim=decollate)
+        )
+
+        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+
+        transforms = select_item_transform + [
+            DTA(EnsureTypeD(keys=[_pred, _label], device='cpu')),
+            DTA(activate_transform),
+            DTA(discrete_transform),
+            onehot_transform,
+        ]
+
+        return Compose(transforms, map_items=not decollate)
+
+    @staticmethod
+    def get_tensorboard_image_transform(item_index: Optional[int] = None, label_key: Optional[str] = None):
+        return None
+        _image = cfg.get_key("image")
+        return {
+            "batch_transform": from_engine(_image),
+            "output_transform": lambda x: None,
+            "max_channels": 3,
+        }
 
 
 @TEST_ENGINES.register("classification")
@@ -374,25 +430,17 @@ class ClassificationTestEngine(MedlpTestEngine):
         metrics = {}
         for name in metric_names:
             if name == "acc":
-                transform = ClassificationTestEngine.get_acc_post_transform(
-                    output_nc, decollate
-                )
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
                 m = {
-                    f"test_{name}": Accuracy(
-                        output_transform=transform, is_multilabel=is_multilabel
-                    )
+                    f"test_{name}": Accuracy(output_transform=transform, is_multilabel=is_multilabel)
                 }
             elif name == "auc":
-                transform = ClassificationTestEngine.get_auc_post_transform(
-                    output_nc, decollate
-                )
+                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate)
                 m = {
                     f"test_{name}": ROCAUC(output_transform=transform),
                 }
             elif name == "prec":
-                transform = ClassificationTestEngine.get_acc_post_transform(
-                    output_nc, decollate
-                )
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
                 m = {
                     f"test_{name}": Precision(
                         output_transform=transform,
@@ -401,9 +449,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                     )
                 }
             elif name == "recall":
-                transform = ClassificationTestEngine.get_acc_post_transform(
-                    output_nc, decollate
-                )
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
                 m = {
                     f"test_{name}": Recall(
                         output_transform=transform,
@@ -412,9 +458,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                     ),
                 }
             elif name == "roc":
-                transform = ClassificationTestEngine.get_auc_post_transform(
-                    output_nc, decollate
-                )
+                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate)
                 m = {
                     f"test_{name}": DrawRocCurve(
                         save_dir=output_dir,
@@ -429,77 +473,6 @@ class ClassificationTestEngine(MedlpTestEngine):
                 )
             metrics.update(m)
         return metrics
-
-    @staticmethod
-    def get_acc_post_transform(output_nc, decollate):
-        is_multilabel = output_nc > 1
-        _pred = cfg.get_key("pred")
-        _label = cfg.get_key("label")
-
-        activate_transform = (
-            ActivationsD(keys=_pred, softmax=True)
-            if is_multilabel
-            else ActivationsD(keys=_pred, sigmoid=True)
-        )
-
-        discrete_transform = (
-            AsDiscreteD(
-                keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True
-            )
-            if is_multilabel
-            else AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)
-        )
-
-        onehot_transform = (
-            from_engine(
-                [_pred, _label], [lambda x: x, onehot_process(output_nc, verbose=True)]
-            )
-            if is_multilabel
-            else from_engine([_pred, _label], ensure_dim=decollate)
-        )
-
-        return Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                activate_transform,
-                discrete_transform,
-                onehot_transform,
-            ],
-            first=decollate,
-        )
-
-    @staticmethod
-    def get_auc_post_transform(output_nc, decollate):
-        is_multilabel = output_nc > 1
-        _pred = cfg.get_key("pred")
-        _label = cfg.get_key("label")
-
-        activate_transform = (
-            ActivationsD(keys=_pred, softmax=True)
-            if is_multilabel
-            else ActivationsD(keys=_pred, sigmoid=True)
-        )
-
-        discrete_transform = (
-            AsDiscreteD(keys=_pred, argmax=True, to_onehot=False)
-            if is_multilabel
-            else lambda x: x
-        )
-
-        onehot_transform = (
-            from_engine([_pred, _label], onehot_process(output_nc, verbose=True))
-            if is_multilabel
-            else from_engine([_pred, _label], ensure_dim=decollate)
-        )
-
-        return Compose(
-            [
-                EnsureTypeD(keys=[_pred, _label]),
-                activate_transform,
-                discrete_transform,
-                onehot_transform,
-            ]
-        )
 
     @staticmethod
     def get_cls_saver_post_transform(
