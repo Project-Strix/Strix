@@ -122,7 +122,7 @@ def get_exp_name(ctx, param, value):
         else ctx.params["timestamp"]
     )
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
-        loss_fn = '+'.join(ctx.params['criterion']) 
+        loss_fn = '_'.join(ctx.params['criterion'])
     else:
         loss_fn = ctx.params['criterion'].split('_')[0]
 
