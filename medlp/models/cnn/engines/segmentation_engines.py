@@ -1,10 +1,9 @@
-from typing import Optional, Sequence, Union
+from typing import Optional
 import re
 import logging
 import copy
 from pathlib import Path
 
-from matplotlib import transforms
 
 import torch
 from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
@@ -21,12 +20,8 @@ from medlp.configures import config as cfg
 from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
 
 from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInferer
-from ignite.engine import Events
-from ignite.handlers import EarlyStopping
 
-from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-
-# from ignite.metrics import Accuracy, MeanSquaredError, Precision, Recall
+from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluator, EnsembleEvaluator
 
 from monai_ex.transforms import (
     Compose,
@@ -44,12 +39,13 @@ from monai_ex.handlers import (
     ROCAUC,
     stopping_fn_from_metric,
     from_engine_ex as from_engine,
+    EarlyStopHandler,
 )
 
 
 @TRAIN_ENGINES.register("segmentation")
-class SegmentationTrainEngine(MedlpTrainEngine):
-    def __new__(
+class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
+    def __init__(
         self,
         opts,
         train_loader,
@@ -73,8 +69,8 @@ class SegmentationTrainEngine(MedlpTrainEngine):
         _loss = cfg.get_key("loss")
         decollate = False
 
-        val_metric = SegmentationTrainEngine.get_metric(phase="val", output_nc=opts.output_nc, decollate=decollate)
-        train_metric = SegmentationTrainEngine.get_metric(phase="train", output_nc=opts.output_nc, decollate=decollate)
+        val_metric = SegmentationTrainEngine.get_metric("val", output_nc=opts.output_nc, decollate=decollate)
+        train_metric = SegmentationTrainEngine.get_metric("train", output_nc=opts.output_nc, decollate=decollate)
         val_metric_name = list(val_metric.keys())[0]
 
         val_handlers = MedlpTrainEngine.get_extra_handlers(
@@ -97,6 +93,17 @@ class SegmentationTrainEngine(MedlpTrainEngine):
                 "logger_name": logger_name,
             },
         )
+
+        if opts.early_stop > 0:
+            val_handlers += [
+                EarlyStopHandler(
+                    patience=opts.early_stop,
+                    score_function=stopping_fn_from_metric(val_metric_name),
+                    trainer=self,
+                    min_delta=0.0001,
+                    epoch_level=True,
+                ),
+            ]        
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
@@ -141,7 +148,8 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(),
         )
 
-        trainer = SupervisedTrainer(
+        SupervisedTrainerEx.__init__(
+            self,
             device=device,
             max_epochs=opts.n_epoch,
             train_data_loader=train_loader,
@@ -156,27 +164,12 @@ class SegmentationTrainEngine(MedlpTrainEngine):
             train_handlers=train_handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+            ensure_dims=True,
         )
-
-        if opts.early_stop > 0:
-            early_stopper = EarlyStopping(
-                patience=opts.early_stop,
-                score_function=stopping_fn_from_metric(val_metric_name),
-                trainer=trainer,
-            )
-
-            evaluator.add_event_handler(event_name=Events.EPOCH_COMPLETED, handler=early_stopper)
-
-        return trainer
 
     @staticmethod
     def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
-        # dice_metric_transform_fn = get_dice_metric_transform_fn(
-        #     output_nc,
-        #     pred_key=cfg.get_key("pred"),
-        #     label_key=cfg.get_key("label"),
-        #     decollate=decollate,
-        # )
         transform = SegmentationTrainEngine.get_dice_post_transform(output_nc, decollate, item_index)
         key_metric = MeanDice(include_background=False, output_transform=transform)
         return {phase + "_mean_dice": key_metric}

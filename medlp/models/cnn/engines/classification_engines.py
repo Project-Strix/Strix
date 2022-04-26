@@ -7,7 +7,6 @@ from typing import Callable, Optional, Sequence
 
 import torch
 from ignite.engine import Events
-from ignite.handlers import EarlyStopping
 from ignite.metrics import Accuracy, Precision, Recall
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES

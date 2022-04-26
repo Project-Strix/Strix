@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from monai_ex.losses import DiceLoss
 from torch import Tensor
 from torch.nn import Module
-from medlp.models.cnn.utils import ensure_same_dim
+from monai_ex.utils import ensure_same_dim
 
 # class ContrastiveLoss(Module):
 #     def __init__(self, margin=2.0):
