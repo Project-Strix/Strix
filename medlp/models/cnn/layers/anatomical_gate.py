@@ -9,7 +9,7 @@ class AnatomicalAttentionGate(nn.Module):
         spatial_dims: int,
         featmap1_inchn: int,
         featmap2_inchn: int,
-        mode: str = "sum",  # 'sum', 'cat', 'weighted', 'product', 'product2'
+        mode: str = "sum",  # 'sum', 'cat', 'weighted', 'mode2', 'mode3'
         act: str = "sigmoid",
     ):
         super().__init__()
@@ -56,7 +56,7 @@ class AnatomicalAttentionGate(nn.Module):
             self.w = nn.Parameter(torch.Tensor([0.5]), requires_grad=True)
         elif self.mode == "sum":
             self.w = 1
-        elif self.mode in ["product", "product2", "product3"]:
+        elif self.mode in ["mode2", "mode3"]:
             pass
         else:
             raise ValueError(f"Unsupported mode {self.mode}")
@@ -64,7 +64,7 @@ class AnatomicalAttentionGate(nn.Module):
     def forward(self, x1, x2):
         concat_featmap = torch.cat([x1, x2], dim=1)
         weighted_featmap1 = self.conv1(concat_featmap) * x1
-        if self.mode == "product3":
+        if self.mode == "mode3":
             dims = list(range(2, 2 + self.spatial_dims))
             weighted_featmap2 = self.conv2(concat_featmap)
             weights = weighted_featmap2.mean(dims, keepdim=True)
@@ -79,10 +79,7 @@ class AnatomicalAttentionGate(nn.Module):
             )
         elif self.mode == "weighted" or self.mode == "sum":
             return weighted_featmap1 + self.w * weighted_featmap2
-        elif self.mode == "product":
-            dims = list(range(2, 2 + self.spatial_dims))
-            return weighted_featmap1 * weighted_featmap2.mean(dims, keepdim=True)
-        elif self.mode == "product2":
+        elif self.mode == "mode2":
             dims = list(range(2, 2 + self.spatial_dims))
             weights = weighted_featmap2.mean(dims, keepdim=True)
             norm_weights = nn.functional.sigmoid(weights)
