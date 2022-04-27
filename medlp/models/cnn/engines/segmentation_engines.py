@@ -228,10 +228,8 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _pred = cfg.get_key("pred")
         if output_nc == 1:
             post_transform = Compose(
-                [   
-                    DTA(GetItemD(keys=_pred, index=item_index))
-                    if item_index is not None
-                    else lambda x: x,
+                [
+                    DTA(GetItemD(keys=_pred, index=item_index)) if item_index is not None else lambda x: x,
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
                     DTA(AsDiscreteD(keys=_pred, threshold=0.5)),
                     from_engine(_pred)
@@ -243,9 +241,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         else:
             post_transform = Compose(
                 [
-                    DTA(GetItemD(keys=_pred, index=item_index))
-                    if item_index is not None
-                    else lambda x: x,
+                    DTA(GetItemD(keys=_pred, index=item_index)) if item_index is not None else lambda x: x,
                     DTA(ActivationsD(keys=_pred, softmax=True)),
                     DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
                     from_engine(_pred)
@@ -386,9 +382,7 @@ class SegmentationTestEngine(MedlpTestEngine):
             return Compose(
                 [
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(AsDiscreteD(keys=_pred, threshold=logit_thresh))
-                    if discrete
-                    else lambda x: x,
+                    DTA(AsDiscreteD(keys=_pred, threshold=logit_thresh)) if discrete else lambda x: x,
                     from_engine(_pred),
                 ],
                 map_items=not decollate,

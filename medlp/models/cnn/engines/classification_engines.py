@@ -74,9 +74,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         key_train_metric = ClassificationTrainEngine.get_metric("train", opts.output_nc, decollate)
         train_metric_name = list(key_train_metric.keys())[0]
 
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image, _label, multi_input_keys, multi_output_keys
-        )
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         val_handlers = MedlpTrainEngine.get_extra_handlers(
             phase="val",
@@ -89,7 +87,9 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_bestmodel=True,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
-            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(opts.output_nc, decollate),
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(
+                opts.output_nc, decollate
+            ),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -114,9 +114,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             device=device,
             val_data_loader=test_loader,
             network=net,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(test_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(),
             postprocessing=None,
@@ -133,9 +131,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             lr_step_transform = lambda x: ()
 
         train_handlers = [
-            ValidationHandler(
-                validator=evaluator, interval=valid_interval, epoch_level=True
-            ),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
@@ -154,7 +150,9 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=opts.save_n_best,
-            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(opts.output_nc, decollate)
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(
+                opts.output_nc, decollate
+            ),
         )
 
         SupervisedTrainerEx.__init__(
@@ -165,9 +163,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             network=net,
             optimizer=optim,
             loss_function=loss,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(train_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(train_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInfererEx(logger_name),
             postprocessing=None,
@@ -209,9 +205,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _label = cfg.get_key("label")
 
         activate_transform = (
-            ActivationsD(keys=_pred, softmax=True)
-            if is_multilabel
-            else ActivationsD(keys=_pred, sigmoid=True)
+            ActivationsD(keys=_pred, softmax=True) if is_multilabel else ActivationsD(keys=_pred, sigmoid=True)
         )
 
         discrete_transform = (
@@ -226,9 +220,11 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             else from_engine([_pred, _label], ensure_dim=decollate)
         )
 
-        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        select_item_transform = (
+            [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        )
         transforms = select_item_transform + [
-            DTA(EnsureTypeD(keys=[_pred, _label], device='cpu')),
+            DTA(EnsureTypeD(keys=[_pred, _label], device="cpu")),
             DTA(activate_transform),
             DTA(discrete_transform),
             onehot_transform,
@@ -243,16 +239,10 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _label = cfg.get_key("label")
 
         activate_transform = (
-            ActivationsD(keys=_pred, softmax=True)
-            if is_multilabel
-            else ActivationsD(keys=_pred, sigmoid=True)
+            ActivationsD(keys=_pred, softmax=True) if is_multilabel else ActivationsD(keys=_pred, sigmoid=True)
         )
 
-        discrete_transform = (
-            AsDiscreteD(keys=_pred, argmax=True, to_onehot=False)
-            if is_multilabel
-            else lambda x: x
-        )
+        discrete_transform = AsDiscreteD(keys=_pred, argmax=True, to_onehot=False) if is_multilabel else lambda x: x
 
         onehot_transform = (
             from_engine([_pred, _label], onehot_process(output_nc, verbose=True))
@@ -260,10 +250,12 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             else from_engine([_pred, _label], ensure_dim=decollate)
         )
 
-        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        select_item_transform = (
+            [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        )
 
         transforms = select_item_transform + [
-            DTA(EnsureTypeD(keys=[_pred, _label], device='cpu')),
+            DTA(EnsureTypeD(keys=[_pred, _label], device="cpu")),
             DTA(activate_transform),
             DTA(discrete_transform),
             onehot_transform,
@@ -272,7 +264,9 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         return Compose(transforms, map_items=not decollate)
 
     @staticmethod
-    def get_tensorboard_image_transform(output_nc:int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None):
+    def get_tensorboard_image_transform(
+        output_nc: int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None
+    ):
         return None
         _image = cfg.get_key("image")
         return {
@@ -306,24 +300,14 @@ class ClassificationTestEngine(MedlpTestEngine):
         _pred = cfg.get_key("pred")
         _acti = cfg.get_key("forward")
 
-        model_path = (
-            opts.model_path[0]
-            if isinstance(opts.model_path, (list, tuple))
-            else opts.model_path
-        )
+        model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
 
         if is_supervised:
-            prepare_batch_fn = get_prepare_batch_fn(
-                opts, _image, _label, multi_input_keys, multi_output_keys
-            )
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
         else:
-            prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-                opts, _image, multi_input_keys
-            )
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
 
-        key_val_metric = ClassificationTestEngine.get_metric(
-            "acc", opts.output_nc, decollate
-        )
+        key_val_metric = ClassificationTestEngine.get_metric("acc", opts.output_nc, decollate)
         key_metric_name = list(key_val_metric.keys())
         additional_val_metrics = ClassificationTestEngine.get_metric(
             ["auc", "prec", "recall", "roc"], opts.output_nc, decollate, opts.out_dir
@@ -352,9 +336,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                 batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
                 else from_engine(_image + "_meta_dict"),
-                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
-                    opts.output_nc
-                ),
+                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(opts.output_nc),
             )
         ]
 
@@ -412,9 +394,7 @@ class ClassificationTestEngine(MedlpTestEngine):
         for name in metric_names:
             if name == "acc":
                 transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
-                m = {
-                    f"test_{name}": Accuracy(output_transform=transform, is_multilabel=is_multilabel)
-                }
+                m = {f"test_{name}": Accuracy(output_transform=transform, is_multilabel=is_multilabel)}
             elif name == "auc":
                 transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate)
                 m = {
@@ -456,9 +436,7 @@ class ClassificationTestEngine(MedlpTestEngine):
         return metrics
 
     @staticmethod
-    def get_cls_saver_post_transform(
-        output_nc: int, discrete: bool = True, logit_thresh: float = 0.5
-    ):
+    def get_cls_saver_post_transform(output_nc: int, discrete: bool = True, logit_thresh: float = 0.5):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
@@ -467,9 +445,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                 [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, sigmoid=True),
-                    AsDiscreteD(keys=_pred, threshold=logit_thresh)
-                    if discrete
-                    else lambda x: x,
+                    AsDiscreteD(keys=_pred, threshold=logit_thresh) if discrete else lambda x: x,
                     from_engine(_pred),
                 ],
                 first=False,
@@ -479,7 +455,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                 [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, softmax=True),
-                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None) #? dim=1, keepdim=True
+                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)  # ? dim=1, keepdim=True
                     if discrete
                     else lambda x: x,
                     from_engine(_pred),
@@ -513,9 +489,7 @@ def build_classification_ensemble_test_engine(**kwargs):
     int_regex = r"=(\d+).pt"
     if is_intra_ensemble:
         if len(model_list) == 1:
-            raise ValueError(
-                "Only one model is specified for intra ensemble test, but need more!"
-            )
+            raise ValueError("Only one model is specified for intra ensemble test, but need more!")
     elif use_best_model:
         model_list = []
         for folder in cv_folders:
@@ -538,9 +512,7 @@ def build_classification_ensemble_test_engine(**kwargs):
             try:
                 models.sort(key=lambda x: int(re.search(int_regex, x.name).group(1)))
             except AttributeError as e:
-                invalid_models = list(
-                    filter(lambda x: re.search(int_regex, x.name) is None, models)
-                )
+                invalid_models = list(filter(lambda x: re.search(int_regex, x.name) is None, models))
                 print("invalid models:", invalid_models)
                 raise e
             model_list.append(models[-1])
@@ -557,20 +529,14 @@ def build_classification_ensemble_test_engine(**kwargs):
         copy.deepcopy(net),
     ] * len(model_list)
     for net, m in zip(nets, model_list):
-        CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(
-            None
-        )
+        CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
     pred_keys = [f"{_pred}{i}" for i in range(len(model_list))]
 
     if is_supervised:
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image, _label, multi_input_keys, multi_output_keys
-        )
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
     else:
-        prepare_batch_fn = get_unsupervised_prepare_batch_fn(
-            opts, _image, multi_input_keys
-        )
+        prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
 
     if opts.output_nc == 1:  # ensemble_type is 'mean':
         if use_best_model:
@@ -613,9 +579,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 ActivationsD(keys=pred_keys, softmax=True),
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
-                ),
+                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
         )
@@ -624,9 +588,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 ActivationsD(keys=pred_keys, softmax=True),
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
-                ),
+                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
         )
@@ -635,9 +597,7 @@ def build_classification_ensemble_test_engine(**kwargs):
                 ActivationsD(keys=pred_keys, softmax=True),
                 AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
                 SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(
-                    keys=pred_keys, output_key=_pred, num_classes=opts.output_nc
-                ),
+                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
             ]
         )
 
@@ -673,18 +633,12 @@ def build_classification_ensemble_test_engine(**kwargs):
         inferer=SimpleInfererEx(),
         post_transform=post_transforms,
         val_handlers=val_handlers,
-        key_val_metric={
-            "test_acc": Accuracy(
-                output_transform=acc_post_transforms, is_multilabel=is_multilabel
-            )
-        },
+        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
         additional_metrics={
             "test_auc": ROCAUC(output_transform=auc_post_transforms),
             "Prec": Precision(output_transform=acc_post_transforms),
             "Recall": Recall(output_transform=acc_post_transforms),
-            "ROC": DrawRocCurve(
-                save_dir=opts.out_dir, output_transform=auc_post_transforms
-            ),
+            "ROC": DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms),
         },
     )
 
