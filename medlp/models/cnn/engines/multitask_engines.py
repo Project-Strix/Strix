@@ -1,25 +1,12 @@
 import torch
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine
-from monai_ex.engines import MultiTaskTrainer
+from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
+from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator
+from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
+from monai_ex.handlers import from_engine_ex as from_engine
+from monai_ex.handlers import stopping_fn_from_metric
 from monai_ex.inferers import SimpleInfererEx as SimpleInferer
-from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from medlp.models.cnn.engines.utils import (
-    get_models,
-    get_prepare_batch_fn,
-    get_unsupervised_prepare_batch_fn,
-)
-
-from monai_ex.handlers import (
-    ValidationHandler,
-    LrScheduleTensorboardHandler,
-    CheckpointLoader,
-    SegmentationSaver,
-    MeanDice,
-    ROCAUC,
-    stopping_fn_from_metric,
-    from_engine_ex as from_engine,
-)
 
 
 @TRAIN_ENGINES.register("multitask")
@@ -94,6 +81,17 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
                 "logger_name": logger_name,
             },
         )
+
+        if opts.early_stop > 0:
+            val_handlers += [
+                EarlyStopHandler(
+                    patience=opts.early_stop,
+                    score_function=stopping_fn_from_metric(val_metric_name),
+                    trainer=self,
+                    min_delta=0.0001,
+                    epoch_level=True,
+                ),
+            ]
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 

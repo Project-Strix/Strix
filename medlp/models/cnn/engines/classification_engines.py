@@ -19,18 +19,18 @@ from medlp.models.cnn.engines.utils import (
 from medlp.models.cnn.utils import onehot_process, output_onehot_transform
 from medlp.utilities.enum import Phases
 from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.utilities.utils import get_attr_, output_filename_check
+from medlp.utilities.utils import output_filename_check
 from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
 from monai_ex.handlers import (
     ROCAUC,
     CheckpointLoaderEx,
     ClassificationSaverEx,
+    EarlyStopHandler,
     LatentCodeSaver,
     LrScheduleTensorboardHandler,
     SegmentationSaver,
     StatsHandler,
     ValidationHandler,
-    EarlyStopHandler,
 )
 from monai_ex.handlers import from_engine_ex as from_engine
 from monai_ex.handlers import stopping_fn_from_metric
