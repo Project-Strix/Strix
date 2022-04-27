@@ -217,7 +217,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         discrete_transform = (
             AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True)
             if is_multilabel
-            else AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)
+            else AsDiscreteD(keys=_pred, threshold=0.5)
         )
 
         onehot_transform = (
@@ -467,9 +467,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                 [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, sigmoid=True),
-                    AsDiscreteD(
-                        keys=_pred, threshold_values=True, logit_thresh=logit_thresh
-                    )
+                    AsDiscreteD(keys=_pred, threshold=logit_thresh)
                     if discrete
                     else lambda x: x,
                     from_engine(_pred),
@@ -481,7 +479,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                 [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, softmax=True),
-                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)
+                    AsDiscreteD(keys=_pred, argmax=True, to_onehot=None) #? dim=1, keepdim=True
                     if discrete
                     else lambda x: x,
                     from_engine(_pred),
@@ -589,7 +587,7 @@ def build_classification_ensemble_test_engine(**kwargs):
         acc_post_transforms = Compose(
             [
                 ActivationsD(keys=_pred, sigmoid=True),
-                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+                AsDiscreteD(keys=_pred, threshold=0.5),
                 partial(output_onehot_transform, n_classes=opts.output_nc),
             ]
         )
@@ -602,7 +600,7 @@ def build_classification_ensemble_test_engine(**kwargs):
         ClsSaver_transform = Compose(
             [
                 ActivationsD(keys=_pred, sigmoid=True),
-                AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5),
+                AsDiscreteD(keys=_pred, threshold=0.5),
                 lambda x: x[_pred].cpu().numpy(),
             ]
         )

@@ -193,7 +193,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
                 + [
                     #! DTA is a tmp solution for decollate
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)),
+                    DTA(AsDiscreteD(keys=_pred, threshold=0.5)),
                     get_dice_metric_transform_fn(
                         output_nc,
                         pred_key=_pred,
@@ -233,7 +233,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
                     if item_index is not None
                     else lambda x: x,
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)),
+                    DTA(AsDiscreteD(keys=_pred, threshold=0.5)),
                     from_engine(_pred)
                     if item_index is None
                     else from_engine(_pred, transforms=lambda x: x[item_index]),
@@ -386,7 +386,7 @@ class SegmentationTestEngine(MedlpTestEngine):
             return Compose(
                 [
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
-                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=logit_thresh))
+                    DTA(AsDiscreteD(keys=_pred, threshold=logit_thresh))
                     if discrete
                     else lambda x: x,
                     from_engine(_pred),
