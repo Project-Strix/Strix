@@ -136,7 +136,7 @@ def train_core(cargs, files_train, files_valid):
         confirmation,
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
-        save_dir=Path(__file__).parent,
+        save_dir=cfg.get_medlp_cfg("external_network_dir")
     ),
 )
 @click.pass_context
