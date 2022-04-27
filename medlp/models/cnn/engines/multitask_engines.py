@@ -21,7 +21,8 @@ from monai_ex.handlers import (
     from_engine_ex as from_engine,
 )
 
-@TRAIN_ENGINES.register('multitask')
+
+@TRAIN_ENGINES.register("multitask")
 class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
     def __init__(
         self,
@@ -58,15 +59,19 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
         )
 
         subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase='val', output_nc=opts.output_nc[0], decollate=decollate, item_index=0
+            phase="val", output_nc=opts.output_nc[0], decollate=decollate, item_index=0
         )
         subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase='val', output_nc=opts.output_nc[1], decollate=decollate, item_index=1
+            phase="val", output_nc=opts.output_nc[1], decollate=decollate, item_index=1
         )
         val_metric_name = list(subtask1_val_metric.keys())[0]
 
-        task1_tb_image_kwargs = TRAIN_ENGINES[opts.subtask1].get_tensorboard_image_transform(0, label_key=multi_output_keys[0])
-        task2_tb_image_kwargs = TRAIN_ENGINES[opts.subtask2].get_tensorboard_image_transform(1, label_key=multi_output_keys[1])
+        task1_tb_image_kwargs = TRAIN_ENGINES[opts.subtask1].get_tensorboard_image_transform(
+            opts.output_nc[0], decollate, 0, label_key=multi_output_keys[0]
+        )
+        task2_tb_image_kwargs = TRAIN_ENGINES[opts.subtask2].get_tensorboard_image_transform(
+            opts.output_nc[1], decollate, 1, label_key=multi_output_keys[1]
+        )
 
         val_handlers = MedlpTrainEngine.get_extra_handlers(
             phase="val",
@@ -80,7 +85,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
             tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
-            tensorboard_image_names=['Subtask1', 'Subtask2'],
+            tensorboard_image_names=["Subtask1", "Subtask2"],
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -90,17 +95,13 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             },
         )
 
-        prepare_batch_fn = get_prepare_batch_fn(
-            opts, _image, _label, multi_input_keys, multi_output_keys
-        )
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         evaluator = SupervisedEvaluator(
             device=device,
             val_data_loader=test_loader,
             network=net,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(test_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(),
             postprocessing=None,
@@ -117,9 +118,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             lr_step_transform = lambda x: ()
 
         train_handlers = [
-            ValidationHandler(
-                validator=evaluator, interval=valid_interval, epoch_level=True
-            ),
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
@@ -138,7 +137,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=1,
             tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
-            tensorboard_image_names=['Subtask1', 'Subtask2'],
+            tensorboard_image_names=["Subtask1", "Subtask2"],
         )
 
         MultiTaskTrainer.__init__(
@@ -149,9 +148,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             network=net,
             optimizer=optim,
             loss_function=loss,
-            epoch_length=int(opts.n_epoch_len)
-            if opts.n_epoch_len > 1.0
-            else int(opts.n_epoch_len * len(train_loader)),
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(train_loader)),
             prepare_batch=prepare_batch_fn,
             inferer=SimpleInferer(),
             postprocessing=None,

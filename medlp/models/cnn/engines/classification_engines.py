@@ -89,7 +89,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_bestmodel=True,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
-            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(),
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(opts.output_nc, decollate),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -154,7 +154,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=opts.save_n_best,
-            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform()
+            tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(opts.output_nc, decollate)
         )
 
         SupervisedTrainerEx.__init__(
@@ -272,7 +272,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         return Compose(transforms, map_items=not decollate)
 
     @staticmethod
-    def get_tensorboard_image_transform(item_index: Optional[int] = None, label_key: Optional[str] = None):
+    def get_tensorboard_image_transform(output_nc:int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None):
         return None
         _image = cfg.get_key("image")
         return {

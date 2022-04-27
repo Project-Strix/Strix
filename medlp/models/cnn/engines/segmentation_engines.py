@@ -84,7 +84,9 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_bestmodel=True,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
-            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(),
+            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
+                output_nc=opts.output_nc, decollate=decollate
+            ),
             dump_tensorboard=True,
             record_nni=opts.nni,
             nni_kwargs={
@@ -103,7 +105,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
                     min_delta=0.0001,
                     epoch_level=True,
                 ),
-            ]        
+            ]
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
@@ -145,7 +147,9 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             save_checkpoint=True,
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=1,
-            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(),
+            tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
+                output_nc=opts.output_nc, decollate=decollate
+            ),
         )
 
         SupervisedTrainerEx.__init__(
@@ -179,7 +183,9 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
-        select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        select_item_transform = (
+            [DTA(GetItemD(keys=[_pred, _label], index=item_index))] if item_index is not None else []
+        )
 
         if output_nc == 1:
             return Compose(
@@ -214,22 +220,46 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             )
 
     @staticmethod
-    def get_tensorboard_image_transform(item_index: Optional[int] = None, label_key: Optional[str] = None):
+    def get_tensorboard_image_transform(
+        output_nc: int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None
+    ):
         _image = cfg.get_key("image")
         _label = label_key if label_key else cfg.get_key("label")
         _pred = cfg.get_key("pred")
-        if item_index is None:
-            return {
-                "batch_transform": from_engine([_image, _label]),
-                "output_transform": from_engine(_pred),
-                "max_channels": 3,
-            }
+        if output_nc == 1:
+            post_transform = Compose(
+                [   
+                    DTA(GetItemD(keys=_pred, index=item_index))
+                    if item_index is not None
+                    else lambda x: x,
+                    DTA(ActivationsD(keys=_pred, sigmoid=True)),
+                    DTA(AsDiscreteD(keys=_pred, threshold_values=True, logit_thresh=0.5)),
+                    from_engine(_pred)
+                    if item_index is None
+                    else from_engine(_pred, transforms=lambda x: x[item_index]),
+                ],
+                map_items=not decollate,
+            )
         else:
-            return {
-                "batch_transform": from_engine([_image, _label]),
-                "output_transform": from_engine(_pred, transforms=lambda x: x[item_index]),
-                "max_channels": 3,
-            }
+            post_transform = Compose(
+                [
+                    DTA(GetItemD(keys=_pred, index=item_index))
+                    if item_index is not None
+                    else lambda x: x,
+                    DTA(ActivationsD(keys=_pred, softmax=True)),
+                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
+                    from_engine(_pred)
+                    if item_index is None
+                    else from_engine(_pred, transforms=lambda x: x[item_index]),
+                ],
+                map_items=not decollate,
+            )
+
+        return {
+            "batch_transform": from_engine([_image, _label]),
+            "output_transform": post_transform,
+            "max_channels": 3,
+        }
 
 
 @TEST_ENGINES.register("segmentation")
