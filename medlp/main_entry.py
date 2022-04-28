@@ -124,17 +124,13 @@ def train_core(cargs, files_train, files_valid):
     trainer.run()
 
 
-@click.command(
-    "train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
-@clb.latent_auxilary_params
+@click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@clb.hidden_auxilary_params
 @clb.common_params
 @clb.solver_params
 @clb.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option(
-    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
-)
+@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm",
