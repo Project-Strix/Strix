@@ -176,7 +176,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         )
 
     @staticmethod
-    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
+    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):
         """Return classification engine's metrics.
 
         Args:
@@ -192,11 +192,11 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         if output_nc > 1:
             transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate, item_index)
             key_val_metric = Accuracy(output_transform=transform, is_multilabel=True)
-            return {phase + "_acc": key_val_metric}
+            return {f"{phase}_acc_{suffix}": key_val_metric} if suffix else {f"{phase}_acc": key_val_metric}
         else:
             transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate, item_index)
             key_val_metric = ROCAUC(output_transform=transform)
-            return {phase + "_auc": key_val_metric}
+            return {f"{phase}_auc_{suffix}": key_val_metric} if suffix else {f"{phase}_auc": key_val_metric}
 
     @staticmethod
     def get_acc_post_transform(output_nc, decollate, item_index):

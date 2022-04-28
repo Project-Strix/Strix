@@ -173,10 +173,10 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         )
 
     @staticmethod
-    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None):
+    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):
         transform = SegmentationTrainEngine.get_dice_post_transform(output_nc, decollate, item_index)
         key_metric = MeanDice(include_background=False, output_transform=transform)
-        return {phase + "_mean_dice": key_metric}
+        return {f"{phase}_mean_dice_{suffix}": key_metric} if suffix else {f"{phase}_mean_dice": key_metric}
 
     @staticmethod
     def get_dice_post_transform(output_nc: int, decollate: bool, item_index: Optional[int] = None):
