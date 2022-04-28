@@ -19,7 +19,7 @@ from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
 import medlp.utilities.arguments as arguments
-from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize
+from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -130,7 +130,7 @@ def train_core(cargs, files_train, files_valid):
 @arguments.solver_params
 @arguments.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@click.option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm",

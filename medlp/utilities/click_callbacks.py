@@ -1,4 +1,8 @@
-import os
+import imp
+
+
+import re
+import subprocess
 from time import strftime
 from pathlib import Path
 import inspect
@@ -10,6 +14,9 @@ from termcolor import colored
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import is_avaible_size
 from utils_cw import Print, check_dir, get_items_from_file
+
+
+###################### Extension of click ################################
 
 
 class DynamicTuple(ParamType):
@@ -66,6 +73,53 @@ class NumericChoice(Choice):
             self.fail(
                 f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx
             )
+
+
+#######################################################################
+
+def select_gpu(ctx, parma, value):
+    # check mig status
+    MIG_CMD = ["nvidia-smi", "--query-gpu=mig.mode.current", "--format=csv,noheader"]
+    LIST_CMD = ["nvidia-smi", "-L"]
+    statuses, gpu_list = [], ''
+
+    try:
+        result = subprocess.check_output(MIG_CMD)
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        modes = result.decode('utf-8').split('\n')
+        statuses = ["enabled" == status.lower() for status in modes if status]
+        gpu_list = subprocess.check_output(LIST_CMD).decode('utf-8').split('\n')
+    finally:
+        gpu_name = lambda x: f"GPU {x}"
+        if any(statuses):
+            mig_uuid = re.compile(r"MIG-[^)]*")
+            mig_mem_uuid = re.compile(r"(\d+g)b.*(MIG-[^)]*)")
+            gpu_id = re.compile(r"GPU (\d)")
+            mig_map = {gpu_name(i): mode for i, mode in enumerate(statuses)}
+            gpu_tables = {}
+            index = 0
+            for gpu_str in gpu_list:
+                gpu_str_ = gpu_str.strip()
+                gid = gpu_id.search(gpu_str_)
+                if gid:
+                    v_gid = 0
+                    index = int(gid.group(1))
+                    if not mig_map[gpu_name(index)]:
+                        gpu_tables.update({gpu_name(index): index})
+                else:
+                    mem_uuid = mig_mem_uuid.search(gpu_str_)
+                    if mem_uuid:
+                        gpu_tables.update({gpu_name(index)+f"-{v_gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
+                        v_gid += 1
+        else:
+            gpu_tables = {i: i for i, s in enumerate(statuses)}
+
+        print(gpu_tables)
+        selected_gpu = prompt("Choose GPU", type=NumericChoice(gpu_tables.keys()))
+        print(selected_gpu)
+
 
 
 def _convert_type(var, types=[float, str]):
