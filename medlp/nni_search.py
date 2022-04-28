@@ -12,7 +12,7 @@ from medlp.models import get_engine
 from medlp.data_io.dataio import get_dataloader, DATASET_MAPPING
 from medlp.utilities.utils import detect_port, parse_nested_data
 from medlp.utilities.enum import Phases
-from medlp.utilities.click_ex import get_nni_exp_name
+from medlp.utilities.click_callbacks import get_nni_exp_name
 
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split

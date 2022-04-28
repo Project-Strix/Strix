@@ -18,8 +18,8 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
-import medlp.utilities.click_callbacks as clb
-from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
+import medlp.utilities.arguments as arguments
+from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -125,10 +125,10 @@ def train_core(cargs, files_train, files_valid):
 
 
 @click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@clb.hidden_auxilary_params
-@clb.common_params
-@clb.solver_params
-@clb.network_params
+@arguments.hidden_auxilary_params
+@arguments.common_params
+@arguments.solver_params
+@arguments.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
@@ -382,14 +382,14 @@ def test_cfg(**args):
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
     if args["use_best_model"]:
-        model_list = clb.get_best_trained_models(exp_dir)
+        model_list = arguments.get_best_trained_models(exp_dir)
         if is_crossvalid:
             configures["n_fold"] = configures["n_repeat"] = 0
             is_crossvalid = False
     elif is_crossvalid:
         model_list = [""]
     else:
-        model_list = [clb.get_trained_models(exp_dir)]
+        model_list = [arguments.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
     phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
