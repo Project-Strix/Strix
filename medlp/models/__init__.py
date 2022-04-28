@@ -31,9 +31,9 @@ from medlp.models.cnn.cnn_nets import *
 from medlp.models.transformer.transformer_nets import *
 
 
-external_dataset_dir = Path(cfg.get_medlp_cfg("EXTERNAL_NETWORK_DIR"))
-if external_dataset_dir.is_dir():
-    for f in external_dataset_dir.glob("*.py"):
+external_network_dir = Path(cfg.get_medlp_cfg("EXTERNAL_NETWORK_DIR"))
+if external_network_dir.is_dir():
+    for f in external_network_dir.glob("*.py"):
         import_file(f.stem, str(f))
 
 
