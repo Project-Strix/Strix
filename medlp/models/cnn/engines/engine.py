@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Callable, Sequence, Union
+from typing import Optional, Callable, Sequence, Union, Dict
 
 import os
 import torch
@@ -51,18 +51,18 @@ class MedlpTrainEngine(ABC):
         optimizer,
         tb_summary_writer,
         logger_name: Optional[str] = None,
-        stats_dicts: Optional[dict] = None,
+        stats_dicts: Optional[Dict] = None,
         save_checkpoint: bool = False,
         checkpoint_save_interval: int = 10,
         ckeckpoint_n_saved: int = 1,
         save_bestmodel: bool = False,
         model_file_prefix: str = "",
         bestmodel_n_saved: int = 1,
-        tensorboard_image_kwargs: Optional[Union[dict, Sequence[dict]]] = None,
-        tensorboard_image_names: Optional[Union[dict, Sequence[dict]]] = "",
+        tensorboard_image_kwargs: Optional[Union[Dict, Sequence[Dict]]] = None,
+        tensorboard_image_names: Optional[Union[Dict, Sequence[Dict]]] = "",
         dump_tensorboard: bool = False,
         record_nni: bool = False,
-        nni_kwargs: Optional[dict] = None,
+        nni_kwargs: Optional[Dict] = None,
     ):
         handlers = []
 
@@ -152,12 +152,12 @@ class MedlpTestEngine(ABC):
 
     @staticmethod
     def get_extra_handlers(
-        phase,
-        out_dir,
-        model_path,
-        net,
+        phase: str,
+        out_dir: str,
+        model_path: Union[str, Sequence[str]],
+        load_dict: Union[Dict, Sequence[Dict]],
         logger_name: Optional[str] = None,
-        stats_dicts: Optional[dict] = None,
+        stats_dicts: Optional[Dict] = None,
         save_image: bool = False,
         image_resample: bool = False,
         test_loader: Optional[DataLoader] = None,
@@ -165,9 +165,11 @@ class MedlpTestEngine(ABC):
         image_output_transform: Callable = lambda x: (),
     ):
         handlers = []
-
-        if os.path.exists(model_path):
-            handlers += [CheckpointLoader(load_path=model_path, load_dict={"net": net})]
+        
+        model_paths, load_dicts = ensure_list(model_path), ensure_list(load_dict)
+        for load_path, load_dict in zip(model_paths, load_dicts):
+            if os.path.exists(load_path):
+                handlers += [CheckpointLoader(load_path=load_path, load_dict=load_dict)]
 
         if stats_dicts is not None:
             for key, output_transform_fn in stats_dicts.items():

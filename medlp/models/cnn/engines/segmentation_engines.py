@@ -13,7 +13,7 @@ from medlp.models.cnn.engines.utils import (
     get_unsupervised_prepare_batch_fn,
     get_dice_metric_transform_fn,
 )
-from medlp.utilities.utils import is_avaible_size, output_filename_check, get_attr_
+from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
 from medlp.utilities.enum import Phases
 from medlp.utilities.transforms import decollate_transform_adaptor as DTA
 from medlp.configures import config as cfg
@@ -68,6 +68,8 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
 
         val_metric = SegmentationTrainEngine.get_metric("val", output_nc=opts.output_nc, decollate=decollate)
         train_metric = SegmentationTrainEngine.get_metric("train", output_nc=opts.output_nc, decollate=decollate)
@@ -122,6 +124,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             amp=opts.amp,
             decollate=decollate,
         )
+        evaluator.logger = logging.getLogger(logger_name)
 
         if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
@@ -280,6 +283,8 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         _label = cfg.get_key("label")
         decollate = True
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
 
         if use_slidingwindow:
             print("---Use slidingwindow infer!---","\nPatch size:", crop_size)
@@ -319,7 +324,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
-            net=net,
+            load_dict={"net": net},
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
             save_image=opts.save_image,
@@ -396,71 +401,122 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
 
 
 @ENSEMBLE_TEST_ENGINES.register("segmentation")
-def build_segmentation_ensemble_test_engine(**kwargs):
-    raise NotImplementedError("Not finished!")
+class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+    def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
+        use_best_model = kwargs.get("best_val_model", True)
+        resample = opts.resample
+        model_list = opts.model_path
+        is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        crop_size = get_attr_(opts, "crop_size", None)
+        use_slidingwindow = opts.slidingwindow
+        float_regex = r"=(-?\d+\.\d+).pt"
+        decollate = True
+        if is_intra_ensemble:
+            raise NotImplementedError()
+        
+        if use_slidingwindow:
+            self.logger.info(f"---Use slidingwindow infer!---","\nPatch size: {crop_size}")
+        else:
+            self.logger.info("---Use simple infer!---")
 
-    opts = kwargs["opts"]
-    test_loader = kwargs["test_loader"]
-    net = kwargs["net"]
-    device = kwargs["device"]
-    use_best_model = kwargs.get("best_val_model", True)
-    model_list = opts.model_path
-    is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
-    logger_name = kwargs.get("logger_name", None)
-    logger = logging.getLogger(logger_name)
-    is_multilabel = opts.output_nc > 1
-    use_slidingwindow = is_avaible_size(opts.crop_size)
-    float_regex = r"=(-?\d+\.\d+).pt"
-    if is_intra_ensemble:
-        raise NotImplementedError()
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        _image = cfg.get_key("image")
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
 
-    cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
-    cv_folders = filter(lambda x: x.is_dir(), cv_folders)
-    best_models = get_models(cv_folders, "best" if use_best_model else "last")
-    best_models = list(filter(lambda x: x is not None and x.is_file(), best_models))
+        cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
+        cv_folders = filter(lambda x: x.is_dir(), cv_folders)
+        best_models = get_models(cv_folders, "best" if use_best_model else "last")
+        best_models = list(filter(lambda x: x is not None and x.is_file(), best_models))
 
-    if len(best_models) != opts.n_fold:
-        print(
-            f"Found {len(best_models)} best models,"
-            f"not equal to {opts.n_fold} n_folds.\n"
-            f"Use {len(best_models)} best models"
+        if len(best_models) != opts.n_fold:
+            self.logger.warn(
+                f"Found {len(best_models)} best models,"
+                f"not equal to {opts.n_fold} n_folds.\n"
+                f"Use {len(best_models)} best models"
+            )
+        self.logger.info(f"Using models: {[m.name for m in best_models]}")
+
+        nets = [copy.deepcopy(net),] * len(best_models)
+
+        pred_keys = [f"pred{i}" for i in range(len(best_models))]
+        w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models] if use_best_model else None
+
+        post_transforms = MeanEnsembleD(
+            keys=pred_keys,
+            output_key=_pred,
+            # in this particular example, we use validation metrics as weights
+            weights=w_,
         )
-    print(f"Using models: {[m.name for m in best_models]}")
 
-    nets = [
-        copy.deepcopy(net),
-    ] * len(best_models)
-    for net, m in zip(nets, best_models):
-        CheckpointLoader(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
+        val_handlers = [
+            SegmentationSaver(
+                output_dir=opts.out_dir,
+                output_ext=".nii.gz",
+                resample=resample,
+                data_root_dir=output_filename_check(test_loader.dataset),
+                batch_transform=from_engine(_image + "_meta_dict"),
+                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(opts.output_nc, decollate),
+            ),
+        ]
 
-    pred_keys = [f"pred{i}" for i in range(len(best_models))]
+        if opts.save_prob:
+            val_handlers += [
+                SegmentationSaver(
+                    output_dir=opts.out_dir,
+                    output_ext=".nii.gz",
+                    output_postfix="prob",
+                    resample=resample,
+                    data_root_dir=output_filename_check(test_loader.dataset),
+                    batch_transform=from_engine(_image + "_meta_dict"),
+                    output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
+                        opts.output_nc, decollate, discrete=False
+                    ),
+                ),
+            ]
+        
+        key_val_metric = SegmentationTestEngine.get_metric(opts.phase, opts.output_nc, decollate)
+        val_metric_name = list(key_val_metric.keys())[0]
+        
+        val_handlers += MedlpTestEngine.get_extra_handlers(
+            phase=opts.phase,
+            out_dir=opts.out_dir,
+            model_path=best_models,
+            load_dict=[{"net": net} for net in nets],
+            logger_name=logger_name,
+            stats_dicts={val_metric_name: lambda x: None},
+            save_image=opts.save_image,
+            image_resample=resample,
+            test_loader=test_loader,
+            image_batch_transform=from_engine(_image + "_meta_dict"),
+            image_output_transform=from_engine(_image),
+        )
 
-    if use_best_model:
-        w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models]
-    else:
-        w_ = None
+        if opts.phase == Phases.TEST_EX:
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
+            key_val_metric = None
+        elif opts.phase == Phases.TEST_IN:
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-    post_transforms = MeanEnsembleD(
-        keys=pred_keys,
-        output_key="pred",
-        # in this particular example, we use validation metrics as weights
-        weights=w_,
-    )
+        if use_slidingwindow:
+            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=opts.n_batch, overlap=0.5)
+        else:
+            inferer = SimpleInferer()
 
-    evaluator = EnsembleEvaluator(
-        device=device,
-        val_data_loader=test_loader,
-        pred_keys=pred_keys,
-        networks=nets,
-        inferer=SimpleInferer(),
-        post_transform=post_transforms,
-        val_handlers=val_handlers,
-        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
-        additional_metrics={
-            "test_auc": ROCAUC(output_transform=auc_post_transforms),
-            "Prec": Precision(output_transform=acc_post_transforms),
-            "Recall": Recall(output_transform=acc_post_transforms),
-        },
-    )
-
-    return evaluator
+        EnsembleEvaluator.__init__(
+            self,
+            device=device,
+            val_data_loader=test_loader,
+            networks=nets,
+            pred_keys=pred_keys,
+            prepare_batch=prepare_batch_fn,
+            inferer=inferer,
+            postprocessing=post_transforms,
+            key_val_metric=key_val_metric,
+            val_handlers=val_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+        )

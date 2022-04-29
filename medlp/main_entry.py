@@ -1,3 +1,4 @@
+import imp
 import os
 import gc
 import sys
@@ -19,6 +20,7 @@ from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
 import medlp.utilities.arguments as arguments
+from medlp.utilities.utils import LogColorFormatter
 from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -74,11 +76,14 @@ def train_core(cargs, files_train, files_valid):
         )
 
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
+    # logging_level = logging.DEBUG if cargs.debug else logging.INFO
+    # trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
+    # stdout_handler = logging.StreamHandler()
+    # stdout_handler.setLevel(logging_level)
 
-    logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
-    if cargs.compact_log and not cargs.debug:
-        logging.StreamHandler.terminator = "\r"
+    # if cargs.compact_log and not cargs.debug:
+    #     logging.StreamHandler.terminator = "\r"
+    
 
     trainer.add_event_handler(
         event_name=Events.EPOCH_STARTED,

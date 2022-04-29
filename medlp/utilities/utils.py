@@ -3,8 +3,9 @@ from __future__ import print_function
 import os
 import socket
 import struct
+import logging
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, TextIO
 
 import matplotlib
 import pylab
@@ -565,3 +566,155 @@ def draw_segmentation_contour(
             draw.ellipse([x1, y1, x2, y2], fill=tuple(colors_[i]), outline=None, width=0)
 
     return torch.from_numpy(np.array(img_to_draw)).permute(2, 0, 1).to(dtype=torch.uint8)
+
+
+class LogColorFormatter(logging.Formatter):
+    """Logging colored formatter, adapted from https://stackoverflow.com/a/56944256/3638629"""
+
+    grey = '\x1b[38;21m'
+    blue = '\x1b[38;5;39m'
+    yellow = '\x1b[38;5;226m'
+    red = '\x1b[38;5;196m'
+    bold_red = '\x1b[31;1m'
+    reset = '\x1b[0m'
+
+    def __init__(self, fmt = None):
+        super().__init__()
+        self.fmt = fmt if fmt else "%(asctime)s %(name)s %(levelname)s: %(message)s (%(filename)s:%(lineno)d)"
+        self.FORMATS = {
+            logging.DEBUG: self.grey + self.fmt + self.reset,
+            logging.INFO: self.blue + self.fmt + self.reset,
+            logging.WARNING: self.yellow + self.fmt + self.reset,
+            logging.ERROR: self.red + self.fmt + self.reset,
+            logging.CRITICAL: self.bold_red + self.fmt + self.reset
+        }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+def setup_logger(
+    name: Optional[str] = "ignite",
+    level: int = logging.INFO,
+    stream: Optional[TextIO] = None,
+    format: str = "%(asctime)s %(name)s %(levelname)s: %(message)s (%(filename)s:%(lineno)d)",
+    color: bool = True,
+    filepath: Optional[str] = None,
+    distributed_rank: Optional[int] = None,
+    reset: bool = False,
+) -> logging.Logger:
+    """
+    Extented ignite's setup_logger. Add `color` option.
+    Setups logger: name, level, format etc.
+
+    Args:
+        name: new name for the logger. If None, the standard logger is used.
+        level: logging level, e.g. CRITICAL, ERROR, WARNING, INFO, DEBUG.
+        stream: logging stream. If None, the standard stream is used (sys.stderr).
+        format: logging format. By default, `%(asctime)s %(name)s %(levelname)s: %(message)s`.
+        filepath: Optional logging file path. If not None, logs are written to the file.
+        distributed_rank: Optional, rank in distributed configuration to avoid logger setup for workers.
+            If None, distributed_rank is initialized to the rank of process.
+        reset: if True, reset an existing logger rather than keep format, handlers, and level.
+
+    Returns:
+        logging.Logger
+
+    Examples:
+        Improve logs readability when training with a trainer and evaluator:
+
+        .. code-block:: python
+
+            from ignite.utils import setup_logger
+
+            trainer = ...
+            evaluator = ...
+
+            trainer.logger = setup_logger("trainer")
+            evaluator.logger = setup_logger("evaluator")
+
+            trainer.run(data, max_epochs=10)
+
+            # Logs will look like
+            # 2020-01-21 12:46:07,356 trainer INFO: Engine run starting with max_epochs=5.
+            # 2020-01-21 12:46:07,358 trainer INFO: Epoch[1] Complete. Time taken: 00:5:23
+            # 2020-01-21 12:46:07,358 evaluator INFO: Engine run starting with max_epochs=1.
+            # 2020-01-21 12:46:07,358 evaluator INFO: Epoch[1] Complete. Time taken: 00:01:02
+            # ...
+
+        Every existing logger can be reset if needed
+
+        .. code-block:: python
+
+            logger = setup_logger(name="my-logger", format="=== %(name)s %(message)s")
+            logger.info("first message")
+            setup_logger(name="my-logger", format="+++ %(name)s %(message)s", reset=True)
+            logger.info("second message")
+
+            # Logs will look like
+            # === my-logger first message
+            # +++ my-logger second message
+
+        Change the level of an existing internal logger
+
+        .. code-block:: python
+
+            setup_logger(
+                name="ignite.distributed.launcher.Parallel",
+                level=logging.WARNING
+            )
+    """
+    # check if the logger already exists
+    existing = name is None or name in logging.root.manager.loggerDict
+
+    # if existing, get the logger otherwise create a new one
+    logger = logging.getLogger(name)
+
+    if distributed_rank is None:
+        import ignite.distributed as idist
+
+        distributed_rank = idist.get_rank()
+
+    # Remove previous handlers
+    if distributed_rank > 0 or reset:
+
+        if logger.hasHandlers():
+            for h in list(logger.handlers):
+                logger.removeHandler(h)
+
+    if distributed_rank > 0:
+
+        # Add null handler to avoid multiple parallel messages
+        logger.addHandler(logging.NullHandler())
+
+    # Keep the existing configuration if not reset
+    if existing and not reset:
+        return logger
+
+    if distributed_rank == 0:
+        logger.setLevel(level)
+
+        formatter = LogColorFormatter(format) if color else logging.Formatter(format)
+
+        ch = logging.StreamHandler(stream=stream)
+        ch.setLevel(level)
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+
+        if filepath is not None:
+            fh = logging.FileHandler(filepath)
+            fh.setLevel(level)
+            fh.setFormatter(formatter)
+            logger.addHandler(fh)
+
+    # don't propagate to ancestors
+    # the problem here is to attach handlers to loggers
+    # should we provide a default configuration less open ?
+    if name is not None:
+        logger.propagate = False
+
+    return logger
+
+

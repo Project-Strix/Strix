@@ -7,7 +7,7 @@ def get_best_model(folder, float_regex=r"=(-?\d+\.\d+).pt"):
     models = list(
         filter(
             lambda x: x.is_file(),
-            [model for model in folder.joinpath("Models").iterdir()],
+            [model for model in (folder / "Models" / "Best_Models").iterdir()],
         )
     )
     if len(models) == 0:
