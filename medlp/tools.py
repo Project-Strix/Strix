@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from medlp.data_io import DATASET_MAPPING
-from medlp.utilities.click_ex import NumericChoice as Choice
-from medlp.utilities.click_callbacks import data_select
+from medlp.utilities.click_callbacks import NumericChoice as Choice
+from medlp.utilities.arguments import data_select
 from medlp.utilities.enum import FRAMEWORKS, Phases
 from medlp.configures import config as cfg
 from monai_ex.data import DatasetSummaryEx
