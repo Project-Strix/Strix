@@ -259,8 +259,8 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
 
 @TEST_ENGINES.register("segmentation")
-class SegmentationTestEngine(MedlpTestEngine):
-    def __new__(
+class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
+    def __init__(
         self,
         opts,
         test_loader,
@@ -282,8 +282,7 @@ class SegmentationTestEngine(MedlpTestEngine):
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
 
         if use_slidingwindow:
-            print("---Use slidingwindow infer!---")
-            print("patch size:", crop_size)
+            print("---Use slidingwindow infer!---","\nPatch size:", crop_size)
         else:
             print("---Use simple infer!---")
 
@@ -336,13 +335,13 @@ class SegmentationTestEngine(MedlpTestEngine):
         elif opts.phase == Phases.TEST_IN:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        # SlidingWindowInferer2Dfor3D(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.6)
         if use_slidingwindow:
             inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5)
         else:
             inferer = SimpleInferer()
 
-        evaluator = SupervisedEvaluator(
+        SupervisedEvaluator.__init__(
+            self,
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -354,8 +353,6 @@ class SegmentationTestEngine(MedlpTestEngine):
             amp=opts.amp,
             decollate=decollate,
         )
-
-        return evaluator
 
     @staticmethod
     def get_metric(phase: str, output_nc: int, decollate: bool):

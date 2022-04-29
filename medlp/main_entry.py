@@ -173,11 +173,12 @@ def train(ctx, **args):
 
     # ! Synthetic test phase
     if data_list is None:
+        train_data_num, valid_data_num = 60, 40
         Print("Using synthetic test data...", color="y")
         train_core(
             cargs,
-            [{"image": None, "label": None},] * 60,
-            [{"image": None, "label": None},] * 40,
+            [{"image": f"train_image{i}.nii.gz", "label": f"train_label{i}.nii.gz"} for i in range(train_data_num)],
+            [{"image": f"valid_image{i}.nii.gz", "label": f"valid_label{i}.nii.gz"} for i in range(valid_data_num)]
         )
         return cargs
 

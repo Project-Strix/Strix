@@ -137,7 +137,7 @@ class MedlpTestEngine(ABC):
     """A base class for medlp inner test engines."""
 
     @abstractmethod
-    def __new__(
+    def __init__(
         self,
         opts,
         test_loader,
