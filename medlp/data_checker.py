@@ -6,7 +6,6 @@ import click
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
-from PIL import ImageColor
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
 from utils_cw import get_items_from_file, Print, check_dir
@@ -203,8 +202,8 @@ def check_data(ctx, **args):
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
@@ -240,8 +239,8 @@ def check_data(ctx, **args):
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
@@ -280,8 +279,8 @@ def check_data(ctx, **args):
     elif len(shape) == 3 and channel == 1:
         z_axis = np.argmin(shape)
         for phase, dataloader in {
-            "train": train_dataloader,
-            "valid": valid_dataloader,
+            Phases.TRAIN.value: train_dataloader,
+            Phases.VALID.value: valid_dataloader,
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size

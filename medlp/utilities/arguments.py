@@ -2,7 +2,6 @@ import time
 from functools import partial, wraps
 from pathlib import Path
 
-import click
 from click import option, prompt, UNPROCESSED
 from medlp.configures import config as cfg
 from medlp.utilities.click_callbacks import NumericChoice as Choice, framework_select
@@ -137,7 +136,7 @@ def network_params(func):
 
 # Put these auxilary params to the top of click.options for
 # successfully loading auxilary params when `train-from-cfg`
-def latent_auxilary_params(func):
+def hidden_auxilary_params(func):
     @option("--lr-policy-params", type=dict, default=None, help="Auxilary params for lr schedule")
     @option("--loss-params", type=dict, default={}, help="Auxilary params for loss")
     @option("--loss-params-task1", type=dict, default={}, hidden=True, help="Auxilary params for task1's loss")

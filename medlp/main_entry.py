@@ -18,8 +18,8 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
-import medlp.utilities.arguments as clb
-from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize
+import medlp.utilities.arguments as arguments
+from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -82,9 +82,7 @@ def train_core(cargs, files_train, files_valid):
 
     trainer.add_event_handler(
         event_name=Events.EPOCH_STARTED,
-        handler=lambda x: print(
-            "\n", "-" * 15, os.path.basename(cargs.experiment_path), "-" * 15
-        ),
+        handler=lambda x: print("\n", "-" * 15, os.path.basename(cargs.experiment_path), "-" * 15),
     )
 
     if cargs.visualize:
@@ -101,9 +99,7 @@ def train_core(cargs, files_train, files_valid):
             Print("Begin SNIP pruning", color="g")
             snip_device = torch.device("cuda")
             # snip_device = torch.device("cpu")  #! TMP solution to solve OOM issue
-            original_device = (
-                torch.device("cuda") if cargs.gpus != "-1" else torch.device("cpu")
-            )
+            original_device = torch.device("cuda") if cargs.gpus != "-1" else torch.device("cpu")
             trainer.add_event_handler(
                 event_name=Events.ITERATION_STARTED(once=1),
                 handler=SNIP_prune_handler(
@@ -123,12 +119,12 @@ def train_core(cargs, files_train, files_valid):
 
 
 @click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@clb.latent_auxilary_params
-@clb.common_params
-@clb.network_params
-@clb.solver_params
+@arguments.hidden_auxilary_params
+@arguments.common_params
+@arguments.solver_params
+@arguments.network_params
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@click.option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_exp_name, default="")
 @click.option(
     "--confirm",
@@ -155,16 +151,15 @@ def train(ctx, **args):
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
 
-    cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
+    if "," in cargs.gpus:
+        cargs.gpu_ids = list(range(len(list(map(int, cargs.gpus.split(","))))))
+    else:
+        cargs.gpu_ids = [0]
 
     # ! dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][
-        cargs.data_list
-    ].get("SOURCE")
+    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("SOURCE")
     if source_file and os.path.isfile(source_file):
-        shutil.copyfile(
-            source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot")
-        )
+        shutil.copyfile(source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot"))
 
     # ! Manually specified train&valid datalist
     if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
@@ -173,20 +168,16 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
         return cargs
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
-        "PATH", ""
-    )
-    test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get(
-        "TEST_PATH"
-    )
+    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("PATH", "")
+    test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("TEST_PATH")
 
     # ! Synthetic test phase
     if data_list is None:
-        Print('Using synthetic test data...', color='y')
+        Print("Using synthetic test data...", color="y")
         train_core(
-            cargs, 
-            [{"image": None, "label": None}, ] * 60,
-            [{"image": None, "label": None}, ] * 40
+            cargs,
+            [{"image": None, "label": None},] * 60,
+            [{"image": None, "label": None},] * 40,
         )
         return cargs
 
@@ -196,8 +187,7 @@ def train(ctx, **args):
 
     if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
         Print(
-            "Test datalist is not found, split test cohort from "
-            f"training data with split ratio of {cargs.split}",
+            "Test datalist is not found, split test cohort from " f"training data with split ratio of {cargs.split}",
             color="y",
         )
         train_test_cohort = split_train_test(
@@ -218,13 +208,9 @@ def train(ctx, **args):
             kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
         elif cargs.n_repeat > 1:
             folds = cargs.n_repeat
-            kf = ShuffleSplit(
-                n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed
-            )
+            kf = ShuffleSplit(n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed)
         else:
-            raise ValueError(
-                f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})"
-            )
+            raise ValueError(f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})")
 
         for i, (train_index, test_index) in enumerate(kf.split(train_datalist)):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
@@ -235,9 +221,7 @@ def train(ctx, **args):
             valid_data = list(np.array(train_datalist)[test_index])
 
             if "-th" in os.path.basename(cargs.experiment_path):
-                cargs.experiment_path = check_dir(
-                    os.path.dirname(cargs.experiment_path), f"{i}-th"
-                )
+                cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f"{i}-th")
             else:
                 cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
 
@@ -253,9 +237,7 @@ def train(ctx, **args):
             gc.collect()
             torch.cuda.empty_cache()
     else:  # ! Plain training
-        train_data, valid_data = train_test_split(
-            train_datalist, test_size=cargs.split, random_state=cargs.seed
-        )
+        train_data, valid_data = train_test_split(train_datalist, test_size=cargs.split, random_state=cargs.seed)
         train_core(cargs, train_data, valid_data)
 
     # ! Do testing
@@ -303,7 +285,7 @@ def train_cfg(**args):
     configures = get_items_from_file(args["config"], format="json")
 
     configures["smi"] = False
-    gpu_id = click.prompt(f"Current GPU id: {configures['gpus']}")
+    gpu_id = click.prompt(f"Current GPU id", default=configures["gpus"])
     configures["gpus"] = gpu_id
     configures["config"] = args["config"]
 
@@ -316,12 +298,8 @@ def train_cfg(**args):
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 @click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
-@click.option(
-    "--test-files", type=str, default="", help="External files (json/yaml) for testing"
-)
-@click.option(
-    "--out-dir", type=str, default=None, help="Optional output dir to save results"
-)
+@click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
+@click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @click.option(  # TODO: automatically decide when using patchdataset
     "--slidingwindow",
     is_flag=True,
@@ -338,13 +316,9 @@ def train_cfg(**args):
     callback=partial(prompt_when, keyword="save_latent"),
     help="Target layer of saving latent code",
 )
-@click.option(
-    "--use-best-model", is_flag=True, help="Automatically select best model for testing"
-)
+@click.option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
 @click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option(
-    "--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU"
-)
+@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 def test_cfg(**args):
     """Entry of test-from-cfg command.
 
@@ -369,8 +343,7 @@ def test_cfg(**args):
         test_files = get_items_from_file(args["test_files"], format="auto")
     elif is_crossvalid:
         raise ValueError(
-            f"{configures['n_fold']} Cross-validation found!"
-            "You must provide external test file (.json/.yaml)."
+            f"{configures['n_fold']} Cross-validation found!" "You must provide external test file (.json/.yaml)."
         )
     else:
         test_fpaths = list(exp_dir.glob("valid_files*"))
@@ -381,14 +354,14 @@ def test_cfg(**args):
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
     if args["use_best_model"]:
-        model_list = clb.get_best_trained_models(exp_dir)
+        model_list = arguments.get_best_trained_models(exp_dir)
         if is_crossvalid:
             configures["n_fold"] = configures["n_repeat"] = 0
             is_crossvalid = False
     elif is_crossvalid:
         model_list = [""]
     else:
-        model_list = [clb.get_trained_models(exp_dir)]
+        model_list = [arguments.get_trained_models(exp_dir)]
 
     configures["preload"] = 0.0
     phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
@@ -403,9 +376,7 @@ def test_cfg(**args):
     if args.get("crop_size", None):
         configures["crop_size"] = args["crop_size"]
     configures["out_dir"] = (
-        check_dir(args["out_dir"])
-        if args["out_dir"]
-        else check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
+        check_dir(args["out_dir"]) if args["out_dir"] else check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
     )
 
     Print(f"{len(test_files)} test files", color="g")
@@ -415,23 +386,17 @@ def test_cfg(**args):
         configures["model_path"] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
-        engine.logger = setup_logger(
-            f"{configures['tensor_dim']}-Tester", level=logging.INFO
-        )
+        engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
 
         if isinstance(engine, SupervisedEvaluator):
             Print("Begin testing...", color="g")
         elif isinstance(engine, EnsembleEvaluator):
             Print("Begin ensemble testing...", color="g")
 
-        shutil.copyfile(
-            test_fpath, check_dir(configures["out_dir"]) / os.path.basename(test_fpath)
-        )
+        shutil.copyfile(test_fpath, check_dir(configures["out_dir"]) / os.path.basename(test_fpath))
         engine.run()
 
-        is_intra_ensemble = (
-            isinstance(model_path, (list, tuple)) and len(model_path) > 1
-        )
+        is_intra_ensemble = isinstance(model_path, (list, tuple)) and len(model_path) > 1
         if is_intra_ensemble:
             os.rename(
                 configures["out_dir"],
@@ -443,11 +408,7 @@ def test_cfg(**args):
                 str(configures["out_dir"]) + "-ensemble",
             )
         else:
-            postfix = (
-                model_path[0].stem
-                if isinstance(model_path, (list, tuple))
-                else model_path.stem
-            )
+            postfix = model_path[0].stem if isinstance(model_path, (list, tuple)) else model_path.stem
             os.rename(configures["out_dir"], str(configures["out_dir"]) + "-" + postfix)
 
 

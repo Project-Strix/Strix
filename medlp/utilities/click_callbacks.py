@@ -1,4 +1,8 @@
+from typing import Callable
+
+import re
 import inspect
+import subprocess
 from functools import partial
 from pathlib import Path
 from time import strftime
@@ -69,6 +73,54 @@ class NumericChoice(Choice):
             )
 
 
+#######################################################################
+
+def select_gpu(ctx, parma, value):
+    if value is not None:
+        return value
+
+    # check mig status
+    MIG_CMD = ["nvidia-smi", "--query-gpu=mig.mode.current", "--format=csv,noheader"]
+    LIST_CMD = ["nvidia-smi", "-L"]
+    statuses, gpu_list = [], ''
+
+    try:
+        result = subprocess.check_output(MIG_CMD)
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        modes = result.decode('utf-8').split('\n')
+        statuses = ["enabled" == status.lower() for status in modes if status]
+        gpu_list = subprocess.check_output(LIST_CMD).decode('utf-8').split('\n')
+    finally:
+        gpu_name = lambda x: f"GPU {x}"
+        if any(statuses):
+            choice_type: Callable = NumericChoice
+            mig_mem_uuid = re.compile(r"(\d+g)b.*(MIG-[^)]*)")
+            gpu_id = re.compile(r"GPU (\d)")
+            mig_map = {gpu_name(i): mode for i, mode in enumerate(statuses)}
+            gpu_tables = {}
+            index = 0
+            for gpu_str in gpu_list:
+                gpu_str_ = gpu_str.strip()
+                gid = gpu_id.search(gpu_str_)
+                if gid:
+                    index = int(gid.group(1))
+                    if not mig_map[gpu_name(index)]:
+                        gpu_tables.update({gpu_name(index): index})
+                else:
+                    mem_uuid = mig_mem_uuid.search(gpu_str_)
+                    if mem_uuid:
+                        gid = mem_uuid.group(2).split('/')[-2]
+                        gpu_tables.update({gpu_name(index)+f"-{gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
+        else:
+            gpu_tables = {str(i): str(i) for i, s in enumerate(statuses)}
+            choice_type: Callable = Choice
+
+        selected_idx = prompt("Choose GPU from", type=choice_type(gpu_tables.keys()))
+        return gpu_tables[selected_idx]
+
+
 def _convert_type(var, types=[float, str]):
     for type_ in types:
         try:
@@ -121,6 +173,7 @@ def get_exp_name(ctx, param, value):
         if ctx.params.get("config") is not None
         else ctx.params["timestamp"]
     )
+
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
         loss_fn = '_'.join(ctx.params['criterion'])
     else:
