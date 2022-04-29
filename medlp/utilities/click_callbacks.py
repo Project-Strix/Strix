@@ -1,6 +1,4 @@
-import imp
-
-
+from typing import Callable
 import re
 import subprocess
 from time import strftime
@@ -78,6 +76,9 @@ class NumericChoice(Choice):
 #######################################################################
 
 def select_gpu(ctx, parma, value):
+    if value is not None:
+        return value
+
     # check mig status
     MIG_CMD = ["nvidia-smi", "--query-gpu=mig.mode.current", "--format=csv,noheader"]
     LIST_CMD = ["nvidia-smi", "-L"]
@@ -94,7 +95,7 @@ def select_gpu(ctx, parma, value):
     finally:
         gpu_name = lambda x: f"GPU {x}"
         if any(statuses):
-            mig_uuid = re.compile(r"MIG-[^)]*")
+            choice_type: Callable = NumericChoice
             mig_mem_uuid = re.compile(r"(\d+g)b.*(MIG-[^)]*)")
             gpu_id = re.compile(r"GPU (\d)")
             mig_map = {gpu_name(i): mode for i, mode in enumerate(statuses)}
@@ -104,22 +105,20 @@ def select_gpu(ctx, parma, value):
                 gpu_str_ = gpu_str.strip()
                 gid = gpu_id.search(gpu_str_)
                 if gid:
-                    v_gid = 0
                     index = int(gid.group(1))
                     if not mig_map[gpu_name(index)]:
                         gpu_tables.update({gpu_name(index): index})
                 else:
                     mem_uuid = mig_mem_uuid.search(gpu_str_)
                     if mem_uuid:
-                        gpu_tables.update({gpu_name(index)+f"-{v_gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
-                        v_gid += 1
+                        gid = mem_uuid.group(2).split('/')[-2]
+                        gpu_tables.update({gpu_name(index)+f"-{gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
         else:
-            gpu_tables = {i: i for i, s in enumerate(statuses)}
+            gpu_tables = {str(i): str(i) for i, s in enumerate(statuses)}
+            choice_type: Callable = Choice
 
-        print(gpu_tables)
-        selected_gpu = prompt("Choose GPU", type=NumericChoice(gpu_tables.keys()))
-        print(selected_gpu)
-
+        selected_idx = prompt("Choose GPU from", type=choice_type(gpu_tables.keys()))
+        return gpu_tables[selected_idx]
 
 
 def _convert_type(var, types=[float, str]):
