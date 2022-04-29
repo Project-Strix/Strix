@@ -18,8 +18,8 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
-import medlp.utilities.click_callbacks as clb
-from medlp.utilities.click_ex import get_unknown_options, get_exp_name, input_cropsize
+import medlp.utilities.arguments as clb
+from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
