@@ -2,6 +2,7 @@ import time
 from functools import partial, wraps
 from pathlib import Path
 
+import click
 from click import option, prompt, UNPROCESSED
 from medlp.configures import config as cfg
 from medlp.utilities.click_callbacks import NumericChoice as Choice, framework_select
