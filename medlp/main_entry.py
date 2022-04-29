@@ -49,7 +49,7 @@ def train_core(cargs, files_train, files_valid):
         files_valid (list): Valid file list.
     """
     Print(f"Get {len(files_train)} training data, {len(files_valid)} validation data", color="g")
-    
+
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
         yaml.dump(files_train, f)
@@ -132,7 +132,7 @@ def train_core(cargs, files_train, files_valid):
         confirmation,
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
-        save_dir=cfg.get_medlp_cfg("external_network_dir")
+        save_dir=cfg.get_medlp_cfg("external_network_dir"),
     ),
 )
 @click.pass_context
@@ -173,22 +173,20 @@ def train(ctx, **args):
 
     # ! Synthetic test phase
     if data_list is None:
-        train_data_num, valid_data_num = 60, 40
+        train_data_num = 100
         Print("Using synthetic test data...", color="y")
-        train_core(
-            cargs,
-            [{"image": f"train_image{i}.nii.gz", "label": f"train_label{i}.nii.gz"} for i in range(train_data_num)],
-            [{"image": f"valid_image{i}.nii.gz", "label": f"valid_label{i}.nii.gz"} for i in range(valid_data_num)]
-        )
-        return cargs
-
-    assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-    train_datalist = get_items_from_file(data_list, format="auto")
-    test_datalist = []
+        train_datalist = [
+            {"image": f"synthetic_image{i}.nii.gz", "label": f"synthetic_label{i}.nii.gz"}
+            for i in range(train_data_num)
+        ]
+    else:
+        assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
+        train_datalist = get_items_from_file(data_list, format="auto")
+        # test_datalist = []
 
     if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
         Print(
-            "Test datalist is not found, split test cohort from " f"training data with split ratio of {cargs.split}",
+            "Test datalist is not found, split test cohort from training data with split ratio of {cargs.split}",
             color="y",
         )
         train_test_cohort = split_train_test(
