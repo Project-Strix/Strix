@@ -19,7 +19,7 @@ from medlp.models.cnn.engines.utils import (
 from medlp.models.cnn.utils import onehot_process, output_onehot_transform
 from medlp.utilities.enum import Phases
 from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.utilities.utils import output_filename_check
+from medlp.utilities.utils import output_filename_check, setup_logger
 from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
 from monai_ex.handlers import (
     ROCAUC,
@@ -68,6 +68,9 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         _label = cfg.get_key("label")
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
+
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
 
         key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
@@ -173,6 +176,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             amp=opts.amp,
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
+            ensure_dims=True,
         )
 
     @staticmethod
@@ -301,6 +305,8 @@ class ClassificationTestEngine(MedlpTestEngine):
         _acti = cfg.get_key("forward")
 
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
 
         if is_supervised:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
