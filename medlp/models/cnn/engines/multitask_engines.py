@@ -1,7 +1,9 @@
 import torch
+import logging
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine
 from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
+from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
 from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -34,6 +36,8 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
 
         if multi_output_keys is None:
             raise ValueError("No 'multi_output_keys' was specified for MultiTask!")
@@ -60,7 +64,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             opts.output_nc[1], decollate, 1, label_key=multi_output_keys[1]
         )
 
-        val_handlers = MedlpTrainEngine.get_extra_handlers(
+        val_handlers = MedlpTrainEngine.get_basic_handlers(
             phase="val",
             model_dir=model_dir,
             net=net,
@@ -109,6 +113,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             amp=opts.amp,
             decollate=decollate,
         )
+        evaluator.logger = logging.getLogger(logger_name)
 
         if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
@@ -123,7 +128,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
                 step_transform=lr_step_transform,
             ),
         ]
-        train_handlers += MedlpTrainEngine.get_extra_handlers(
+        train_handlers += MedlpTrainEngine.get_basic_handlers(
             phase="train",
             model_dir=model_dir,
             net=net,
@@ -157,3 +162,63 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
         )
+
+
+@TEST_ENGINES.register("multitask")
+class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
+    def __init__(
+        self,
+        opts,
+        test_loader,
+        net,
+        device,
+        logger_name,
+        **kwargs,
+    ):
+        if opts.slidingwindow:
+            raise ValueError("Not implemented yet")
+
+        crop_size = get_attr_(opts, "crop_size", None)
+        n_batch = opts.n_batch
+        resample = opts.resample
+        use_slidingwindow = opts.slidingwindow
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        _image = cfg.get_key("image")
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+        decollate = True
+        model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
+
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+
+        subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+            phase="val", output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+        )
+        subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+            phase="val", output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+        )
+        val_metric_name = list(subtask1_val_metric.keys())[0]
+        
+
+
+
+
+        SupervisedEvaluator.__init__(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=None,
+            key_val_metric=subtask1_val_metric,
+            additional_metrics=subtask2_val_metric,
+            val_handlers=val_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+        )
+
+

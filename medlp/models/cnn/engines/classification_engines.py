@@ -1,11 +1,13 @@
 import copy
 import logging
 import re
+from types import SimpleNamespace
 from functools import partial
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Dict
 
 import torch
+from torch.utils.data import DataLoader
 from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
 from medlp.configures import config as cfg
@@ -79,7 +81,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        val_handlers = MedlpTrainEngine.get_extra_handlers(
+        val_handlers = MedlpTrainEngine.get_basic_handlers(
             phase="val",
             model_dir=model_dir,
             net=net,
@@ -142,7 +144,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             ),
         ]
 
-        train_handlers += MedlpTrainEngine.get_extra_handlers(
+        train_handlers += MedlpTrainEngine.get_basic_handlers(
             phase="train",
             model_dir=model_dir,
             net=net,
@@ -272,17 +274,11 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         output_nc: int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None
     ):
         return None
-        _image = cfg.get_key("image")
-        return {
-            "batch_transform": from_engine(_image),
-            "output_transform": lambda x: None,
-            "max_channels": 3,
-        }
 
 
 @TEST_ENGINES.register("classification")
-class ClassificationTestEngine(MedlpTestEngine):
-    def __new__(
+class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
+    def __init__(
         self,
         opts,
         test_loader,
@@ -291,14 +287,12 @@ class ClassificationTestEngine(MedlpTestEngine):
         logger_name,
         **kwargs,
     ):
-        is_multilabel = opts.output_nc > 1
         is_supervised = kwargs.get("is_supervised", opts.phase == Phases.TEST_IN)
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
         output_latent_code = kwargs.get("output_latent_code", False)
         target_latent_layer = kwargs.get("target_latent_layer", None)
-        root_dir = output_filename_check(test_loader.dataset)
-        decollate = False
+        decollate = True
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _pred = cfg.get_key("pred")
@@ -313,18 +307,18 @@ class ClassificationTestEngine(MedlpTestEngine):
         else:
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
 
-        key_val_metric = ClassificationTestEngine.get_metric("acc", opts.output_nc, decollate)
+        key_val_metric = ClassificationTestEngine.get_metric(opts.phase, opts.output_nc, decollate, metric_names="acc")
         key_metric_name = list(key_val_metric.keys())
         additional_val_metrics = ClassificationTestEngine.get_metric(
-            ["auc", "prec", "recall", "roc"], opts.output_nc, decollate, opts.out_dir
+            opts.phase, opts.output_nc, decollate, output_dir=opts.out_dir, metric_names=["auc", "prec", "recall", "roc"]
         )
         additional_metric_names = list(additional_val_metrics.keys())
 
-        val_handlers = MedlpTestEngine.get_extra_handlers(
+        handlers = MedlpTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
-            net=net,
+            load_dict={"net": net},
             logger_name=logger_name,
             stats_dicts={"Metrics": lambda x: None},
             save_image=opts.save_image,
@@ -334,8 +328,105 @@ class ClassificationTestEngine(MedlpTestEngine):
             image_output_transform=from_engine(_image),
         )
 
+        extra_handlers = ClassificationTestEngine.get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, **kwargs
+        )
+        if extra_handlers:
+            handlers += extra_handlers
+
+        SupervisedEvaluatorEx.__init__(
+            self,
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
+            postprocessing=None,  # post_transforms,
+            val_handlers=handlers,
+            key_val_metric=key_val_metric if is_supervised else None,
+            additional_metrics=additional_val_metrics if is_supervised else None,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+            output_latent_code=output_latent_code,
+            target_latent_layer=target_latent_layer,
+        )
+
+    @staticmethod
+    def get_metric(
+        phase: Phases,
+        output_nc: int,
+        decollate: bool,
+        item_index: Optional[int] = None,
+        **kwargs,
+    ):
+        suffix = kwargs.get("suffix", '')
+        output_dir = kwargs.get("output_dir", None)
+        metric_names = kwargs.get("metric_names", "acc")
+        metric_names = ensure_tuple(metric_names)
+
+        is_multilabel = output_nc > 1
+        metrics = {}
+        for name in metric_names:
+            metric_name = ClassificationTestEngine.get_key_metric_name(phase, suffix, metric_name=name)
+            if name == "acc":
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate, item_index)
+                m = {metric_name: Accuracy(output_transform=transform, is_multilabel=is_multilabel)}
+            elif name == "auc":
+                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate, item_index)
+                m = {metric_name: ROCAUC(output_transform=transform)}
+            elif name == "prec":
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate, item_index)
+                m = {
+                    metric_name: Precision(
+                        output_transform=transform, average=is_multilabel, is_multilabel=is_multilabel
+                    )
+                }
+            elif name == "recall":
+                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate, item_index)
+                m = {
+                    metric_name: Recall(
+                        output_transform=transform, average=is_multilabel, is_multilabel=is_multilabel
+                    )
+                }
+            elif name == "roc":
+                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate, item_index)
+                m = {
+                    metric_name: DrawRocCurve(
+                        save_dir=output_dir, output_transform=transform, is_multilabel=is_multilabel
+                    )
+                }
+            else:
+                raise NotImplementedError(
+                    "Currently only support 'acc, auc, prec, recall, roc' as metric, but got {name}.",
+                )
+            metrics.update(m)
+        return metrics
+
+    @staticmethod
+    def get_key_metric_name(phase: Phases, suffix: str = '', **kwargs):
+        metric_name = kwargs.get("metric_name", "acc")
+        if phase == Phases.TEST_EX or phase == Phases.TEST_IN:
+            return f"{phase.value}_{metric_name}_{suffix}" if suffix else f"{phase.value}_{metric_name}"
+        else:
+            return ValueError("Phase not correct for testengine.")
+
+    @staticmethod
+    def get_extra_handlers(
+        opts: SimpleNamespace,
+        test_loader: DataLoader,
+        decollate: bool,
+        logger_name: str,
+        **kwargs: Dict,
+    ):
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _acti = cfg.get_key("forward")
+        output_latent_code = kwargs.get("output_latent_code", False)
+        root_dir = output_filename_check(test_loader.dataset)
         has_label = opts.phase == Phases.TEST_IN
-        val_handlers += [
+
+        extra_handlers = [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
                 save_labels=has_label,
@@ -347,7 +438,7 @@ class ClassificationTestEngine(MedlpTestEngine):
         ]
 
         if opts.save_prob:
-            val_handlers += [
+            extra_handlers += [
                 ClassificationSaverEx(
                     output_dir=opts.out_dir,
                     filename="prob.csv",
@@ -359,7 +450,7 @@ class ClassificationTestEngine(MedlpTestEngine):
             ]
 
         if output_latent_code:
-            val_handlers += [
+            extra_handlers += [
                 LatentCodeSaver(
                     output_dir=opts.out_dir,
                     filename="latent",
@@ -372,74 +463,7 @@ class ClassificationTestEngine(MedlpTestEngine):
                     save_as_onefile=True,
                 )
             ]
-
-        evaluator = SupervisedEvaluatorEx(
-            device=device,
-            val_data_loader=test_loader,
-            network=net,
-            prepare_batch=prepare_batch_fn,
-            inferer=SimpleInfererEx(),  # SlidingWindowClassify(roi_size=opts.crop_size, sw_batch_size=4, overlap=0.3),
-            postprocessing=None,  # post_transforms,
-            val_handlers=val_handlers,
-            key_val_metric=key_val_metric if is_supervised else None,
-            additional_metrics=additional_val_metrics if is_supervised else None,
-            amp=opts.amp,
-            decollate=decollate,
-            custom_keys=cfg.get_keys_dict(),
-            output_latent_code=output_latent_code,
-            target_latent_layer=target_latent_layer,
-        )
-
-        return evaluator
-
-    @staticmethod
-    def get_metric(metric_names, output_nc, decollate, output_dir=None):
-        metric_names = ensure_tuple(metric_names)
-        is_multilabel = output_nc > 1
-        metrics = {}
-        for name in metric_names:
-            if name == "acc":
-                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
-                m = {f"test_{name}": Accuracy(output_transform=transform, is_multilabel=is_multilabel)}
-            elif name == "auc":
-                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate)
-                m = {
-                    f"test_{name}": ROCAUC(output_transform=transform),
-                }
-            elif name == "prec":
-                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
-                m = {
-                    f"test_{name}": Precision(
-                        output_transform=transform,
-                        average=is_multilabel,
-                        is_multilabel=is_multilabel,
-                    )
-                }
-            elif name == "recall":
-                transform = ClassificationTrainEngine.get_acc_post_transform(output_nc, decollate)
-                m = {
-                    f"test_{name}": Recall(
-                        output_transform=transform,
-                        average=is_multilabel,
-                        is_multilabel=is_multilabel,
-                    ),
-                }
-            elif name == "roc":
-                transform = ClassificationTrainEngine.get_auc_post_transform(output_nc, decollate)
-                m = {
-                    f"test_{name}": DrawRocCurve(
-                        save_dir=output_dir,
-                        output_transform=transform,
-                        is_multilabel=is_multilabel,
-                    ),
-                }
-            else:
-                raise NotImplementedError(
-                    "Currently only support 'acc, auc, prec, recall, roc' as metric",
-                    f"but got {name}.",
-                )
-            metrics.update(m)
-        return metrics
+        return extra_handlers
 
     @staticmethod
     def get_cls_saver_post_transform(output_nc: int, discrete: bool = True, logit_thresh: float = 0.5):

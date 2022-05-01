@@ -44,7 +44,7 @@ class MedlpTrainEngine(ABC):
         )
 
     @staticmethod
-    def get_extra_handlers(
+    def get_basic_handlers(
         phase,
         model_dir,
         net,
@@ -151,7 +151,7 @@ class MedlpTestEngine(ABC):
         )
 
     @staticmethod
-    def get_extra_handlers(
+    def get_basic_handlers(
         phase: str,
         out_dir: str,
         model_path: Union[str, Sequence[str]],
