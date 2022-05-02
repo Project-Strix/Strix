@@ -240,20 +240,12 @@ def output_filename_check(torch_dataset, meta_key="image_meta_dict"):
     if isinstance(next_data, list):
         next_data = next_data[0]
 
-    if (
-        Path(prev_data[meta_key]["filename_or_obj"]).stem
-        != Path(next_data[meta_key]["filename_or_obj"]).stem
+    for prev_item, next_item in zip(
+        Path(prev_data[meta_key]["filename_or_obj"]).parents,
+        Path(next_data[meta_key]["filename_or_obj"]).parents,
     ):
-        return Path(prev_data[meta_key]["filename_or_obj"]).parent
-
-    for i, (prev_v, next_v) in enumerate(
-        zip(
-            Path(prev_data[meta_key]["filename_or_obj"]).parents,
-            Path(next_data[meta_key]["filename_or_obj"]).parents,
-        )
-    ):
-        if prev_v.stem != next_v.stem:
-            return prev_v.parent
+        if prev_item.stem != next_item.stem:
+            return prev_item.parent
 
     return ""
 

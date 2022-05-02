@@ -17,7 +17,6 @@ def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models")
     model_rootdir = Path(exp_folder)
     assert model_rootdir.is_dir(), f"Model dir is not found! {model_rootdir}"
 
-    subcategories = list(filter(lambda x: x.is_dir(), model_rootdir.iterdir()))
     best_models = []
 
     for model_dir in list(model_rootdir.rglob(best_model_dirname)):

@@ -1,6 +1,9 @@
 import os
 from abc import ABC, abstractmethod
+from types import SimpleNamespace
 from typing import Callable, Dict, Optional, Sequence, Union
+
+import torch
 
 from medlp.configures import config as cfg
 from medlp.utilities.utils import output_filename_check
@@ -137,11 +140,11 @@ class MedlpTestEngine(ABC):
     @abstractmethod
     def __init__(
         self,
-        opts,
-        test_loader,
-        net,
-        device,
-        logger_name,
+        opts: SimpleNamespace,
+        test_loader: DataLoader,
+        net: Dict,
+        device: Union[str, torch.device],
+        logger_name: str,
         **kwargs,
     ):
         raise NotImplementedError(

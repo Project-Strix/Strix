@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Optional, Any, Sequence, Dict
+from typing import Optional, Union, Sequence, Dict
 import re
 import logging
 import copy
@@ -72,8 +72,8 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         logging_level = logging.DEBUG if opts.debug else logging.INFO
         self.logger = setup_logger(logger_name, logging_level, reset=True)
 
-        val_metric = SegmentationTrainEngine.get_metric("val", output_nc=opts.output_nc, decollate=decollate)
-        train_metric = SegmentationTrainEngine.get_metric("train", output_nc=opts.output_nc, decollate=decollate)
+        val_metric = SegmentationTrainEngine.get_metric(Phases.VALID, output_nc=opts.output_nc, decollate=decollate)
+        train_metric = SegmentationTrainEngine.get_metric(Phases.TRAIN, output_nc=opts.output_nc, decollate=decollate)
         val_metric_name = list(val_metric.keys())[0]
 
         val_handlers = MedlpTrainEngine.get_basic_handlers(
@@ -177,10 +177,10 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         )
 
     @staticmethod
-    def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):
+    def get_metric(phase: Phases, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):
         transform = SegmentationTrainEngine.get_dice_post_transform(output_nc, decollate, item_index)
         key_metric = MeanDice(include_background=False, output_transform=transform)
-        return {f"{phase}_mean_dice_{suffix}": key_metric} if suffix else {f"{phase}_mean_dice": key_metric}
+        return {f"{phase.value}_mean_dice_{suffix}": key_metric} if suffix else {f"{phase.value}_mean_dice": key_metric}
 
     @staticmethod
     def get_dice_post_transform(output_nc: int, decollate: bool, item_index: Optional[int] = None):
@@ -374,13 +374,14 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         _image = cfg.get_key("image")
         suffix = kwargs.get("suffix", '')
 
+        data_root_dir = output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict")
         extra_handlers = [
             SegmentationSaver(
                 output_dir=opts.out_dir,
                 output_postfix=f"{suffix}_seg",
                 output_ext=".nii.gz",
                 resample=opts.resample,
-                data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
+                data_root_dir=data_root_dir,
                 batch_transform=from_engine(_image + "_meta_dict"), 
                 output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
                     opts.output_nc[item_index], decollate=decollate, item_index=item_index),
@@ -394,7 +395,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
                     output_postfix=f"{suffix}_prob",
                     output_ext=".nii.gz",
                     resample=opts.resample,
-                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
+                    data_root_dir=data_root_dir,
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
                         opts.output_nc[item_index], decollate, discrete=False, item_index=item_index
@@ -438,9 +439,16 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
 
 @ENSEMBLE_TEST_ENGINES.register("segmentation")
 class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
-    def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
+    def __init__(
+        self,
+        opts: SimpleNamespace,
+        test_loader: DataLoader,
+        net: Dict,
+        device: Union[str, torch.device],
+        logger_name: str,
+        **kwargs
+    ):
         use_best_model = kwargs.get("best_val_model", True)
-        resample = opts.resample
         model_list = opts.model_path
         is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
         logging_level = logging.DEBUG if opts.debug else logging.INFO
@@ -450,7 +458,7 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
         float_regex = r"=(-?\d+\.\d+).pt"
         decollate = True
         if is_intra_ensemble:
-            raise NotImplementedError()
+            raise NotImplementedError("Intra ensemble testing not tested yet")
         
         if use_slidingwindow:
             self.logger.info(f"---Use slidingwindow infer!---","\nPatch size: {crop_size}")
@@ -478,7 +486,7 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
 
         nets = [copy.deepcopy(net),] * len(best_models)
 
-        pred_keys = [f"pred{i}" for i in range(len(best_models))]
+        pred_keys = [f"{_pred}{i}" for i in range(len(best_models))]
         w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models] if use_best_model else None
 
         post_transforms = MeanEnsembleD(
@@ -488,36 +496,10 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
             weights=w_,
         )
 
-        val_handlers = [
-            SegmentationSaver(
-                output_dir=opts.out_dir,
-                output_ext=".nii.gz",
-                resample=resample,
-                data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(opts.output_nc, decollate),
-            ),
-        ]
-
-        if opts.save_prob:
-            val_handlers += [
-                SegmentationSaver(
-                    output_dir=opts.out_dir,
-                    output_ext=".nii.gz",
-                    output_postfix="prob",
-                    resample=resample,
-                    data_root_dir=output_filename_check(test_loader.dataset),
-                    batch_transform=from_engine(_image + "_meta_dict"),
-                    output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
-                        opts.output_nc, decollate, discrete=False
-                    ),
-                ),
-            ]
-        
         key_val_metric = SegmentationTestEngine.get_metric(opts.phase, opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
         
-        val_handlers += MedlpTestEngine.get_basic_handlers(
+        handlers = MedlpTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=best_models,
@@ -525,16 +507,23 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
             save_image=opts.save_image,
-            image_resample=resample,
+            image_resample=opts.resample,
             test_loader=test_loader,
             image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )
+        extra_handlers = SegmentationTestEngine.get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, **kwargs
+        )
+        if extra_handlers:
+            handlers += extra_handlers
 
         if opts.phase == Phases.TEST_EX:
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
             key_val_metric = None
         elif opts.phase == Phases.TEST_IN:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        else:
+            raise ValueError(f"Got unexpected phase here {opts.phase}, expect testing.")
 
         if use_slidingwindow:
             inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=opts.n_batch, overlap=0.5)
@@ -551,7 +540,7 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
             inferer=inferer,
             postprocessing=post_transforms,
             key_val_metric=key_val_metric,
-            val_handlers=val_handlers,
+            val_handlers=handlers,
             amp=opts.amp,
             decollate=decollate,
         )

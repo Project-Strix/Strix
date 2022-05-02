@@ -1,12 +1,15 @@
-import imp
+import re
+import copy
+from pathlib import Path 
 import torch
 import logging
 from medlp.configures import config as cfg
-from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine
-from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
+from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine, ENSEMBLE_TEST_ENGINES
+from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
 from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
 from medlp.utilities.enum import Phases
-from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator
+from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.transforms import MeanEnsembleD, MultitaskMeanEnsembleD
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
 from monai_ex.handlers import stopping_fn_from_metric
@@ -197,12 +200,11 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
 
         subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase="val", output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+            phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
         )
         subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase="val", output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+            phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
         )
-        val_metric_name = list(subtask1_val_metric.keys())[0]
         
         handlers = MedlpTestEngine.get_basic_handlers(
             phase=opts.phase,
@@ -246,3 +248,105 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
         )
 
 
+@ENSEMBLE_TEST_ENGINES.register("multitask")
+class MultitaskEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+    def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
+        if opts.slidingwindow:
+            raise ValueError("Not implemented yet")
+        
+        model_list = opts.model_path
+        is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
+        if is_intra_ensemble:
+            raise NotImplementedError()
+
+        use_best_model = kwargs.get("best_val_model", True)
+        crop_size = get_attr_(opts, "crop_size", None)
+        use_slidingwindow = opts.slidingwindow
+        float_regex = r"=(-?\d+\.\d+).pt"
+        decollate = True
+        is_supervised = opts.phase == Phases.TEST_IN
+        logging_level = logging.DEBUG if opts.debug else logging.INFO
+        self.logger = setup_logger(logger_name, logging_level, reset=True)
+
+        
+        if use_slidingwindow:
+            self.logger.info(f"---Use slidingwindow infer!---","\nPatch size: {crop_size}")
+        else:
+            self.logger.info("---Use simple infer!---")
+
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        _image = cfg.get_key("image")
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
+        cv_folders = filter(lambda x: x.is_dir(), cv_folders)
+        best_models = get_models(cv_folders, "best" if use_best_model else "last")
+        best_models = list(filter(lambda x: x is not None and x.is_file(), best_models))
+
+        if len(best_models) != opts.n_fold:
+            self.logger.warn(
+                f"Found {len(best_models)} best models,"
+                f"not equal to {opts.n_fold} n_folds.\n"
+                f"Use {len(best_models)} best models"
+            )
+        self.logger.info(f"Using models: {[m.name for m in best_models]}")
+
+        nets = [copy.deepcopy(net),] * len(best_models)
+        pred_keys = [f"{_pred}{i}" for i in range(len(best_models))]
+        w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models] if use_best_model else None
+
+        post_transforms = MultitaskMeanEnsembleD(keys=pred_keys, output_key=_pred, task_num=2, weights=w_)
+
+        if is_supervised:
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        else:
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
+
+        subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+            phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+        )
+        subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+            phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+        )
+
+        handlers = MedlpTestEngine.get_basic_handlers(
+            phase=opts.phase,
+            out_dir=opts.out_dir,
+            model_path=best_models,
+            load_dict=[{"net": net} for net in nets],
+            logger_name=logger_name,
+            stats_dicts={"Metrics": lambda x: None},
+            save_image=opts.save_image,
+            image_resample=opts.resample,
+            test_loader=test_loader,
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
+        )
+        subtask1_extra_handlers = TEST_ENGINES[opts.subtask1].get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, item_index=0, suffix="task1", **kwargs
+        )
+        subtask2_extra_handlers = TEST_ENGINES[opts.subtask2].get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, item_index=1, suffix="task2", **kwargs
+        )
+
+        if subtask1_extra_handlers:
+            handlers += subtask1_extra_handlers
+        if subtask2_extra_handlers:
+            handlers += subtask2_extra_handlers
+        
+        EnsembleEvaluator.__init__(
+            self,
+            device=device,
+            val_data_loader=test_loader,
+            networks=nets,
+            pred_keys=pred_keys,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=post_transforms,
+            key_val_metric=subtask1_val_metric,
+            additional_metrics=subtask2_val_metric,
+            val_handlers=handlers,
+            amp=opts.amp,
+            decollate=decollate,
+        )

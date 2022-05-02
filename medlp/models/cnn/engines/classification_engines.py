@@ -4,7 +4,7 @@ import re
 from types import SimpleNamespace
 from functools import partial
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Dict
+from typing import Union, Optional, Sequence, Dict
 
 import torch
 from torch.utils.data import DataLoader
@@ -14,6 +14,7 @@ from medlp.configures import config as cfg
 from medlp.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
 from medlp.models.cnn.engines.engine import MedlpTestEngine, MedlpTrainEngine
 from medlp.models.cnn.engines.utils import (
+    get_models,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
     output_onehot_transform,
@@ -496,181 +497,100 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
 
 
 @ENSEMBLE_TEST_ENGINES.register("classification")
-def build_classification_ensemble_test_engine(**kwargs):
-    opts = kwargs["opts"]
-    test_loader = kwargs["test_loader"]
-    net = kwargs["net"]
-    device = kwargs["device"]
-    use_best_model = kwargs.get("best_val_model", True)
-    model_list = opts.model_path
-    is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
-    logger_name = kwargs.get("logger_name", None)
-    logger = logging.getLogger(logger_name)
-    is_multilabel = opts.output_nc > 1
-    is_supervised = opts.phase == Phases.TEST_IN
-    multi_input_keys = kwargs.get("multi_input_keys", None)
-    multi_output_keys = kwargs.get("multi_output_keys", None)
-    _image = cfg.get_key("image")
-    _label = cfg.get_key("label")
-    _pred = cfg.get_key("pred")
+class ClassificationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+    def __init__(
+        self,
+        opts: SimpleNamespace,
+        test_loader: DataLoader,
+        net: Dict,
+        device: Union[str, torch.device],
+        logger_name: str,
+        **kwargs
+    ):
+        use_best_model = kwargs.get("best_val_model", True)
+        model_list = opts.model_path
+        logger = logging.getLogger(logger_name)
+        float_regex = r"=(-?\d+\.\d+).pt"
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _pred = cfg.get_key("pred")
+        decollate = True
+        is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
+        if is_intra_ensemble:
+            raise NotImplementedError("Intra ensemble testing not tested yet")
 
-    cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
-    cv_folders = filter(lambda x: x.is_dir(), cv_folders)
-    float_regex = r"=(-?\d+\.\d+).pt"
-    int_regex = r"=(\d+).pt"
-    if is_intra_ensemble:
-        if len(model_list) == 1:
-            raise ValueError("Only one model is specified for intra ensemble test, but need more!")
-    elif use_best_model:
-        model_list = []
-        for folder in cv_folders:
-            models = list(
-                filter(
-                    lambda x: re.search(float_regex, x.name),
-                    [model for model in (folder / "Models").rglob("*.pt")],
-                )  # ? better to usefolder/"Models"/"Best_Models"
+        cv_folders = [Path(opts.experiment_path) / f"{i}-th" for i in range(opts.n_fold)]
+        cv_folders = filter(lambda x: x.is_dir(), cv_folders)
+        best_models = get_models(cv_folders, "best" if use_best_model else "last")
+        model_list = list(filter(lambda x: x is not None and x.is_file(), best_models))
+
+        if len(model_list) != opts.n_fold and not is_intra_ensemble:
+            print(
+                f"Found {len(model_list)} best models,"
+                f"not equal to {opts.n_fold} n_folds.\n"
+                f"Use {len(model_list)} best models"
             )
-            models.sort(key=lambda x: float(re.search(float_regex, x.name).group(1)))
-            model_list.append(models[-1])
-    else:  # get latest
-        for folder in cv_folders:
-            models = list(
-                filter(
-                    lambda x: x.is_file(),
-                    [model for model in (folder / "Models" / "Checkpoint").iterdir()],
-                )
-            )
-            try:
-                models.sort(key=lambda x: int(re.search(int_regex, x.name).group(1)))
-            except AttributeError as e:
-                invalid_models = list(filter(lambda x: re.search(int_regex, x.name) is None, models))
-                print("invalid models:", invalid_models)
-                raise e
-            model_list.append(models[-1])
+        print(f"Using models: {[m.name for m in model_list]}")
 
-    if len(model_list) != opts.n_fold and not is_intra_ensemble:
-        print(
-            f"Found {len(model_list)} best models,"
-            f"not equal to {opts.n_fold} n_folds.\n"
-            f"Use {len(model_list)} best models"
-        )
-    print(f"Using models: {[m.name for m in model_list]}")
+        nets = [copy.deepcopy(net),] * len(model_list)
+        for net, m in zip(nets, model_list):
+            CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
 
-    nets = [
-        copy.deepcopy(net),
-    ] * len(model_list)
-    for net, m in zip(nets, model_list):
-        CheckpointLoaderEx(load_path=str(m), load_dict={"net": net}, name=logger_name)(None)
+        pred_keys = [f"{_pred}{i}" for i in range(len(model_list))]
+        w_ = [float(re.search(float_regex, m.name).group(1)) for m in best_models] if use_best_model else None
 
-    pred_keys = [f"{_pred}{i}" for i in range(len(model_list))]
-
-    if is_supervised:
-        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
-    else:
-        prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
-
-    if opts.output_nc == 1:  # ensemble_type is 'mean':
-        if use_best_model:
-            w_ = [float(re.search(float_regex, m.name).group(1)) for m in model_list]
-        else:
-            w_ = None
         post_transforms = MeanEnsembleD(
             keys=pred_keys,
             output_key=_pred,
-            # in this particular example, we use validation metrics as weights
             weights=w_,
         )
 
-        acc_post_transforms = Compose(
-            [
-                ActivationsD(keys=_pred, sigmoid=True),
-                AsDiscreteD(keys=_pred, threshold=0.5),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
-            ]
-        )
-        auc_post_transforms = Compose(
-            [
-                ActivationsD(keys=_pred, sigmoid=True),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
-            ]
-        )
-        ClsSaver_transform = Compose(
-            [
-                ActivationsD(keys=_pred, sigmoid=True),
-                AsDiscreteD(keys=_pred, threshold=0.5),
-                lambda x: x[_pred].cpu().numpy(),
-            ]
+        key_val_metric = ClassificationTestEngine.get_metric(opts.phase, opts.output_nc, decollate, metric_names="acc")
+        additional_val_metrics = ClassificationTestEngine.get_metric(
+            opts.phase, opts.output_nc, decollate, output_dir=opts.out_dir, metric_names=["auc", "prec", "recall", "roc"]
         )
 
-    else:  # ensemble_type is 'vote'
-        post_transforms = None
-
-        acc_post_transforms = Compose(
-            [
-                ActivationsD(keys=pred_keys, softmax=True),
-                AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
-            ]
+        handlers = MedlpTestEngine.get_basic_handlers(
+            phase=opts.phase,
+            out_dir=opts.out_dir,
+            model_path=best_models,
+            load_dict=[{"net": net} for net in nets],
+            logger_name=logger_name,
+            stats_dicts={"Metrics": lambda x: None},
+            save_image=opts.save_image,
+            image_resample=opts.resample,
+            test_loader=test_loader,
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )
-        auc_post_transforms = Compose(
-            [
-                ActivationsD(keys=pred_keys, softmax=True),
-                AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
-                partial(output_onehot_transform, n_classes=opts.output_nc),
-            ]
+        extra_handlers = ClassificationTestEngine.get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, **kwargs
         )
-        ClsSaver_transform = Compose(
-            [
-                ActivationsD(keys=pred_keys, softmax=True),
-                AsDiscreteD(keys=pred_keys, argmax=True, to_onehot=False),
-                SqueezeDimD(keys=pred_keys),
-                VoteEnsembleD(keys=pred_keys, output_key=_pred, num_classes=opts.output_nc),
-            ]
+        if extra_handlers:
+            handlers += extra_handlers
+
+        if opts.phase == Phases.TEST_IN:
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        elif opts.phase == Phases.TEST_EX:
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
+            key_val_metric = None
+        else:
+            raise ValueError(f"Got unexpected phase here {opts.phase}, expect testing.")
+
+        EnsembleEvaluator.__init__(
+            self,
+            device=device,
+            val_data_loader=test_loader,
+            networks=nets,
+            pred_keys=pred_keys,
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInfererEx(),
+            postprocessing=post_transforms,
+            key_val_metric=key_val_metric,
+            additional_metrics=additional_val_metrics,
+            val_handlers=handlers,
+            amp=opts.amp,
+            decollate=decollate
         )
 
-    val_handlers = [
-        StatsHandler(output_transform=lambda x: None, name=logger_name),
-        ClassificationSaverEx(
-            output_dir=opts.out_dir,
-            batch_transform=lambda x: x[_image + "_meta_dict"],
-            output_transform=ClsSaver_transform,
-        ),
-    ]
-
-    if opts.save_image:
-        root_dir = output_filename_check(test_loader.dataset)
-        val_handlers += [
-            SegmentationSaver(
-                output_dir=opts.out_dir,
-                output_postfix=_image,
-                data_root_dir=root_dir,
-                resample=False,
-                mode="bilinear",
-                batch_transform=lambda x: x[_image + "_meta_dict"],
-                output_transform=lambda x: x[_image],
-            )
-        ]
-
-    evaluator = EnsembleEvaluator(
-        device=device,
-        val_data_loader=test_loader,
-        pred_keys=pred_keys,
-        networks=nets,
-        prepare_batch=prepare_batch_fn,
-        inferer=SimpleInfererEx(),
-        post_transform=post_transforms,
-        val_handlers=val_handlers,
-        key_val_metric={"test_acc": Accuracy(output_transform=acc_post_transforms, is_multilabel=is_multilabel)},
-        additional_metrics={
-            "test_auc": ROCAUC(output_transform=auc_post_transforms),
-            "Prec": Precision(output_transform=acc_post_transforms),
-            "Recall": Recall(output_transform=acc_post_transforms),
-            "ROC": DrawRocCurve(save_dir=opts.out_dir, output_transform=auc_post_transforms),
-        },
-    )
-
-    return evaluator
