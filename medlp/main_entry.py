@@ -19,7 +19,7 @@ from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
 import medlp.utilities.arguments as arguments
-from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu
+from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu, check_batchsize
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -135,6 +135,7 @@ def train_core(cargs, files_train, files_valid):
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
         save_dir=Path(__file__).parent,
+        checking_functions=[check_batchsize]
     ),
 )
 @click.pass_context

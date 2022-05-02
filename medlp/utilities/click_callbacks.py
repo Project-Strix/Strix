@@ -1,11 +1,13 @@
 from typing import Callable
 import re
+import os
 import subprocess
 from time import strftime
 from pathlib import Path
 import inspect
 from functools import partial
 from click import Choice, ParamType, prompt
+import click
 from click.types import convert_type
 from types import SimpleNamespace as sn
 from termcolor import colored
@@ -405,3 +407,21 @@ def input_cropsize(ctx, param, value):
         )
     ctx.params["crop_size"] = crop_size
     return value
+
+
+def check_batchsize(ctx_params):
+    if "valid_list" in ctx_params and os.path.isfile(ctx_params["valid_list"]):
+        files_valid = get_items_from_file(ctx_params["valid_list"], format="auto")
+        len_valid = len(files_valid)
+    else:
+        data_list = DATASET_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["data_list"]].get(
+            "PATH", ""
+        )
+        split = ctx_params["split"]
+        all_data_list = get_items_from_file(data_list, format="auto")
+        len_valid = len(all_data_list) * split
+
+    if len_valid < ctx_params['n_batch_valid']:
+        print(f"Validation Batch size {ctx_params['n_batch_valid']} larger than all valid data size {len_valid}!")
+        raise click.Abort()
+

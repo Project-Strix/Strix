@@ -70,7 +70,8 @@ def common_params(func):
         "--n-epoch-len", type=float, default=1.0,
         help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch"
     )
-    @option("--n-batch", prompt=True, show_default=True, type=int, default=10, help="Batch size")
+    @option("--n-batch", prompt=True, show_default=True, type=int, default=10, help="Train batch size")
+    @option("--n-batch-valid", prompt=True, show_default=True, type=int, default=5, help="Valid batch size")
     @option("-IS", "--imbalance-sample", is_flag=True, help="Use imbalanced dataset sampling")
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
