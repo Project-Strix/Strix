@@ -1,11 +1,9 @@
-from multiprocessing.managers import ValueProxy
 from types import SimpleNamespace
 from typing import Optional, Any, Sequence, Dict
 import re
 import logging
 import copy
 from pathlib import Path
-
 
 import torch
 from torch.utils.data import DataLoader 
@@ -305,8 +303,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             save_image=opts.save_image,
             image_resample=opts.resample,
             test_loader=test_loader,
-            image_batch_transform=from_engine(_image + "_meta_dict"),
-            image_output_transform=from_engine(_image),
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )
         extra_handlers = SegmentationTestEngine.get_extra_handlers(
             opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, **kwargs
@@ -371,18 +368,22 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         test_loader: DataLoader,
         decollate: bool,
         logger_name: str,
+        item_index: Optional[int] = None,
         **kwargs: Dict,
     ) -> Sequence:
         _image = cfg.get_key("image")
+        suffix = kwargs.get("suffix", '')
 
         extra_handlers = [
             SegmentationSaver(
                 output_dir=opts.out_dir,
+                output_postfix=f"{suffix}_seg",
                 output_ext=".nii.gz",
                 resample=opts.resample,
-                data_root_dir=output_filename_check(test_loader.dataset),
-                batch_transform=from_engine(_image + "_meta_dict"),
-                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(opts.output_nc, decollate),
+                data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
+                batch_transform=from_engine(_image + "_meta_dict"), 
+                output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
+                    opts.output_nc[item_index], decollate=decollate, item_index=item_index),
             ),
         ]
 
@@ -390,13 +391,13 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             extra_handlers += [
                 SegmentationSaver(
                     output_dir=opts.out_dir,
+                    output_postfix=f"{suffix}_prob",
                     output_ext=".nii.gz",
-                    output_postfix="prob",
                     resample=opts.resample,
-                    data_root_dir=output_filename_check(test_loader.dataset),
+                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
-                        opts.output_nc, decollate, discrete=False
+                        opts.output_nc[item_index], decollate, discrete=False, item_index=item_index
                     ),
                 ),
             ]
@@ -409,13 +410,15 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         decollate: bool,
         discrete: bool = True,
         logit_thresh: float = 0.5,
+        item_index: Optional[int] = None,
     ):
         _pred = cfg.get_key("pred")
-        _label = cfg.get_key("label")
+
+        select_item_transform = [DTA(GetItemD(keys=_pred, index=item_index))] if item_index is not None else []
 
         if output_nc == 1:
             return Compose(
-                [
+                select_item_transform + [
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
                     DTA(AsDiscreteD(keys=_pred, threshold=logit_thresh)) if discrete else lambda x: x,
                     from_engine(_pred),
@@ -424,7 +427,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             )
         else:
             return Compose(
-                [
+                select_item_transform + [
                     DTA(ActivationsD(keys=_pred, softmax=True)),
                     DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)) if discrete else lambda x: x,
                     from_engine(_pred),
@@ -524,8 +527,7 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
             save_image=opts.save_image,
             image_resample=resample,
             test_loader=test_loader,
-            image_batch_transform=from_engine(_image + "_meta_dict"),
-            image_output_transform=from_engine(_image),
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )
 
         if opts.phase == Phases.TEST_EX:

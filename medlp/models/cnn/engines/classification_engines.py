@@ -287,7 +287,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         logger_name,
         **kwargs,
     ):
-        is_supervised = kwargs.get("is_supervised", opts.phase == Phases.TEST_IN)
+        is_supervised = opts.phase == Phases.TEST_IN
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
         output_latent_code = kwargs.get("output_latent_code", False)
@@ -324,8 +324,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
             save_image=opts.save_image,
             image_resample=False,
             test_loader=test_loader,
-            image_batch_transform=from_engine(_image + "_meta_dict"),
-            image_output_transform=from_engine(_image),
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )
 
         extra_handlers = ClassificationTestEngine.get_extra_handlers(
@@ -422,6 +421,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _acti = cfg.get_key("forward")
+        suffix = kwargs.get("suffix", '')
         output_latent_code = kwargs.get("output_latent_code", False)
         root_dir = output_filename_check(test_loader.dataset)
         has_label = opts.phase == Phases.TEST_IN
@@ -429,6 +429,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         extra_handlers = [
             ClassificationSaverEx(
                 output_dir=opts.out_dir,
+                filename=f"{suffix}_predictions.csv" if suffix else "predictions.csv",
                 save_labels=has_label,
                 batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
@@ -441,7 +442,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
             extra_handlers += [
                 ClassificationSaverEx(
                     output_dir=opts.out_dir,
-                    filename="prob.csv",
+                    filename=f"{suffix}_prob.csv" if suffix else "prob.csv",
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
                         opts.output_nc, discrete=False
@@ -453,7 +454,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
             extra_handlers += [
                 LatentCodeSaver(
                     output_dir=opts.out_dir,
-                    filename="latent",
+                    filename=f"{suffix}latent",
                     data_root_dir=root_dir,
                     overwrite=True,
                     batch_transform=from_engine(_image + "_meta_dict"),

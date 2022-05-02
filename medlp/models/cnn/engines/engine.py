@@ -1,23 +1,21 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Callable, Sequence, Union, Dict
-
 import os
-import torch
-from torch.utils.data import DataLoader
+from abc import ABC, abstractmethod
+from typing import Callable, Dict, Optional, Sequence, Union
 
+from medlp.configures import config as cfg
+from medlp.utilities.utils import output_filename_check
 from monai_ex.handlers import (
-    StatsHandler,
-    TensorBoardStatsHandler,
-    TensorBoardImageHandlerEx,
-    CheckpointSaverEx,
     CheckpointLoader,
-    SegmentationSaver,
+    CheckpointSaverEx,
     NNIReporterHandler,
+    ImageBatchSaver,
+    StatsHandler,
     TensorboardDumper,
-    from_engine,
+    TensorBoardImageHandlerEx,
+    TensorBoardStatsHandler,
 )
 from monai_ex.utils import ensure_list
-from medlp.utilities.utils import output_filename_check
+from torch.utils.data import DataLoader
 
 
 class MedlpTrainEngine(ABC):
@@ -162,7 +160,6 @@ class MedlpTestEngine(ABC):
         image_resample: bool = False,
         test_loader: Optional[DataLoader] = None,
         image_batch_transform: Callable = lambda x: (),
-        image_output_transform: Callable = lambda x: (),
     ):
         handlers = []
         
@@ -182,16 +179,16 @@ class MedlpTestEngine(ABC):
                 ]
 
         if save_image:
+            _image = cfg.get_key("image")
             handlers += [
-                SegmentationSaver(
+                ImageBatchSaver(
                     output_dir=out_dir,
                     output_ext=".nii.gz",
-                    output_postfix="image",
-                    data_root_dir=output_filename_check(test_loader.dataset),
+                    output_postfix=_image,
+                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
                     resample=image_resample,
                     mode="bilinear",
-                    batch_transform=image_batch_transform,
-                    output_transform=image_output_transform,
+                    image_batch_transform=image_batch_transform,
                 )
             ]
 

@@ -1,9 +1,11 @@
+import imp
 import torch
 import logging
 from medlp.configures import config as cfg
 from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine
 from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn
 from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
+from medlp.utilities.enum import Phases
 from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -178,21 +180,21 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
         if opts.slidingwindow:
             raise ValueError("Not implemented yet")
 
-        crop_size = get_attr_(opts, "crop_size", None)
-        n_batch = opts.n_batch
-        resample = opts.resample
-        use_slidingwindow = opts.slidingwindow
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
+        is_supervised = opts.phase == Phases.TEST_IN
+
         _image = cfg.get_key("image")
-        _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
         decollate = True
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
         logging_level = logging.DEBUG if opts.debug else logging.INFO
         self.logger = setup_logger(logger_name, logging_level, reset=True)
 
-        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        if is_supervised:
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        else:
+            prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
 
         subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
             phase="val", output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
@@ -202,11 +204,33 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
         )
         val_metric_name = list(subtask1_val_metric.keys())[0]
         
+        handlers = MedlpTestEngine.get_basic_handlers(
+            phase=opts.phase,
+            out_dir=opts.out_dir,
+            model_path=model_path,
+            load_dict={"net": net},
+            logger_name=logger_name,
+            stats_dicts={"Metrics": lambda x: None},
+            save_image=opts.save_image,
+            image_resample=False,
+            test_loader=test_loader,
+            image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
+        )
 
+        subtask1_extra_handlers = TEST_ENGINES[opts.subtask1].get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, item_index=0, suffix="task1", **kwargs
+        )
+        subtask2_extra_handlers = TEST_ENGINES[opts.subtask2].get_extra_handlers(
+            opts=opts, test_loader=test_loader, decollate=decollate, logger_name=logger_name, item_index=1, suffix="task2", **kwargs
+        )
 
-
+        if subtask1_extra_handlers:
+            handlers += subtask1_extra_handlers
+        if subtask2_extra_handlers:
+            handlers += subtask2_extra_handlers
 
         SupervisedEvaluator.__init__(
+            self,
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -216,7 +240,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
             postprocessing=None,
             key_val_metric=subtask1_val_metric,
             additional_metrics=subtask2_val_metric,
-            val_handlers=val_handlers,
+            val_handlers=handlers,
             amp=opts.amp,
             decollate=decollate,
         )
