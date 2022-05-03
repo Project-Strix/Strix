@@ -311,6 +311,7 @@ def train_cfg(**args):
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--save-label", is_flag=True, help="Save the tested label data (image type)")
 @click.option("--save-latent", is_flag=True, help="Save the latent code")
 @click.option("--save-prob", is_flag=True, help="Save predicted probablity")
 @click.option(
@@ -370,6 +371,7 @@ def test_cfg(**args):
     phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
     configures["phase"] = phase
     configures["save_image"] = args["save_image"]
+    configures["save_label"] = args["save_label"]
     configures["save_prob"] = args["save_prob"]
     configures["experiment_path"] = exp_dir
     configures["resample"] = True  # ! departure

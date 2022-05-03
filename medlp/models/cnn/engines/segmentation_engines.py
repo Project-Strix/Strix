@@ -41,6 +41,7 @@ from monai_ex.handlers import (
     stopping_fn_from_metric,
     from_engine_ex as from_engine,
     EarlyStopHandler,
+    ImageBatchSaver,
 )
 
 
@@ -402,6 +403,20 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
                     ),
                 ),
             ]
+        
+        if opts.save_label:
+            _label = cfg.get_key("label")
+            extra_handlers += [
+                ImageBatchSaver(
+                    output_dir=opts.out_dir,
+                    output_ext=".nii.gz",
+                    output_postfix=f"{suffix}_label",
+                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
+                    resample=opts.resample,
+                    mode="bilinear",
+                    image_batch_transform=from_engine([_label, _label + "_meta_dict"]),
+                )                
+            ]
 
         return extra_handlers
 
@@ -414,7 +429,6 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         item_index: Optional[int] = None,
     ):
         _pred = cfg.get_key("pred")
-
         select_item_transform = [DTA(GetItemD(keys=_pred, index=item_index))] if item_index is not None else []
 
         if output_nc == 1:

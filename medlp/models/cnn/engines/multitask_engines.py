@@ -299,17 +299,18 @@ class MultitaskEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
 
         post_transforms = MultitaskMeanEnsembleD(keys=pred_keys, output_key=_pred, task_num=2, weights=w_)
 
-        if is_supervised:
-            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
-        else:
+        if not is_supervised:
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
+            subtask1_val_metric = subtask2_val_metric = None
+        else:
+            prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
-        )
-        subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
-        )
+            subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+                phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+            )
+            subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+                phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+            )
 
         handlers = MedlpTestEngine.get_basic_handlers(
             phase=opts.phase,

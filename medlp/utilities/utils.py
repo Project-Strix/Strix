@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import socket
 import struct
@@ -25,7 +23,7 @@ from monai.networks import one_hot
 from monai_ex.utils import ensure_list
 
 
-def get_attr_(obj, name, default):
+def get_attr_(obj, name, default = None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 
