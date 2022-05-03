@@ -1,3 +1,4 @@
+import imp
 from typing import Callable
 import re
 import os
@@ -6,73 +7,15 @@ from time import strftime
 from pathlib import Path
 import inspect
 from functools import partial
-from click import Choice, ParamType, prompt
-import click
-from click.types import convert_type
+from click import Choice, prompt, Abort
+
 from types import SimpleNamespace as sn
 from termcolor import colored
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import is_avaible_size
+from medlp.utilities.enum import BUILTIN_TYPES
+from medlp.utilities.click import NumericChoice
 from utils_cw import Print, check_dir, get_items_from_file
-
-
-###################### Extension of click ################################
-
-
-class DynamicTuple(ParamType):
-    def __init__(self, input_type):
-        self.type = convert_type(input_type)
-
-    @property
-    def name(self):
-        return "< Dynamic Tuple >"
-
-    def convert(self, value, param, ctx):
-        # Hotfix for prompt input
-        if isinstance(value, str):
-            if "," in value:
-                sep = ","
-            elif ";" in value:
-                sep = ";"
-            else:
-                sep = " "
-
-            value = value.strip().split(sep)
-            value = list(filter(lambda x: x != " ", value))
-        elif value is None or value == "":
-            return None
-
-        types = (self.type,) * len(value)
-        return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
-
-
-class NumericChoice(Choice):
-    def __init__(self, choices, **kwargs):
-        self.choicemap = {}
-        choicestrs = []
-        for i, choice in enumerate(choices, start=1):
-            self.choicemap[i] = choice
-            if len(choices) > 5:
-                choicestrs.append(f"\n\t{i}: {choice}")
-            else:
-                choicestrs.append(f"{i}: {choice}")
-
-        super().__init__(choicestrs, **kwargs)
-
-    def convert(self, value, param, ctx):
-        try:
-            return self.choicemap[int(value)]
-        except ValueError as e:
-            if value in self.choicemap.values():
-                return value
-            self.fail(
-                f"invaid index choice: {value}. Please input integer index or correct value!"
-                f"Error msg: {e}"
-            )
-        except KeyError as e:
-            self.fail(
-                f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx
-            )
 
 
 #######################################################################
@@ -423,5 +366,5 @@ def check_batchsize(ctx_params):
 
     if len_valid < ctx_params['n_batch_valid']:
         print(f"Validation Batch size {ctx_params['n_batch_valid']} larger than all valid data size {len_valid}!")
-        raise click.Abort()
+        raise Abort()
 

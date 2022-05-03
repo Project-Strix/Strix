@@ -14,7 +14,7 @@ import torch
 from torchvision.utils import save_image
 
 from medlp.utilities.arguments import data_select
-from medlp.utilities.click_callbacks import NumericChoice as Choice
+from medlp.utilities.click import NumericChoice as Choice
 from medlp.utilities.click_callbacks import get_unknown_options
 from medlp.utilities.enum import FRAMEWORKS, Phases
 from medlp.utilities.utils import (

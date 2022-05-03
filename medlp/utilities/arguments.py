@@ -1,25 +1,15 @@
 import time
-import click
-from pathlib import Path
 from functools import partial, wraps
-from click import option, prompt
+from pathlib import Path
+
 from medlp.configures import config as cfg
-from medlp.utilities.click_callbacks import (
-    NumericChoice as Choice,
-    lr_schedule_params,
-    loss_select,
-    model_select,
-    data_select,
-    parse_input_str,
-)
-from medlp.utilities.enum import (
-    NORMS,
-    LR_SCHEDULES,
-    FRAMEWORKS,
-    OPTIMIZERS,
-    ACTIVATIONS,
-)
+from medlp.utilities.click import NumericChoice as Choice
+from medlp.utilities.click_callbacks import data_select, loss_select, lr_schedule_params, model_select, parse_input_str
+from medlp.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
 from utils_cw import prompt_when
+
+import click
+from click import option, prompt
 
 
 def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
