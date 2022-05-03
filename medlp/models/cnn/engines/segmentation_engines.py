@@ -67,11 +67,10 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         multi_output_keys = kwargs.get("multi_output_keys", None)
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
-        _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         val_metric = SegmentationTrainEngine.get_metric(Phases.VALID, output_nc=opts.output_nc, decollate=decollate)
         train_metric = SegmentationTrainEngine.get_metric(Phases.TRAIN, output_nc=opts.output_nc, decollate=decollate)
@@ -126,7 +125,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             amp=opts.amp,
             decollate=decollate,
         )
-        evaluator.logger = logging.getLogger(logger_name)
+        evaluator.logger = setup_logger(logger_name)
 
         if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
@@ -282,8 +281,8 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         decollate = True
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         if use_slidingwindow:
             print("---Use slidingwindow infer!---","\nPatch size:", crop_size)
@@ -374,6 +373,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
     ) -> Sequence:
         _image = cfg.get_key("image")
         suffix = kwargs.get("suffix", '')
+        output_nc = opts.output_nc if item_index is None else opts.output_nc[item_index]
 
         data_root_dir = output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict")
         extra_handlers = [
@@ -385,7 +385,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
                 data_root_dir=data_root_dir,
                 batch_transform=from_engine(_image + "_meta_dict"), 
                 output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
-                    opts.output_nc[item_index], decollate=decollate, item_index=item_index),
+                    output_nc, decollate=decollate, item_index=item_index),
             ),
         ]
 
@@ -399,7 +399,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
                     data_root_dir=data_root_dir,
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
-                        opts.output_nc[item_index], decollate, discrete=False, item_index=item_index
+                        output_nc, decollate, discrete=False, item_index=item_index
                     ),
                 ),
             ]
@@ -465,8 +465,8 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
         use_best_model = kwargs.get("best_val_model", True)
         model_list = opts.model_path
         is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
         crop_size = get_attr_(opts, "crop_size", None)
         use_slidingwindow = opts.slidingwindow
         float_regex = r"=(-?\d+\.\d+).pt"

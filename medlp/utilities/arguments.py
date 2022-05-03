@@ -86,6 +86,7 @@ def common_params(func):
     @option("--n-repeat", type=int, default=0, help="K times random permutation cross-validator")
     @option("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
     @option("--seed", type=int, default=101, help="random seed")
+    @option("--disable-logfile", is_flag=True, help="Stop dump log file to local disk")
     @option("--compact-log", is_flag=True, help="Output compact log info")
     @option("--symbolic-tb", is_flag=True, help="Create symbolic for tensorboard logs")
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")

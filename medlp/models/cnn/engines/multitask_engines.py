@@ -41,8 +41,8 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         if multi_output_keys is None:
             raise ValueError("No 'multi_output_keys' was specified for MultiTask!")
@@ -118,7 +118,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             amp=opts.amp,
             decollate=decollate,
         )
-        evaluator.logger = logging.getLogger(logger_name)
+        evaluator.logger = setup_logger(logger_name)
 
         if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
@@ -191,8 +191,8 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
         _label = cfg.get_key("label")
         decollate = True
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         if is_supervised:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
@@ -265,8 +265,8 @@ class MultitaskEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
         float_regex = r"=(-?\d+\.\d+).pt"
         decollate = True
         is_supervised = opts.phase == Phases.TEST_IN
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         
         if use_slidingwindow:

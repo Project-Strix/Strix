@@ -594,9 +594,12 @@ def setup_logger(
     filepath: Optional[str] = None,
     distributed_rank: Optional[int] = None,
     reset: bool = False,
+    terminator: str = '\n'
 ) -> logging.Logger:
     """
-    Extented ignite's setup_logger. Add `color` option.
+    Extented ignite's setup_logger. 
+    Extended: `color`, `terminator`.
+
     Setups logger: name, level, format etc.
 
     Args:
@@ -604,10 +607,12 @@ def setup_logger(
         level: logging level, e.g. CRITICAL, ERROR, WARNING, INFO, DEBUG.
         stream: logging stream. If None, the standard stream is used (sys.stderr).
         format: logging format. By default, `%(asctime)s %(name)s %(levelname)s: %(message)s`.
+        color: whether use colored log
         filepath: Optional logging file path. If not None, logs are written to the file.
         distributed_rank: Optional, rank in distributed configuration to avoid logger setup for workers.
             If None, distributed_rank is initialized to the rank of process.
         reset: if True, reset an existing logger rather than keep format, handlers, and level.
+        terminator: change the terminator of output stream. eg. `\r` for concise msg
 
     Returns:
         logging.Logger
@@ -691,12 +696,13 @@ def setup_logger(
         ch = logging.StreamHandler(stream=stream)
         ch.setLevel(level)
         ch.setFormatter(formatter)
+        ch.terminator = terminator
         logger.addHandler(ch)
 
         if filepath is not None:
             fh = logging.FileHandler(filepath)
             fh.setLevel(level)
-            fh.setFormatter(formatter)
+            fh.setFormatter(logging.Formatter(format)) # file no color
             logger.addHandler(fh)
 
     # don't propagate to ancestors

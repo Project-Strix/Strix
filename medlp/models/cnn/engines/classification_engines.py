@@ -17,12 +17,11 @@ from medlp.models.cnn.engines.utils import (
     get_models,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
-    output_onehot_transform,
 )
-from medlp.models.cnn.utils import onehot_process, output_onehot_transform
+from medlp.models.cnn.utils import onehot_process
 from medlp.utilities.enum import Phases
 from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.utilities.utils import output_filename_check, setup_logger
+from medlp.utilities.utils import output_filename_check, setup_logger, get_attr_
 from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
 from monai_ex.handlers import (
     ROCAUC,
@@ -69,11 +68,10 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         decollate = False
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
-        _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
 
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
@@ -130,6 +128,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
         )
+        evaluator.logger = setup_logger(logger_name)
 
         if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
@@ -300,8 +299,8 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         _acti = cfg.get_key("forward")
 
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
-        logging_level = logging.DEBUG if opts.debug else logging.INFO
-        self.logger = setup_logger(logger_name, logging_level, reset=True)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
 
         if is_supervised:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
@@ -417,6 +416,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         test_loader: DataLoader,
         decollate: bool,
         logger_name: str,
+        item_index: Optional[int] = None,
         **kwargs: Dict,
     ):
         _image = cfg.get_key("image")
@@ -426,6 +426,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         output_latent_code = kwargs.get("output_latent_code", False)
         root_dir = output_filename_check(test_loader.dataset)
         has_label = opts.phase == Phases.TEST_IN
+        output_nc = opts.output_nc if item_index is None else opts.output_nc[item_index]
 
         extra_handlers = [
             ClassificationSaverEx(
@@ -435,7 +436,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
                 batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
                 else from_engine(_image + "_meta_dict"),
-                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(opts.output_nc),
+                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(output_nc),
             )
         ]
 
@@ -446,7 +447,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
                     filename=f"{suffix}_prob.csv" if suffix else "prob.csv",
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
-                        opts.output_nc, discrete=False
+                        output_nc, discrete=False
                     ),
                 )
             ]
@@ -509,7 +510,8 @@ class ClassificationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
     ):
         use_best_model = kwargs.get("best_val_model", True)
         model_list = opts.model_path
-        logger = logging.getLogger(logger_name)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        self.logger = setup_logger(logger_name)
         float_regex = r"=(-?\d+\.\d+).pt"
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)

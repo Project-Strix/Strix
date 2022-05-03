@@ -240,7 +240,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         "valid_interval": valid_interval,
         "device": device,
         "model_dir": model_dir,
-        "logger_name": f"{opts.tensor_dim}-Trainer",
+        "logger_name": None,
         "multi_input_keys": multi_input_keys,
         "multi_output_keys": multi_output_keys,
     }
