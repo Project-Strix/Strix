@@ -321,6 +321,11 @@ def input_cropsize(ctx, param, value):
     return value
 
 
+#######################################################################
+##                    checklist callbacks
+#######################################################################
+
+
 def check_batchsize(ctx_params):
     train_list, valid_list, framework, tensor_dim, data_name, split, n_batch_train, n_batch_valid = (
         ctx_params.get("train_list"),
@@ -356,3 +361,11 @@ def check_batchsize(ctx_params):
         ret = False
     
     return ret
+
+
+def check_loss(ctx_params):
+    output_nc, loss_fn = ctx_params.get("output_nc"), ctx_params.get("criterion")
+    if loss_fn == "CE" and output_nc == 1:
+        print("Single output channel should use BCE instead of CE loss.")
+        return False
+    return True
