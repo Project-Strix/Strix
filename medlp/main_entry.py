@@ -25,7 +25,8 @@ from medlp.utilities.click_callbacks import (
     input_cropsize,
     select_gpu,
     check_batchsize,
-    check_loss
+    check_loss,
+    check_lr_policy
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -142,7 +143,7 @@ def train_core(cargs, files_train, files_valid):
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
         save_dir=Path(__file__).parent,
-        checklist=[check_batchsize, check_loss]
+        checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )
 @click.pass_context

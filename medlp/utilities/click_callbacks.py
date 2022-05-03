@@ -99,12 +99,6 @@ def get_exp_name(ctx, param, value):
     datalist_name = str(ctx.params["data_list"])
     partial_data = "-partial" if "partial" in ctx.params and ctx.params["partial"] < 1 else ""
 
-    if ctx.params["lr_policy"] == "plateau" and ctx.params["valid_interval"] != 1:
-        Print(
-            "Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau",
-            color="y",
-        )
-
     if "debug" in ctx.params and ctx.params["debug"]:
         Print("You are in Debug mode with preload=0, out_dir=debug", color="y")
         ctx.params["preload"] = 0.0  # emmm...
@@ -368,4 +362,10 @@ def check_loss(ctx_params):
     if loss_fn == "CE" and output_nc == 1:
         print("Single output channel should use BCE instead of CE loss.")
         return False
+    return True
+
+
+def check_lr_policy(ctx_params):
+    if ctx_params.get("lr_policy") == "plateau" and ctx_params("valid_interval") != 1:
+        Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
     return True
