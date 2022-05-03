@@ -48,17 +48,17 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             raise ValueError("No 'multi_output_keys' was specified for MultiTask!")
 
         subtask1_train_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase="train", output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+            phase=Phases.TRAIN, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
         )
         subtask2_train_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase="train", output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+            phase=Phases.TRAIN, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
         )
 
         subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase="val", output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+            phase=Phases.VALID, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
         )
         subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase="val", output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+            phase=Phases.VALID, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
         )
         val_metric_name = list(subtask1_val_metric.keys())[0]
 
@@ -70,7 +70,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
         )
 
         val_handlers = MedlpTrainEngine.get_basic_handlers(
-            phase="val",
+            phase=Phases.VALID,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -134,7 +134,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             ),
         ]
         train_handlers += MedlpTrainEngine.get_basic_handlers(
-            phase="train",
+            phase=Phases.TRAIN,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
