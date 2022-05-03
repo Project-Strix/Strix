@@ -129,7 +129,7 @@ def get_exp_name(ctx, param, value):
 
     project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
 
-    if project_name:
+    if project_name and not project_name.startswith("Project"):
         proj_dirname = f"Project-{project_name}"
         return Path(ctx.params["out_dir"]) / ctx.params["framework"] / proj_dirname / datalist_name / exp_name
     else:
