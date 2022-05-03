@@ -702,7 +702,7 @@ def setup_logger(
         if filepath is not None:
             fh = logging.FileHandler(filepath)
             fh.setLevel(level)
-            fh.setFormatter(formatter)
+            fh.setFormatter(logging.Formatter(format)) # file no color
             logger.addHandler(fh)
 
     # don't propagate to ancestors

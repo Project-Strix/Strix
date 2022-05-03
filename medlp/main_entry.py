@@ -141,8 +141,9 @@ def train(ctx, **args):
     logger_name = f"{cargs.tensor_dim}-Trainer"
     cargs.logger_name = logger_name
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
+    log_path = None if cargs.disable_logfile else cargs.experiment_path.joinpath("logs")
     log_terminator = '\r' if cargs.compact_log and not cargs.debug else '\n'
-    logger = setup_logger(logger_name, level=logging_level, reset=True, terminator=log_terminator)
+    logger = setup_logger(logger_name, logging_level, filepath=log_path, reset=True, terminator=log_terminator)
 
     if len(auxilary_params) > 0:  # dump auxilary params
         with cargs.experiment_path.joinpath("param.list").open("w") as f:
@@ -358,6 +359,7 @@ def test_cfg(**args):
     configures["preload"] = 0.0
     phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
     configures["phase"] = phase
+    configures["logger_name"] = logger_name
     configures["save_image"] = args["save_image"]
     configures["save_label"] = args["save_label"]
     configures["save_prob"] = args["save_prob"]
@@ -379,7 +381,6 @@ def test_cfg(**args):
         configures["model_path"] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
-        engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
 
         if isinstance(engine, SupervisedEvaluator):
             logger.info(" ==== Begin testing ====")
