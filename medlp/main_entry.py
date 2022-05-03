@@ -135,7 +135,7 @@ def train_core(cargs, files_train, files_valid):
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
         save_dir=Path(__file__).parent,
-        checking_functions=[check_batchsize]
+        checklist=check_batchsize
     ),
 )
 @click.pass_context
@@ -165,7 +165,7 @@ def train(ctx, **args):
         shutil.copyfile(source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot"))
 
     # ! Manually specified train&valid datalist
-    if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
+    if cargs.train_list and cargs.valid_list:
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)
