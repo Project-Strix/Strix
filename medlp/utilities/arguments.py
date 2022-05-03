@@ -1,25 +1,15 @@
 import time
-import click
-from pathlib import Path
 from functools import partial, wraps
-from click import option, prompt
+from pathlib import Path
+
 from medlp.configures import config as cfg
-from medlp.utilities.click_callbacks import (
-    NumericChoice as Choice,
-    lr_schedule_params,
-    loss_select,
-    model_select,
-    data_select,
-    parse_input_str,
-)
-from medlp.utilities.enum import (
-    NORMS,
-    LR_SCHEDULES,
-    FRAMEWORKS,
-    OPTIMIZERS,
-    ACTIVATIONS,
-)
+from medlp.utilities.click import NumericChoice as Choice
+from medlp.utilities.click_callbacks import data_select, loss_select, lr_schedule_params, model_select, parse_input_str
+from medlp.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
 from utils_cw import prompt_when
+
+import click
+from click import option, prompt
 
 
 def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
@@ -77,8 +67,8 @@ def common_params(func):
     @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
     @option("--output-nc", type=int, default=1, prompt=True, help="output channels (classes)")
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
-    @option("--train-list", type=str, default="", help="Specified training datalist")
-    @option("--valid-list", type=str, default="", help="Specified validation datalist")
+    @option("--train-list", type=click.Path(exists=True), default=None, help="Specified training datalist")
+    @option("--valid-list", type=click.Path(exists=True), default=None, help="Specified validation datalist")
     @option("-W", "--pretrained-model-path", type=str, default="", help="pretrained model path")
     @option("--out-dir", type=str, prompt=True, show_default=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
     @option("--augment-ratio", type=float, default=0.3, help="Data augumentation ratio")

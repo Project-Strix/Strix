@@ -19,7 +19,15 @@ from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
 import medlp.utilities.arguments as arguments
-from medlp.utilities.click_callbacks import get_unknown_options, get_exp_name, input_cropsize, select_gpu, check_batchsize
+from medlp.utilities.click_callbacks import (
+    get_unknown_options,
+    get_exp_name,
+    input_cropsize,
+    select_gpu,
+    check_batchsize,
+    check_loss,
+    check_lr_policy
+)
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 from utils_cw import (
@@ -135,7 +143,7 @@ def train_core(cargs, files_train, files_valid):
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
         save_dir=Path(__file__).parent,
-        checking_functions=[check_batchsize]
+        checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )
 @click.pass_context
@@ -165,7 +173,7 @@ def train(ctx, **args):
         shutil.copyfile(source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot"))
 
     # ! Manually specified train&valid datalist
-    if os.path.isfile(cargs.train_list) and os.path.isfile(cargs.valid_list):
+    if cargs.train_list and cargs.valid_list:
         files_train = get_items_from_file(cargs.train_list, format="auto")
         files_valid = get_items_from_file(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)

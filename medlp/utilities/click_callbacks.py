@@ -1,3 +1,4 @@
+import imp
 from typing import Callable
 import re
 import os
@@ -6,76 +7,19 @@ from time import strftime
 from pathlib import Path
 import inspect
 from functools import partial
-from click import Choice, ParamType, prompt
-import click
-from click.types import convert_type
+from click import Choice, prompt, Abort
+
 from types import SimpleNamespace as sn
 from termcolor import colored
 from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import is_avaible_size
+from medlp.utilities.enum import BUILTIN_TYPES
+from medlp.utilities.click import NumericChoice
 from utils_cw import Print, check_dir, get_items_from_file
 
 
-###################### Extension of click ################################
-
-
-class DynamicTuple(ParamType):
-    def __init__(self, input_type):
-        self.type = convert_type(input_type)
-
-    @property
-    def name(self):
-        return "< Dynamic Tuple >"
-
-    def convert(self, value, param, ctx):
-        # Hotfix for prompt input
-        if isinstance(value, str):
-            if "," in value:
-                sep = ","
-            elif ";" in value:
-                sep = ";"
-            else:
-                sep = " "
-
-            value = value.strip().split(sep)
-            value = list(filter(lambda x: x != " ", value))
-        elif value is None or value == "":
-            return None
-
-        types = (self.type,) * len(value)
-        return tuple(ty(x, param, ctx) for ty, x in zip(types, value))
-
-
-class NumericChoice(Choice):
-    def __init__(self, choices, **kwargs):
-        self.choicemap = {}
-        choicestrs = []
-        for i, choice in enumerate(choices, start=1):
-            self.choicemap[i] = choice
-            if len(choices) > 5:
-                choicestrs.append(f"\n\t{i}: {choice}")
-            else:
-                choicestrs.append(f"{i}: {choice}")
-
-        super().__init__(choicestrs, **kwargs)
-
-    def convert(self, value, param, ctx):
-        try:
-            return self.choicemap[int(value)]
-        except ValueError as e:
-            if value in self.choicemap.values():
-                return value
-            self.fail(
-                f"invaid index choice: {value}. Please input integer index or correct value!"
-                f"Error msg: {e}"
-            )
-        except KeyError as e:
-            self.fail(
-                f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx
-            )
-
-
 #######################################################################
+
 
 def select_gpu(ctx, parma, value):
     if value is not None:
@@ -84,16 +28,16 @@ def select_gpu(ctx, parma, value):
     # check mig status
     MIG_CMD = ["nvidia-smi", "--query-gpu=mig.mode.current", "--format=csv,noheader"]
     LIST_CMD = ["nvidia-smi", "-L"]
-    statuses, gpu_list = [], ''
+    statuses, gpu_list = [], ""
 
     try:
         result = subprocess.check_output(MIG_CMD)
     except subprocess.CalledProcessError:
         pass
     else:
-        modes = result.decode('utf-8').split('\n')
+        modes = result.decode("utf-8").split("\n")
         statuses = ["enabled" == status.lower() for status in modes if status]
-        gpu_list = subprocess.check_output(LIST_CMD).decode('utf-8').split('\n')
+        gpu_list = subprocess.check_output(LIST_CMD).decode("utf-8").split("\n")
     finally:
         gpu_name = lambda x: f"GPU {x}"
         if any(statuses):
@@ -113,8 +57,8 @@ def select_gpu(ctx, parma, value):
                 else:
                     mem_uuid = mig_mem_uuid.search(gpu_str_)
                     if mem_uuid:
-                        gid = mem_uuid.group(2).split('/')[-2]
-                        gpu_tables.update({gpu_name(index)+f"-{gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
+                        gid = mem_uuid.group(2).split("/")[-2]
+                        gpu_tables.update({gpu_name(index) + f"-{gid} ({mem_uuid.group(1)})": mem_uuid.group(2)})
         else:
             gpu_tables = {str(i): str(i) for i, s in enumerate(statuses)}
             choice_type: Callable = Choice
@@ -140,13 +84,9 @@ def get_unknown_options(ctx, verbose=False):
 
     for i in range(0, len(ctx.args), 2):  # Todo: how to handle flag auxilary params?
         if str(ctx.args[i]).startswith("--"):
-            auxilary_params[ctx.args[i][2:].replace("-", "_")] = _convert_type(
-                ctx.args[i + 1]
-            )
+            auxilary_params[ctx.args[i][2:].replace("-", "_")] = _convert_type(ctx.args[i + 1])
         elif str(ctx.args[i]).startswith("-"):
-            auxilary_params[ctx.args[i][1:].replace("-", "_")] = _convert_type(
-                ctx.args[i + 1]
-            )
+            auxilary_params[ctx.args[i][1:].replace("-", "_")] = _convert_type(ctx.args[i + 1])
         else:
             Print("Got invalid argument:", ctx.args[i], color="y", verbose=verbose)
 
@@ -157,15 +97,7 @@ def get_unknown_options(ctx, verbose=False):
 def get_exp_name(ctx, param, value):
     model_name = ctx.params["model_name"]
     datalist_name = str(ctx.params["data_list"])
-    partial_data = (
-        "-partial" if "partial" in ctx.params and ctx.params["partial"] < 1 else ""
-    )
-
-    if ctx.params["lr_policy"] == "plateau" and ctx.params["valid_interval"] != 1:
-        Print(
-            "Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau",
-            color="y",
-        )
+    partial_data = "-partial" if "partial" in ctx.params and ctx.params["partial"] < 1 else ""
 
     if "debug" in ctx.params and ctx.params["debug"]:
         Print("You are in Debug mode with preload=0, out_dir=debug", color="y")
@@ -175,11 +107,7 @@ def get_exp_name(ctx, param, value):
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
     layer_norm = mapping[ctx.params["layer_norm"]]
     # update timestamp if train-from-cfg
-    timestamp = (
-        strftime("%m%d_%H%M")
-        if ctx.params.get("config") is not None
-        else ctx.params["timestamp"]
-    )
+    timestamp = strftime("%m%d_%H%M") if ctx.params.get("config") is not None else ctx.params["timestamp"]
 
     exp_name = (
         f"{model_name}-{ctx.params['criterion'].split('_')[0]}-"
@@ -199,26 +127,13 @@ def get_exp_name(ctx, param, value):
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
-    project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][
-        datalist_name
-    ].get("PROJECT")
+    project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
 
-    if project_name:
+    if project_name and not project_name.startswith("Project"):
         proj_dirname = f"Project-{project_name}"
-        return (
-            Path(ctx.params["out_dir"])
-            / ctx.params["framework"]
-            / proj_dirname
-            / datalist_name
-            / exp_name
-        )
+        return Path(ctx.params["out_dir"]) / ctx.params["framework"] / proj_dirname / datalist_name / exp_name
     else:
-        return (
-            Path(ctx.params["out_dir"])
-            / ctx.params["framework"]
-            / datalist_name
-            / exp_name
-        )
+        return Path(ctx.params["out_dir"]) / ctx.params["framework"] / datalist_name / exp_name
 
 
 def get_nni_exp_name(ctx, param, value):
@@ -261,9 +176,7 @@ def _prompt(prompt_str, data_type, default_value, value_proc=None, color=None):
 
 
 def lr_schedule_params(ctx, param, value):
-    if (
-        ctx.params.get("lr_policy_params", None) is not None
-    ):  # loaded config from specified file
+    if ctx.params.get("lr_policy_params", None) is not None:  # loaded config from specified file
         return value
 
     if value == "step":
@@ -334,9 +247,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
             for k, v in filter(cond, sig.parameters.items()):
                 if anno.get(k) in BUILTIN_TYPES:
                     default_value = None if v.default is v.empty else v.default
-                    loss_params[k] = _prompt(
-                        f"Loss argument '{k}'", anno[k], default_value
-                    )
+                    loss_params[k] = _prompt(f"Loss argument '{k}'", anno[k], default_value)
                 else:
                     print(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
                     # raise ValueError(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
@@ -348,9 +259,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 def model_select(ctx, param, value):
     from medlp.models import ARCHI_MAPPING
 
-    archilist = list(
-        ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
-    )
+    archilist = list(ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
     assert (
         len(archilist) > 0
     ), f"No architecture available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
@@ -366,13 +275,10 @@ def model_select(ctx, param, value):
 def data_select(ctx, param, value):
     from medlp.data_io import DATASET_MAPPING
 
-    datalist = list(
-        DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
-    )
+    datalist = list(DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
 
     assert len(datalist) > 0, (
-        f"No datalist available for {ctx.params['tensor_dim']} "
-        f"{ctx.params['framework']} task! Abort!"
+        f"No datalist available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!"
     )
 
     if value is not None and value in datalist:
@@ -409,19 +315,57 @@ def input_cropsize(ctx, param, value):
     return value
 
 
+#######################################################################
+##                    checklist callbacks
+#######################################################################
+
+
 def check_batchsize(ctx_params):
-    if "valid_list" in ctx_params and os.path.isfile(ctx_params["valid_list"]):
-        files_valid = get_items_from_file(ctx_params["valid_list"], format="auto")
-        len_valid = len(files_valid)
+    train_list, valid_list, framework, tensor_dim, data_name, split, n_batch_train, n_batch_valid = (
+        ctx_params.get("train_list"),
+        ctx_params.get("valid_list"),
+        ctx_params.get("framework"),
+        ctx_params.get("tensor_dim"),
+        ctx_params.get("data_list"),
+        ctx_params.get("split"),
+        ctx_params.get("n_batch"),
+        ctx_params.get("n_batch_valid"),
+    )
+    if train_list and valid_list:
+        print(valid_list, train_list)
+        files_train = get_items_from_file(train_list, format="auto")
+        files_valid = get_items_from_file(valid_list, format="auto")
+        len_train, len_valid = len(files_train), len(files_valid)
+    elif data_name in ["RandomData", "SyntheticData"]:
+        all_cases = 100
+        len_valid = int(all_cases * split)
+        len_train = all_cases - len_valid
     else:
-        data_list = DATASET_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["data_list"]].get(
-            "PATH", ""
-        )
-        split = ctx_params["split"]
-        all_data_list = get_items_from_file(data_list, format="auto")
-        len_valid = len(all_data_list) * split
+        datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
+        all_data_list = get_items_from_file(datalist_fname, format="auto")
+        len_valid = int(len(all_data_list) * split)
+        len_train = len(all_data_list) - len_valid
+    
+    ret = True
+    if len_train < n_batch_train:
+        print(f"Validation batch size ({n_batch_train}) larger than valid data size ({len_train})!")
+        ret = False
+    if len_valid < n_batch_valid:
+        print(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!")
+        ret = False
+    
+    return ret
 
-    if len_valid < ctx_params['n_batch_valid']:
-        print(f"Validation Batch size {ctx_params['n_batch_valid']} larger than all valid data size {len_valid}!")
-        raise click.Abort()
 
+def check_loss(ctx_params):
+    output_nc, loss_fn = ctx_params.get("output_nc"), ctx_params.get("criterion")
+    if loss_fn == "CE" and output_nc == 1:
+        print("Single output channel should use BCE instead of CE loss.")
+        return False
+    return True
+
+
+def check_lr_policy(ctx_params):
+    if ctx_params.get("lr_policy") == "plateau" and ctx_params("valid_interval") != 1:
+        Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
+    return True

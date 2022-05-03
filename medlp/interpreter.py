@@ -15,7 +15,8 @@ from medlp.models import get_test_engine
 from medlp.data_io.dataio import get_dataloader
 from medlp.utilities.utils import get_specify_file
 from medlp.utilities.enum import Phases
-from medlp.utilities.click_callbacks import NumericChoice as Choice, parse_input_str
+from medlp.utilities.click_callbacks import parse_input_str
+from medlp.utilities.click import NumericChoice as Choice
 from medlp.utilities.arguments import get_trained_models
 from monai_ex.handlers import GradCamHandler
 
