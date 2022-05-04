@@ -2,9 +2,13 @@ import time
 from functools import partial, wraps
 from pathlib import Path
 
+import click
+from click import option, prompt, UNPROCESSED
 from medlp.configures import config as cfg
-from medlp.utilities.click import NumericChoice as Choice
-from medlp.utilities.click_callbacks import data_select, loss_select, lr_schedule_params, model_select, parse_input_str
+from medlp.utilities.click_callbacks import NumericChoice as Choice, framework_select
+from medlp.utilities.click_callbacks import (
+    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc
+)
 from medlp.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
 from utils_cw import prompt_when
 
@@ -16,7 +20,6 @@ def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models")
     model_rootdir = Path(exp_folder)
     assert model_rootdir.is_dir(), f"Model dir is not found! {model_rootdir}"
 
-    subcategories = list(filter(lambda x: x.is_dir(), model_rootdir.iterdir()))
     best_models = []
 
     for model_dir in list(model_rootdir.rglob(best_model_dirname)):
@@ -52,20 +55,23 @@ def get_trained_models(exp_folder):
 
 def common_params(func):
     @option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
-    @option("--framework", prompt=True, type=Choice(FRAMEWORKS), default=1, help="Choose your framework type")
+    @option(
+        "--framework", prompt=True, type=Choice(FRAMEWORKS), default=1,
+        callback=framework_select, help="Choose your framework type"
+    )
     @option("--data-list", type=str, callback=data_select, default=None, help="Data file list (json/yaml)")
     @option("--preload", type=float, default=1.0, help="Ratio of preload data")
     @option("--n-epoch", prompt=True, show_default=True, type=int, default=1000, help="Epoch number")
     @option(
         "--n-epoch-len", type=float, default=1.0,
-        help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch"
+        help="Num of iterations for one epoch, if n_epoch_len <= 1: n_epoch_len = n_epoch_len*n_epoch",
     )
     @option("--n-batch", prompt=True, show_default=True, type=int, default=10, help="Train batch size")
     @option("--n-batch-valid", prompt=True, show_default=True, type=int, default=5, help="Valid batch size")
     @option("-IS", "--imbalance-sample", is_flag=True, help="Use imbalanced dataset sampling")
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
-    @option("--input-nc", type=int, default=1, prompt=True, help="input data channels")
-    @option("--output-nc", type=int, default=1, prompt=True, help="output channels (classes)")
+    @option("--input-nc", type=int, default=1, prompt=True, help="Input data channels")
+    @option("--output-nc", type=UNPROCESSED, default=1, prompt=True, callback=multi_ouputnc, help="Output channels")
     @option("--split", type=float, default=0.2, help="Training/testing split ratio")
     @option("--train-list", type=click.Path(exists=True), default=None, help="Specified training datalist")
     @option("--valid-list", type=click.Path(exists=True), default=None, help="Specified validation datalist")
@@ -84,6 +90,7 @@ def common_params(func):
     @option("--n-repeat", type=int, default=0, help="K times random permutation cross-validator")
     @option("--ith-fold", type=int, default=-1, help="i-th fold of cross-validation")
     @option("--seed", type=int, default=101, help="random seed")
+    @option("--disable-logfile", is_flag=True, help="Stop dump log file to local disk")
     @option("--compact-log", is_flag=True, help="Output compact log info")
     @option("--symbolic-tb", is_flag=True, help="Create symbolic for tensorboard logs")
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
@@ -103,7 +110,7 @@ def solver_params(func):
     @option("-WD", "--l2-weight-decay", type=float, default=0, help="weight decay (L2 penalty)")
     @option("--lr", type=float, default=1e-3, help="learning rate")
     @option(
-        "--lr-policy", prompt=True, type=Choice(LR_SCHEDULES), 
+        "--lr-policy", prompt=True, type=Choice(LR_SCHEDULES),
         callback=lr_schedule_params, default="plateau", help="learning rate strategy"
     )
     @wraps(func)
@@ -115,7 +122,7 @@ def solver_params(func):
 
 def network_params(func):
     @option("--model-name", type=str, callback=model_select, default=None, help="Select deeplearning model")
-    @option("-L", "--criterion", type=str, callback=loss_select, default=None, help="loss criterion type")
+    @option("-L", "--criterion", type=UNPROCESSED, callback=loss_select, default=None, help="loss criterion type")
     @option("--layer-norm", prompt=True, type=Choice(NORMS), default=1, help="Layer norm type")
     @option("--layer-act", type=Choice(ACTIVATIONS), default="relu", help="Layer activation type")
     @option("--n-features", type=int, default=64, help="Feature num of first layer")
@@ -133,20 +140,24 @@ def network_params(func):
 
 
 # Put these auxilary params to the top of click.options for
-# successfully loading auxilary params.
+# successfully loading auxilary params when `train-from-cfg`
 def hidden_auxilary_params(func):
     @option("--lr-policy-params", type=dict, default=None, help="Auxilary params for lr schedule")
     @option("--loss-params", type=dict, default={}, help="Auxilary params for loss")
+    @option("--loss-params-task1", type=dict, default={}, hidden=True, help="Auxilary params for task1's loss")
+    @option("--loss-params-task2", type=dict, default={}, hidden=True, help="Auxilary params for task2's loss")
     @option("--pretrained", type=bool, default=False, help="Load pretrained model which have hard-coded model path")
     @option("--deep-supervision", type=bool, default=False, help="Use deep supervision module")
     @option("--deep-supr-num", type=int, default=1, help="Num of features will be output")
     @option(
-        "--snip-percent", type=float, default=0.4, callback=partial(prompt_when, keyword="snip"), 
-        help="Pruning ratio of wights/channels"
+        "--snip-percent", type=float, default=0.4, 
+        callback=partial(prompt_when, keyword="snip"), help="Pruning ratio of wights",
     )
     @option("--config", type=click.Path(exists=True))
     @option("--n-group", type=int, default=1, help="Num of conv groups")
     @option("--do-test", type=bool, default=False, hidden=True, help="Automatically do test after training")
+    @option("--subtask1", type=str, default=None, hidden=True, help="Subtask 1 in multitask framework")
+    @option("--subtask2", type=str, default=None, hidden=True, help="Subtask 2 in multitask framework")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

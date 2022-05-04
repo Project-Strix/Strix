@@ -2,6 +2,7 @@ import os
 import gc
 import sys
 import shutil
+from turtle import Terminator
 import yaml
 import logging
 import time
@@ -19,6 +20,7 @@ from medlp.data_io.dataio import get_dataloader
 from medlp.configures import config as cfg
 from medlp.utilities.enum import Phases
 import medlp.utilities.arguments as arguments
+from medlp.utilities.utils import setup_logger
 from medlp.utilities.click_callbacks import (
     get_unknown_options,
     get_exp_name,
@@ -43,7 +45,6 @@ from utils_cw import (
 
 import click
 from ignite.engine import Events
-from ignite.utils import setup_logger
 from monai_ex.handlers import TensorboardGraphHandler, SNIP_prune_handler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
@@ -56,10 +57,9 @@ def train_core(cargs, files_train, files_valid):
         files_train (list): Train file list.
         files_valid (list): Valid file list.
     """
-    Print(
-        f"Get {len(files_train)} training data, {len(files_valid)} validation data",
-        color="g",
-    )
+    logger = setup_logger(cargs.logger_name)
+    logger.info(f"Get {len(files_train)} training data, {len(files_valid)} validation data")
+
     # Save param and datalist
     with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
         yaml.dump(files_train, f)
@@ -84,19 +84,13 @@ def train_core(cargs, files_train, files_valid):
         )
 
     trainer, net = get_engine(cargs, train_loader, valid_loader, writer=writer)
-
-    logging_level = logging.DEBUG if cargs.debug else logging.INFO
-    trainer.logger = setup_logger(f"{cargs.tensor_dim}-Trainer", level=logging_level, reset=True)
-    if cargs.compact_log and not cargs.debug:
-        logging.StreamHandler.terminator = "\r"
-
     trainer.add_event_handler(
         event_name=Events.EPOCH_STARTED,
         handler=lambda x: print("\n", "-" * 15, os.path.basename(cargs.experiment_path), "-" * 15),
     )
 
     if cargs.visualize:
-        Print("Visualize the architecture to tensorboard", color="g")
+        logger.info("Visualize the architecture to tensorboard")
         trainer.add_event_handler(
             event_name=Events.ITERATION_COMPLETED(once=1),
             handler=TensorboardGraphHandler(net, writer, lambda x: x["image"]),
@@ -104,9 +98,9 @@ def train_core(cargs, files_train, files_valid):
 
     if cargs.snip:
         if cargs.snip_percent == 0.0 or cargs.snip_percent == 1.0:
-            Print("Invalid snip_percent. Skip SNIP!", color="y")
+            logger.warn("Invalid snip_percent. Skip SNIP!")
         else:
-            Print("Begin SNIP pruning", color="g")
+            logger.info("Begin SNIP pruning")
             snip_device = torch.device("cuda")
             # snip_device = torch.device("cpu")  #! TMP solution to solve OOM issue
             original_device = torch.device("cuda") if cargs.gpus != "-1" else torch.device("cpu")
@@ -142,7 +136,7 @@ def train_core(cargs, files_train, files_valid):
         confirmation,
         output_dir_ctx="experiment_path",
         save_code=(cfg.get_medlp_cfg("mode") == "dev"),
-        save_dir=Path(__file__).parent,
+        save_dir=cfg.get_medlp_cfg("external_network_dir"),
         checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )
@@ -153,12 +147,19 @@ def train(ctx, **args):
     args.update(auxilary_params)
     cargs = sn(**args)
 
+    logger_name = f"{cargs.tensor_dim}-Trainer"
+    cargs.logger_name = logger_name
+    logging_level = logging.DEBUG if cargs.debug else logging.INFO
+    log_path = None if cargs.disable_logfile else cargs.experiment_path.joinpath("logs")
+    log_terminator = '\r' if cargs.compact_log and not cargs.debug else '\n'
+    logger = setup_logger(logger_name, logging_level, filepath=log_path, reset=True, terminator=log_terminator)
+
     if len(auxilary_params) > 0:  # dump auxilary params
         with cargs.experiment_path.joinpath("param.list").open("w") as f:
             json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
-        Print("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
+        logger.warn("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
 
@@ -184,33 +185,30 @@ def train(ctx, **args):
 
     # ! Synthetic test phase
     if data_list is None:
-        Print("Using synthetic test data...", color="y")
-        train_core(
-            cargs,
-            [{"image": None, "label": None},] * 60,
-            [{"image": None, "label": None},] * 40,
-        )
-        return cargs
-
-    assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-    train_datalist = get_items_from_file(data_list, format="auto")
-    test_datalist = []
+        train_data_num = 100
+        logger.info(" ==== Using synthetic test data ====")
+        train_datalist = [
+            {"image": f"synthetic_image{i}.nii.gz", "label": f"synthetic_label{i}.nii.gz"}
+            for i in range(train_data_num)
+        ]
+    else:
+        assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
+        train_datalist = get_items_from_file(data_list, format="auto")
 
     if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
-        Print(
-            "Test datalist is not found, split test cohort from " f"training data with split ratio of {cargs.split}",
-            color="y",
+        logger.warn(
+            f"Test datalist is not found, split test cohort from training data with split ratio of {cargs.split}"
         )
         train_test_cohort = split_train_test(
             train_datalist, cargs.split, cfg.get_key("label"), 1, random_seed=cargs.seed
         )
         train_datalist, test_datalist = train_test_cohort[0]
 
-    if cargs.partial < 1:
-        Print("Use {} data".format(int(len(train_datalist) * cargs.partial)), color="y")
+    if 0 < cargs.partial < 1:
+        logger.info("Use {} data".format(int(len(train_datalist) * cargs.partial)))
         train_datalist = train_datalist[: int(len(train_datalist) * cargs.partial)]
-    elif cargs.partial > 1:
-        Print(f"Expect partial < 1, but got'{cargs.partial}'. Ignored.")
+    elif cargs.partial > 1 or cargs.partial == 0:
+        logger.warn(f"Expect 0 < partial < 1, but got {cargs.partial}. Ignored.")
 
     cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
     if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
@@ -227,7 +225,7 @@ def train(ctx, **args):
             ith = i if cargs.ith_fold < 0 else cargs.ith_fold
             if i < ith:
                 continue
-            Print(f"Processing {i+1}/{folds} cross-validation", color="g")
+            logger.info(f"\n\n\t**** Processing {i+1}/{folds} cross-validation ****\n\n")
             train_data = list(np.array(train_datalist)[train_index])
             valid_data = list(np.array(train_datalist)[test_index])
 
@@ -244,7 +242,7 @@ def train(ctx, **args):
                 json.dump(fold_args, f, indent=2)
 
             train_core(cargs, train_data, valid_data)
-            Print("Cleaning CUDA cache...", color="g")
+            logger.info("Cleaning CUDA cache...")
             gc.collect()
             torch.cuda.empty_cache()
     else:  # ! Plain training
@@ -279,19 +277,13 @@ def train(ctx, **args):
     return cargs
 
 
-@click.command(
-    "train-from-cfg",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
+@click.command("train-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("--config", type=click.Path(exists=True))
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     """Entry of train-from-cfg command"""
     if len(args.get("additional_args")) != 0:  # parse additional args
-        Print(
-            "*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n",
-            color="y",
-        )
+        Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
     configures = get_items_from_file(args["config"], format="json")
 
@@ -301,13 +293,9 @@ def train_cfg(**args):
     configures["config"] = args["config"]
 
     train(default_map=configures)
-    # ctx.invoke(train, **configures)
 
 
-@click.command(
-    "test-from-cfg",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
+@click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
 @click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
@@ -319,7 +307,9 @@ def train_cfg(**args):
 )
 @click.option("--with-label", is_flag=True, help="whether test data has label")
 @click.option("--save-image", is_flag=True, help="Save the tested image data")
+@click.option("--save-label", is_flag=True, help="Save the tested label data (image type)")
 @click.option("--save-latent", is_flag=True, help="Save the latent code")
+@click.option("--save-prob", is_flag=True, help="Save predicted probablity")
 @click.option(
     "--target-layer",
     type=str,
@@ -336,12 +326,14 @@ def test_cfg(**args):
         ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
         ValueError: Test file not exist error.
     """
-    logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-
     configures = get_items_from_file(args["config"], format="json")
 
+    logger_name = f"{configures['tensor_dim']}-Tester"
+    logging_level = logging.DEBUG if configures["debug"] else logging.INFO
+    logger = setup_logger(logger_name, level=logging_level, reset=True)
+
     if "CUDA_VISIBLE_DEVICES" in os.environ:
-        Print("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
+        logger.warn("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
@@ -353,7 +345,7 @@ def test_cfg(**args):
         test_files = get_items_from_file(args["test_files"], format="auto")
     elif is_crossvalid:
         raise ValueError(
-            f"{configures['n_fold']} Cross-validation found!" "You must provide external test file (.json/.yaml)."
+            f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
         )
     else:
         test_fpaths = list(exp_dir.glob("valid_files*"))
@@ -363,7 +355,7 @@ def test_cfg(**args):
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
-    if args["use_best_model"]:
+    if args["use_best_model"]: #! refactor this!
         model_list = arguments.get_best_trained_models(exp_dir)
         if is_crossvalid:
             configures["n_fold"] = configures["n_repeat"] = 0
@@ -376,7 +368,10 @@ def test_cfg(**args):
     configures["preload"] = 0.0
     phase = Phases.TEST_IN if args["with_label"] else Phases.TEST_EX
     configures["phase"] = phase
+    configures["logger_name"] = logger_name
     configures["save_image"] = args["save_image"]
+    configures["save_label"] = args["save_label"]
+    configures["save_prob"] = args["save_prob"]
     configures["experiment_path"] = exp_dir
     configures["resample"] = True  # ! departure
     configures["slidingwindow"] = args["slidingwindow"]
@@ -388,19 +383,18 @@ def test_cfg(**args):
         check_dir(args["out_dir"]) if args["out_dir"] else check_dir(exp_dir, f'Test@{time.strftime("%m%d_%H%M")}')
     )
 
-    Print(f"{len(test_files)} test files", color="g")
+    logger.info(f"{len(test_files)} test files")
     test_loader = get_dataloader(sn(**configures), test_files, phase=phase)
 
     for model_path in model_list:
         configures["model_path"] = model_path
 
         engine = get_test_engine(sn(**configures), test_loader)
-        engine.logger = setup_logger(f"{configures['tensor_dim']}-Tester", level=logging.INFO)
 
         if isinstance(engine, SupervisedEvaluator):
-            Print("Begin testing...", color="g")
+            logger.info(" ==== Begin testing ====")
         elif isinstance(engine, EnsembleEvaluator):
-            Print("Begin ensemble testing...", color="g")
+            logger.info(" ==== Begin ensemble testing ====")
 
         shutil.copyfile(test_fpath, check_dir(configures["out_dir"]) / os.path.basename(test_fpath))
         engine.run()

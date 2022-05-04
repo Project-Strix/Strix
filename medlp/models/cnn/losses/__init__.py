@@ -14,6 +14,7 @@ from .losses import (
     ContrastiveBCELoss,
     CrossEntropyLossEx,
     BCEWithLogitsLossEx,
+    CombinationLoss,
 )
 
 CLASSIFICATION_LOSS = Registry()
@@ -47,3 +48,5 @@ SIAMESE_LOSS.register('ContrastiveCELoss', ContrastiveCELoss)
 SIAMESE_LOSS.register('ContrastiveBCELoss', ContrastiveBCELoss)
 
 SELFLEARNING_LOSS.register('MSE', torch.nn.MSELoss)
+
+MULTITASK_LOSS.register("CombinationLoss", CombinationLoss)

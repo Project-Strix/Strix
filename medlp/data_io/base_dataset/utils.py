@@ -1,6 +1,4 @@
 import os
-# from monai_ex.engines.utils import CustomKeys
-# from medlp.configures import get_keys_dict, get_keys_list, cfg.get_key
 from medlp.configures import config as cfg
 
 def get_input_data(files_list, is_supervised, verbose, dataset_name=''):
@@ -47,4 +45,7 @@ def get_input_data(files_list, is_supervised, verbose, dataset_name=''):
                     f"Not supported file_list format,"
                     f"Got {type(f)} in Unsupervised{dataset_name}"
                 )
+    if verbose:
+        print(f"Input data has {len(input_data)} items with keys: {list(input_data[0].keys())}")
+
     return input_data

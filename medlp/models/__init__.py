@@ -25,19 +25,51 @@ from medlp.data_io import DATASET_MAPPING
 from medlp.utilities.utils import get_attr_
 from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
 from medlp.utilities.imports import import_file
+from medlp.utilities.enum import Frameworks
 from medlp.configures import config as cfg
 from medlp.models.cnn.cnn_nets import *
 from medlp.models.transformer.transformer_nets import *
 
 
-external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_NETWORK_DIR'))
-if external_dataset_dir.is_dir():
-    for f in external_dataset_dir.glob("*.py"):
+external_network_dir = Path(cfg.get_medlp_cfg("EXTERNAL_NETWORK_DIR"))
+if external_network_dir.is_dir():
+    for f in external_network_dir.glob("*.py"):
         import_file(f.stem, str(f))
 
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
+
+
+def get_loss_fn(framework: str, loss_name: str, loss_params: dict, output_nc: int, deep_supervision: bool = False):
+    loss_type = LOSS_MAPPING[framework][loss_name]
+
+    if output_nc == 1:
+        kwargs = {
+            "include_background": True,
+            "sigmoid": True,
+            "softmax": False,
+            "to_onehot_y": False,
+        }
+    else:
+        kwargs = {
+            "include_background": False,
+            "sigmoid": False,
+            "softmax": True,
+            "to_onehot_y": True,
+        }
+
+    if "Dice" in loss_type.__name__:
+        kwargs.update(loss_params)
+        loss = loss_type(**kwargs)
+    else:
+        loss = loss_type(**loss_params)
+
+    if deep_supervision:
+        raise NotImplementedError
+        loss = DeepSupervisionLoss(loss)
+
+    return loss
 
 
 def get_network(opts):
@@ -119,39 +151,16 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     multi_input_keys = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
     multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
 
-    framework_type = opts.framework
     device = torch.device("cuda") if opts.gpus != "-1" else torch.device("cpu")
     model_dir = check_dir(opts.experiment_path, "Models")
 
     loss = lr_scheduler = None
-    loss_type = LOSS_MAPPING[framework_type][opts.criterion]
-
-    if opts.output_nc == 1:
-        kwargs = {
-            "include_background": True,
-            "sigmoid": True,
-            "softmax": False,
-            "to_onehot_y": False,
-        }
+    if opts.framework == Frameworks.MULTITASK.value:
+        subloss1 = get_loss_fn(opts.subtask1, opts.criterion[0], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision)
+        subloss2 = get_loss_fn(opts.subtask2, opts.criterion[1], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision)
+        loss = LOSS_MAPPING[opts.framework]["CombinationLoss"](subloss1, subloss2, aggregate="sum")
     else:
-        kwargs = {
-            "include_background": False,
-            "sigmoid": False,
-            "softmax": True,
-            "to_onehot_y": True,
-        }
-
-    # if loss_type in [DiceLoss, GeneralizedDiceLoss, DiceFocalLoss]:
-    #     loss = loss_type(**kwargs)
-    if "Dice" in loss_type.__name__:
-        kwargs.update(opts.loss_params)
-        loss = loss_type(**kwargs)
-    else:
-        loss = loss_type(**opts.loss_params)
-
-    if opts.deep_supervision:
-        raise NotImplementedError
-        loss = DeepSupervisionLoss(loss)
+        loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, opts.deep_supervision)
 
     net_ = get_network(opts)
 
@@ -176,9 +185,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     elif opts.optim == "adamw":
         optim = torch.optim.AdamW(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == "adagrad":
-        optim = torch.optim.Adagrad(
-            net.parameters(), opts.lr, weight_decay=weight_decay
-        )
+        optim = torch.optim.Adagrad(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == "radam":
         optim = RAdam(net.parameters(), opts.lr, weight_decay=weight_decay)
     elif opts.optim == "ranger":
@@ -197,15 +204,11 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     if opts.lr_policy == "const":
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda x: 1)
     elif opts.lr_policy == "poly":
-        lr_scheduler = PolynomialLRDecay(
-            optim, opts.n_epoch, end_learning_rate=opts.lr * 0.1, power=0.9
-        )
+        lr_scheduler = PolynomialLRDecay(optim, opts.n_epoch, end_learning_rate=opts.lr * 0.1, power=0.9)
     elif opts.lr_policy == "step":
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, **opts.lr_policy_params)
     elif opts.lr_policy == "multistep":
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optim, **opts.lr_policy_params
-        )
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, **opts.lr_policy_params)
     elif opts.lr_policy == "plateau":
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optim,
@@ -237,12 +240,12 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         "valid_interval": valid_interval,
         "device": device,
         "model_dir": model_dir,
-        "logger_name": f"{opts.tensor_dim}-Trainer",
+        "logger_name": None,
         "multi_input_keys": multi_input_keys,
         "multi_output_keys": multi_output_keys,
     }
 
-    engine = TRAIN_ENGINES[framework_type](**params)
+    engine = TRAIN_ENGINES[opts.framework](**params)
 
     return engine, net
 
@@ -278,15 +281,9 @@ def get_test_engine(opts, test_loader):
         "target_latent_layer": opts.target_layer,
     }
 
-    is_intra_ensemble = (
-        isinstance(opts.model_path, (list, tuple)) and len(opts.model_path) > 1
-    )
+    is_intra_ensemble = isinstance(opts.model_path, (list, tuple)) and len(opts.model_path) > 1
 
-    if (
-        get_attr_(opts, "n_fold", 0) > 1
-        or get_attr_(opts, "n_repeat", 0) > 1
-        or is_intra_ensemble
-    ):
+    if get_attr_(opts, "n_fold", 0) > 1 or get_attr_(opts, "n_repeat", 0) > 1 or is_intra_ensemble:
         return ENSEMBLE_TEST_ENGINES[frame](**params)
     else:
         return TEST_ENGINES[frame](**params)

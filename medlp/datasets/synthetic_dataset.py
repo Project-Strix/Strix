@@ -90,7 +90,7 @@ def random_dataset_cls_nc1(files_list, phase, opts):
         channeler=EnsureChannelFirstD(keys="image"),
         orienter=None,
         spacer=None,
-        rescaler=NormalizeIntensityD(keys=["image"]),
+        rescaler=NormalizeIntensityD(keys="image"),
         resizer=None,
         cropper=None,
         caster=CastToTypeD(keys="image", dtype=np.float32),

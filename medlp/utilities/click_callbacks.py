@@ -1,17 +1,20 @@
 import imp
 from typing import Callable
-import re
-import os
-import subprocess
-from time import strftime
-from pathlib import Path
-import inspect
-from functools import partial
-from click import Choice, prompt, Abort
 
+import re
+import inspect
+import subprocess
+from functools import partial
+from pathlib import Path
+from time import strftime
 from types import SimpleNamespace as sn
-from termcolor import colored
+
+from click import Choice, ParamType, prompt
+from click.types import convert_type
 from medlp.data_io import DATASET_MAPPING
+from medlp.models import ARCHI_MAPPING
+from medlp.models.cnn.losses import LOSS_MAPPING
+from medlp.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from medlp.utilities.utils import is_avaible_size
 from medlp.utilities.enum import BUILTIN_TYPES
 from medlp.utilities.click import NumericChoice
@@ -109,9 +112,13 @@ def get_exp_name(ctx, param, value):
     # update timestamp if train-from-cfg
     timestamp = strftime("%m%d_%H%M") if ctx.params.get("config") is not None else ctx.params["timestamp"]
 
+    if ctx.params["framework"] == Frameworks.MULTITASK.value:
+        loss_fn = '_'.join(ctx.params['criterion'])
+    else:
+        loss_fn = ctx.params['criterion'].split('_')[0]
+
     exp_name = (
-        f"{model_name}-{ctx.params['criterion'].split('_')[0]}-"
-        f"{layer_norm}-{ctx.params['optim']}-"
+        f"{model_name}-{loss_fn}-{layer_norm}-{ctx.params['optim']}-"
         f"{ctx.params['lr_policy']}{partial_data}-{timestamp}"
     )
 
@@ -184,12 +191,7 @@ def lr_schedule_params(ctx, param, value):
         gamma = _prompt("step gamma", float, 0.1)
         ctx.params["lr_policy_params"] = {"step_size": iters, "gamma": gamma}
     elif value == "multistep":
-        steps = _prompt(
-            "steps",
-            tuple,
-            (100, 300),
-            value_proc=lambda x: list(map(int, x.split(","))),
-        )
+        steps = _prompt("steps", tuple, (100, 300), value_proc=lambda x: list(map(int, x.split(","))))
         gamma = _prompt("step gamma", float, 0.1)
         ctx.params["lr_policy_params"] = {"milestones": steps, "gamma": gamma}
         # print("lr_policy_params", ctx.params["lr_policy_params"])
@@ -208,34 +210,64 @@ def lr_schedule_params(ctx, param, value):
     return value
 
 
-def loss_select(ctx, param, value, prompt_all_args=False):
-    from medlp.models.cnn.losses import LOSS_MAPPING
+def multi_ouputnc(ctx, param, value):
+    if isinstance(value, str) and value.isnumeric():
+        value = int(value)
 
-    losslist = list(LOSS_MAPPING[ctx.params["framework"]].keys())
-
-    assert len(losslist) > 0, f"No loss available for {ctx.params['framework']}! Abort!"
-    if value is not None and value in losslist:
+    if ctx.params['framework'] != Frameworks.MULTITASK.value:
         return value
+
+    if ctx.params['framework'] == Frameworks.MULTITASK.value and\
+       not isinstance(value, list):
+        subtask1_nc = prompt(f"Output nc for {colored('task1', 'yellow')}", type=int, default=value)
+        subtask2_nc = prompt(f"Output nc for {colored('task2', 'yellow')}", type=int, default=value)
+        return [subtask1_nc, subtask2_nc]
     else:
-        value = prompt("Loss list", type=NumericChoice(losslist))
+        return value
+
+
+def framework_select(ctx, param, value):
+    if value == Frameworks.MULTITASK.value and not ctx.params.get('subtask1'):
+        if "multitask" in FRAMEWORKS:
+            FRAMEWORKS.remove("multitask")
+        subtask1 = prompt(f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=2)
+        subtask2 = prompt(f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=1)
+        ctx.params['subtask1'] = subtask1
+        ctx.params['subtask2'] = subtask2
+    return value
+
+
+def loss_select(ctx, param, value, prompt_all_args=False):
+
+    def _single_loss_select(ctx, framework, value, prompt_all_args, meta_key_postfix=''):
+        losslist = list(LOSS_MAPPING[framework].keys())
+
+        assert len(losslist) > 0, f"No loss available for {framework}! Abort!"
+        if value is not None and value in losslist:
+            return value
+
+        prompts = f"Loss_fn for {colored(meta_key_postfix[1:], 'yellow')}" if meta_key_postfix else "Loss_fn"
+        value = prompt(prompts, type=NumericChoice(losslist))
+
+        meta_key = f"loss_params{meta_key_postfix}"
 
         if "WCE" in value:
             weights = _prompt("Loss weights", tuple, (0.9, 0.1), split_input_str_)
-            ctx.params["loss_params"] = {"weight": weights}
+            ctx.params[meta_key] = {"weight": weights}
         elif value == "WBCE":
             pos_weight = _prompt("Pos weight", float, 2.0)
-            ctx.params["loss_params"] = {"pos_weight": pos_weight}
+            ctx.params[meta_key] = {"pos_weight": pos_weight}
         elif "FocalLoss" in value:
             gamma = _prompt("Gamma", float, 2.0)
-            ctx.params["loss_params"] = {"gamma": gamma}
+            ctx.params[meta_key] = {"gamma": gamma}
         elif "Contrastive" in value:
             margin = _prompt("Margin", float, 2.0)
-            ctx.params["loss_params"] = {"margin": margin}
+            ctx.params[meta_key] = {"margin": margin}
         elif value == "GDL":
             w_type = _prompt("Weight type(square, simple, uniform)", str, "square")
-            ctx.params["loss_params"] = {"w_type": w_type}
+            ctx.params[meta_key] = {"w_type": w_type}
         else:  #! custom loss
-            func = LOSS_MAPPING[ctx.params["framework"]][value]
+            func = LOSS_MAPPING[framework][value]
             sig = inspect.signature(func)
             anno = inspect.getfullargspec(func).annotations
             if not prompt_all_args:
@@ -251,35 +283,53 @@ def loss_select(ctx, param, value, prompt_all_args=False):
                 else:
                     print(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
                     # raise ValueError(f"Cannot handle type '{anno.get(k)}' for argment '{k}'")
-            ctx.params["loss_params"] = loss_params
+            ctx.params[meta_key] = loss_params
 
         return value
 
+    if ctx.params["framework"] == Frameworks.MULTITASK.value:
+        if not isinstance(value, list):
+            loss1 = _single_loss_select(
+                ctx, ctx.params["subtask1"], value, prompt_all_args, '_task1'
+            )
+            loss2 = _single_loss_select(
+                ctx, ctx.params["subtask2"], value, prompt_all_args, '_task2'
+            )
+            return [loss1, loss2]
+        else:
+            return value
+    else:
+        return _single_loss_select(ctx, ctx.params["framework"], value, prompt_all_args)
+
 
 def model_select(ctx, param, value):
-    from medlp.models import ARCHI_MAPPING
-
-    archilist = list(ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
-    assert (
-        len(archilist) > 0
-    ), f"No architecture available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!"
+    archilist = list(
+        ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
+    )
+    if len(archilist) == 0:
+        print(
+            f"No architecture available for {ctx.params['tensor_dim']} "
+            f"{ctx.params['framework']} task! Abort!"
+        )
+        ctx.exit()
 
     if value is not None and value in archilist:
         return value
     else:
         return prompt("Model list", type=NumericChoice(archilist))
 
-    return value
-
 
 def data_select(ctx, param, value):
-    from medlp.data_io import DATASET_MAPPING
-
-    datalist = list(DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
-
-    assert len(datalist) > 0, (
-        f"No datalist available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!"
+    datalist = list(
+        DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
     )
+
+    if len(datalist) == 0:
+        print(
+            f"No datalist available for {ctx.params['tensor_dim']} "
+            f"{ctx.params['framework']} task! Abort!"
+        )
+        ctx.exit()
 
     if value is not None and value in datalist:
         return value

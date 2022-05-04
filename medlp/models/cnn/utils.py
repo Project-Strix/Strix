@@ -1,9 +1,6 @@
-import logging
-
+from pickletools import read_uint1
 import numpy as np
 import torch
-import scipy.misc
-import scipy.ndimage
 import importlib.util
 from torch.autograd import Variable
 import torch.nn as nn
@@ -114,7 +111,7 @@ def output_onehot_transform(output, n_classes=3, verbose=False):
 
 def acc_output_transform(output, n_classes=2, verbose=False):
     y_pred, y = output["pred"], output["label"]
-    pred_ = AsDiscrete(threshold_values=True, logit_thresh=0.5)(y_pred)
+    pred_ = AsDiscrete(threshold=0.5)(y_pred)
 
 
 def print_network(net):

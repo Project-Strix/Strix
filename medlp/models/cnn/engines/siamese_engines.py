@@ -9,7 +9,7 @@ from medlp.models.cnn.engines import (
     TEST_ENGINES,
     ENSEMBLE_TEST_ENGINES
 )
-from medlp.models.cnn.utils import output_onehot_transform
+from medlp.models.cnn.engines.utils import output_onehot_transform
 from medlp.models.cnn.losses.losses import ContrastiveLoss
 from medlp.configures import config as cfg
 
