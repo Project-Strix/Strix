@@ -1,5 +1,5 @@
 from monai_ex import data
-from medlp.data_io import SIAMESE_DATASETS
+from strix.data_io import SIAMESE_DATASETS
 from monai_ex.data import DataLoader
 from utils_cw import get_items_from_file
 

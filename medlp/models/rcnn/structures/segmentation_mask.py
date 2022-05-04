@@ -2,7 +2,7 @@ import cv2
 
 import torch
 import numpy as np
-from medlp.models.rcnn.layers.misc import interpolate
+from strix.models.rcnn.layers.misc import interpolate
 
 import pycocotools.mask as mask_utils
 

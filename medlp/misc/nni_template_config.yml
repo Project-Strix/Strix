@@ -24,6 +24,6 @@ assessor:
       threshold: 0.95
       gap: 1
 trial:
-    command: python main.py train-fcfg --config "/homes/yliu/Code/medlp/param.list"
+    command: python main.py train-fcfg --config "/homes/yliu/Code/strix/param.list"
     codeDir: .
     gpuNum: 0

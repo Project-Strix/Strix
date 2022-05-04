@@ -1,7 +1,7 @@
 from pathlib import Path
 import nibabel as nib
 from utils_cw import get_items_from_file, check_dir
-from medlp.data_io.dataio import SEGMENTATION_DATASETS 
+from strix.data_io.dataio import SEGMENTATION_DATASETS 
 
 dataset_name = 'lidc'
 dataset_type = SEGMENTATION_DATASETS['3D'][dataset_name]
@@ -13,7 +13,7 @@ lidc = dataset_type(
     {}
 )
 
-out_dir = check_dir('/homes/clwang/Data/medlp_exp/LIDC_test_crops')
+out_dir = check_dir('/homes/clwang/Data/strix_exp/LIDC_test_crops')
 for i, data in enumerate(lidc):
     filename = Path(data['image_meta_dict']['filename_or_obj'])
     print(i, filename)

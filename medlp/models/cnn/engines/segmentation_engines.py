@@ -7,18 +7,18 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader 
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.models.cnn.engines.utils import (
+from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from strix.models.cnn.engines.utils import (
     get_models,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
     get_dice_metric_transform_fn,
 )
-from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
-from medlp.utilities.enum import Phases
-from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.configures import config as cfg
-from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
+from strix.utilities.utils import setup_logger, output_filename_check, get_attr_
+from strix.utilities.enum import Phases
+from strix.utilities.transforms import decollate_transform_adaptor as DTA
+from strix.configures import config as cfg
+from strix.models.cnn.engines.engine import StrixTrainEngine, StrixTestEngine
 
 from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInferer
 
@@ -46,7 +46,7 @@ from monai_ex.handlers import (
 
 
 @TRAIN_ENGINES.register("segmentation")
-class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
+class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
     def __init__(
         self,
         opts,
@@ -76,7 +76,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
         train_metric = SegmentationTrainEngine.get_metric(Phases.TRAIN, output_nc=opts.output_nc, decollate=decollate)
         val_metric_name = list(val_metric.keys())[0]
 
-        val_handlers = MedlpTrainEngine.get_basic_handlers(
+        val_handlers = StrixTrainEngine.get_basic_handlers(
             phase="val",
             model_dir=model_dir,
             net=net,
@@ -141,7 +141,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
                 step_transform=lr_step_transform,
             ),
         ]
-        train_handlers += MedlpTrainEngine.get_basic_handlers(
+        train_handlers += StrixTrainEngine.get_basic_handlers(
             phase="train",
             model_dir=model_dir,
             net=net,
@@ -264,7 +264,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
 
 @TEST_ENGINES.register("segmentation")
-class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
+class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
     def __init__(
         self,
         opts,
@@ -294,7 +294,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         metric_name = SegmentationTestEngine.get_key_metric_name(opts.phase)
 
         model_path = opts.model_path[0] if isinstance(opts.model_path, (list, tuple)) else opts.model_path
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
@@ -459,7 +459,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
 
 
 @ENSEMBLE_TEST_ENGINES.register("segmentation")
-class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+class SegmentationEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
     def __init__(
         self,
         opts: SimpleNamespace,
@@ -520,7 +520,7 @@ class SegmentationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
         key_val_metric = SegmentationTestEngine.get_metric(opts.phase, opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
         
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=best_models,

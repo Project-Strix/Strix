@@ -4,8 +4,8 @@ import copy
 import logging
 
 import torch.utils.data
-from medlp.models.rcnn.utils.comm import get_world_size
-from medlp.models.rcnn.utils.imports import import_file
+from strix.models.rcnn.utils.comm import get_world_size
+from strix.models.rcnn.utils.imports import import_file
 
 from . import datasets as D
 from . import samplers
@@ -145,7 +145,7 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
     aspect_grouping = [1] if cfg.DATALOADER.ASPECT_RATIO_GROUPING else []
 
     paths_catalog = import_file(
-        "medlp.models.rcnn.config.paths_catalog", cfg.PATHS_CATALOG, True
+        "strix.models.rcnn.config.paths_catalog", cfg.PATHS_CATALOG, True
     )
     DatasetCatalog = paths_catalog.DatasetCatalog
     dataset_list = cfg.DATASETS.TRAIN if is_train else cfg.DATASETS.TEST

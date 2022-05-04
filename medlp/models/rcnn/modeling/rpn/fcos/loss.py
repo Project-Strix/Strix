@@ -8,12 +8,12 @@ from torch.nn import functional as F
 from torch import nn
 
 from ..utils import concat_box_prediction_layers
-from medlp.models.rcnn.layers import IOULoss
-from medlp.models.rcnn.layers import SigmoidFocalLoss
-from medlp.models.rcnn.modeling.matcher import Matcher
-from medlp.models.rcnn.modeling.utils import cat
-from medlp.models.rcnn.structures.boxlist_ops import boxlist_iou
-from medlp.models.rcnn.structures.boxlist_ops import cat_boxlist
+from strix.models.rcnn.layers import IOULoss
+from strix.models.rcnn.layers import SigmoidFocalLoss
+from strix.models.rcnn.modeling.matcher import Matcher
+from strix.models.rcnn.modeling.utils import cat
+from strix.models.rcnn.structures.boxlist_ops import boxlist_iou
+from strix.models.rcnn.structures.boxlist_ops import cat_boxlist
 
 
 INF = 100000000

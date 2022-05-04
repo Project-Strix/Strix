@@ -5,8 +5,8 @@ from collections import OrderedDict
 
 import torch
 
-from medlp.models.rcnn.utils.model_serialization import load_state_dict
-from medlp.models.rcnn.utils.registry import Registry
+from strix.models.rcnn.utils.model_serialization import load_state_dict
+from strix.models.rcnn.utils.registry import Registry
 
 
 def _rename_basic_resnet_weights(layer_keys):

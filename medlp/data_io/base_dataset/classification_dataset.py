@@ -3,7 +3,7 @@ from typing import Optional, Sequence, Union
 from monai_ex.data import Dataset
 from monai_ex.transforms import MapTransform, Compose
 from monai_ex.utils import ensure_list
-from medlp.data_io.base_dataset.utils import get_input_data
+from strix.data_io.base_dataset.utils import get_input_data
 
 
 class BasicClassificationDataset(object):

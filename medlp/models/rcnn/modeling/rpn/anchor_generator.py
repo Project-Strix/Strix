@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from medlp.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.bounding_box import BoxList
 
 
 class BufferList(nn.Module):

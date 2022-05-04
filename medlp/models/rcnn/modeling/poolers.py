@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from medlp.models.rcnn.layers import ROIAlign
+from strix.models.rcnn.layers import ROIAlign
 
 from .utils import cat
 

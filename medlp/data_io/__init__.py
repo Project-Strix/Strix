@@ -1,12 +1,12 @@
 from pathlib import Path
-from medlp.utilities.imports import import_file
-from medlp.configures import config as cfg
-from medlp.data_io.base_dataset.classification_dataset import *
-from medlp.data_io.base_dataset.selflearning_dataset import *
-from medlp.data_io.base_dataset.segmentation_dataset import *
-from medlp.data_io.base_dataset.siamese_dataset import *
+from strix.utilities.imports import import_file
+from strix.configures import config as cfg
+from strix.data_io.base_dataset.classification_dataset import *
+from strix.data_io.base_dataset.selflearning_dataset import *
+from strix.data_io.base_dataset.segmentation_dataset import *
+from strix.data_io.base_dataset.siamese_dataset import *
 
-from medlp.data_io.dataio import (
+from strix.data_io.dataio import (
     CLASSIFICATION_DATASETS,
     SEGMENTATION_DATASETS,
     SIAMESE_DATASETS,
@@ -14,10 +14,10 @@ from medlp.data_io.dataio import (
     MULTITASK_DATASETS,
     DATASET_MAPPING,
 )
-from medlp.data_io.generate_dataset import register_dataset_from_cfg
+from strix.data_io.generate_dataset import register_dataset_from_cfg
 
 internal_dataset_dir = Path(__file__).parent.parent.joinpath("datasets")
-external_dataset_dir = Path(cfg.get_medlp_cfg('EXTERNAL_DATASET_DIR'))
+external_dataset_dir = Path(cfg.get_strix_cfg('EXTERNAL_DATASET_DIR'))
 
 dataset_dirs = [internal_dataset_dir, external_dataset_dir]
 

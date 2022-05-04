@@ -2,9 +2,9 @@
 import torch
 import torchvision
 
-from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.models.rcnn.structures.segmentation_mask import SegmentationMask
-from medlp.models.rcnn.structures.keypoint import PersonKeypoints
+from strix.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.segmentation_mask import SegmentationMask
+from strix.models.rcnn.structures.keypoint import PersonKeypoints
 
 
 min_keypoints_per_image = 10

@@ -28,7 +28,7 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-medlp.egg-info
+strix.egg-info
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -112,6 +112,6 @@ venv.bak/
 *.json
 *.list
 *.zip
-medlp/tmp.py
-medlp_configures.cfg
+strix/tmp.py
+strix_configures.cfg
 *.code-workspace

@@ -1,5 +1,5 @@
 import torch
-from medlp.models.cnn.losses import ContrastiveLoss
+from strix.models.cnn.losses import ContrastiveLoss
 
 
 loss = ContrastiveLoss()

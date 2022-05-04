@@ -4,7 +4,7 @@ import torch
 from parameterized import parameterized
 
 from monai.networks import eval_mode
-from medlp.models.cnn.nets.segnet import SegNet
+from strix.models.cnn.nets.segnet import SegNet
 # from tests.utils import test_script_save
 
 # CASES_1D = []

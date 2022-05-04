@@ -2,7 +2,7 @@ from typing import Optional
 
 import os
 import inspect
-from medlp.utilities.enum import DIMS, NETWORK_ARGS
+from strix.utilities.enum import DIMS, NETWORK_ARGS
 
 
 def _register_generic(module_dict, module_name, module):

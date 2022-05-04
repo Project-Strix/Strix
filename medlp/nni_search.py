@@ -8,11 +8,11 @@ from pathlib import Path
 from types import SimpleNamespace as sn
 from utils_cw import Print, get_items_from_file, check_dir
 
-from medlp.models import get_engine
-from medlp.data_io.dataio import get_dataloader, DATASET_MAPPING
-from medlp.utilities.utils import detect_port, parse_nested_data
-from medlp.utilities.enum import Phases
-from medlp.utilities.click_callbacks import get_nni_exp_name
+from strix.models import get_engine
+from strix.data_io.dataio import get_dataloader, DATASET_MAPPING
+from strix.utilities.utils import detect_port, parse_nested_data
+from strix.utilities.enum import Phases
+from strix.utilities.click_callbacks import get_nni_exp_name
 
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
@@ -121,7 +121,7 @@ def train_nni(**kwargs):
 @click.option("--nni-config", type=str, default="", help="NNI config file (.yaml)")
 @click.option("--port", type=int, default=8080, help="Port of nni server")
 @click.option("--background", is_flag=True, help="Run nni in background")
-@click.option("--out-dir", type=str, prompt=True, show_default=True, default="/homes/clwang/Data/medlp_exp/NNI")
+@click.option("--out-dir", type=str, prompt=True, show_default=True, default="/homes/clwang/Data/strix_exp/NNI")
 @click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 @click.option("--experiment-path", type=str, callback=get_nni_exp_name, default="nni-search")
 def nni_search(**args):

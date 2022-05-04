@@ -18,7 +18,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
-from medlp.utilities.enum import LR_SCHEDULES
+from strix.utilities.enum import LR_SCHEDULES
 from monai.networks import one_hot
 from monai_ex.utils import ensure_list
 

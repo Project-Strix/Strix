@@ -1,5 +1,5 @@
-# from medlp.utilities.utils import ENGINES, assert_network_type
-# from medlp.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
+# from strix.utilities.utils import ENGINES, assert_network_type
+# from strix.models.rcnn.modeling.detector.generalized_rcnn import GeneralizedRCNN
 
 # from monai_ex.engines import RcnnTrainer
 # from monai_ex.handlers import (

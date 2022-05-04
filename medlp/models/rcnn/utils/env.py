@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import os
 
-from medlp.models.rcnn.utils.imports import import_file
+from strix.models.rcnn.utils.imports import import_file
 
 
 def setup_environment():
@@ -21,7 +21,7 @@ def setup_custom_environment(custom_module_path):
     """Load custom environment setup from a Python source file and run the setup
     function.
     """
-    module = import_file("medlp.models.rcnn.utils.env.custom_module", custom_module_path)
+    module = import_file("strix.models.rcnn.utils.env.custom_module", custom_module_path)
     assert hasattr(module, "setup_environment") and callable(
         module.setup_environment
     ), (

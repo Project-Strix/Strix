@@ -1,7 +1,7 @@
 from torch import nn
 
-from medlp.models.rcnn import layers
-from medlp.models.rcnn.modeling import registry
+from strix.models.rcnn import layers
+from strix.models.rcnn.modeling import registry
 
 
 @registry.ROI_KEYPOINT_PREDICTOR.register("KeypointRCNNPredictor")

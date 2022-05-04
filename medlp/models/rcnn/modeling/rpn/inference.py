@@ -1,11 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 
-from medlp.models.rcnn.modeling.box_coder import BoxCoder
-from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.models.rcnn.structures.boxlist_ops import cat_boxlist
-from medlp.models.rcnn.structures.boxlist_ops import boxlist_nms
-from medlp.models.rcnn.structures.boxlist_ops import remove_small_boxes
+from strix.models.rcnn.modeling.box_coder import BoxCoder
+from strix.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.boxlist_ops import cat_boxlist
+from strix.models.rcnn.structures.boxlist_ops import boxlist_nms
+from strix.models.rcnn.structures.boxlist_ops import remove_small_boxes
 
 from ..utils import cat
 from .utils import permute_and_flatten

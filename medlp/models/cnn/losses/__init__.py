@@ -1,5 +1,5 @@
 import torch
-from medlp.utilities.registry import Registry
+from strix.utilities.registry import Registry
 from monai_ex.losses import (
     DiceLoss,
     GeneralizedDiceLoss,

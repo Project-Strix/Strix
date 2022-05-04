@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from collections import OrderedDict
 from monai_ex.networks.blocks import Convolution, UpSample
 from monai_ex.networks.layers import Conv, Dropout, Norm, Pool
-from medlp.models.cnn.nets.vgg import vgg16_bn
-from medlp.models.cnn.utils import set_trainable
+from strix.models.cnn.nets.vgg import vgg16_bn
+from strix.models.cnn.utils import set_trainable
 
 
 class MultiConv(nn.Sequential):

@@ -13,18 +13,18 @@ from utils_cw import get_items_from_file, Print, check_dir
 import torch
 from torchvision.utils import save_image
 
-from medlp.utilities.arguments import data_select
-from medlp.utilities.click import NumericChoice as Choice
-from medlp.utilities.click_callbacks import get_unknown_options
-from medlp.utilities.enum import FRAMEWORKS, Phases
-from medlp.utilities.utils import (
+from strix.utilities.arguments import data_select
+from strix.utilities.click import NumericChoice as Choice
+from strix.utilities.click_callbacks import get_unknown_options
+from strix.utilities.enum import FRAMEWORKS, Phases
+from strix.utilities.utils import (
     draw_segmentation_masks,
     draw_segmentation_contour,
     norm_tensor,
     get_colors,
 )
-from medlp.data_io import DATASET_MAPPING
-from medlp.configures import config as cfg
+from strix.data_io import DATASET_MAPPING
+from strix.configures import config as cfg
 from monai_ex.utils import first
 from monai_ex.data import DataLoader
 
@@ -146,7 +146,7 @@ def save_3d_image_grid(
 @click.option("--contour-overlap", is_flag=True, help="Overlapping mask's contour")
 @click.option("--mask-key", type=str, default="mask", help="Specify mask key, default is 'mask'")
 @click.option("--seed", type=int, default=101, help="random seed")
-@click.option("--out-dir", type=str, prompt=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
+@click.option("--out-dir", type=str, prompt=True, default=cfg.get_strix_cfg("OUTPUT_DIR"))
 @click.pass_context
 def check_data(ctx, **args):
     cargs = sn(**args)

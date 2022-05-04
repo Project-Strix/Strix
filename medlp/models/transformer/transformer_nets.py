@@ -3,13 +3,13 @@ from typing import Any
 import os
 import torch
 
-from medlp.models import SEGMENTATION_ARCHI
+from strix.models import SEGMENTATION_ARCHI
 from monai_ex.networks.nets import UNETR
 
 
 @SEGMENTATION_ARCHI.register("2D", "UNETR")
 @SEGMENTATION_ARCHI.register("3D", "UNETR")
-def medlp_unetr(
+def strix_unetr(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,

@@ -1,5 +1,5 @@
 import os
-from medlp.configures import config as cfg
+from strix.configures import config as cfg
 
 def get_input_data(files_list, is_supervised, verbose, dataset_name=''):
     """

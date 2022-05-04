@@ -4,8 +4,8 @@
 
 from torch import nn
 from torch.nn import BatchNorm2d
-#from medlp.models.rcnn.layers import FrozenBatchNorm2d as BatchNorm2d
-from medlp.models.rcnn.layers import Conv2d
+#from strix.models.rcnn.layers import FrozenBatchNorm2d as BatchNorm2d
+from strix.models.rcnn.layers import Conv2d
 
 
 def conv_bn(inp, oup, stride):

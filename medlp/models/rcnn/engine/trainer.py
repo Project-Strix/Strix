@@ -6,8 +6,8 @@ import time
 import torch
 import torch.distributed as dist
 
-from medlp.models.rcnn.utils.comm import get_world_size, is_pytorch_1_1_0_or_later
-from medlp.models.rcnn.utils.metric_logger import MetricLogger
+from strix.models.rcnn.utils.comm import get_world_size, is_pytorch_1_1_0_or_later
+from strix.models.rcnn.utils.metric_logger import MetricLogger
 
 
 def reduce_loss_dict(loss_dict):
@@ -45,7 +45,7 @@ def do_train(
     checkpoint_period,
     arguments,
 ):
-    logger = logging.getLogger("medlp.models.rcnn.trainer")
+    logger = logging.getLogger("strix.models.rcnn.trainer")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
     max_iter = len(data_loader)

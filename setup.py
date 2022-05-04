@@ -8,7 +8,7 @@ from setuptools import setup, find_namespace_packages
 # from torch.utils.cpp_extension import CUDAExtension
 
 # def get_extensions():
-#     extensions_dir = Path(__file__).parent.joinpath('medlp/models/rcnn/csrc')
+#     extensions_dir = Path(__file__).parent.joinpath('strix/models/rcnn/csrc')
 
 #     main_file = list(extensions_dir.glob("*.cpp"))
 #     source_cpu = list((extensions_dir/"cpu").glob("*.cpp"))
@@ -37,7 +37,7 @@ from setuptools import setup, find_namespace_packages
 
 #     ext_modules = [
 #         extension(
-#             "medlp.models.rcnn._C",
+#             "strix.models.rcnn._C",
 #             sources,
 #             include_dirs=include_dirs,
 #             define_macros=define_macros,
@@ -49,8 +49,8 @@ from setuptools import setup, find_namespace_packages
 
 
 setup(
-    name="medlp",
-    packages=find_namespace_packages(include=["medlp", "medlp.*"]),
+    name="strix",
+    packages=find_namespace_packages(include=["strix", "strix.*"]),
     version="0.0.7",
     description="Medical Deep Learning Platform",
     author="Chenglong Wang",
@@ -73,13 +73,13 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "medlp-train = medlp.main_entry:train",
-            "medlp-train-from-cfg = medlp.main_entry:train_cfg",
-            "medlp-train-and-test = medlp.main_entry:train_and_test",
-            "medlp-test-from-cfg = medlp.main_entry:test_cfg",
-            "medlp-nni-search = medlp.nni_search:nni_search",
-            "medlp-check-data = medlp.data_checker:check_data",
-            "medlp-gradcam-from-cfg = medlp.interpreter:gradcam",
+            "strix-train = strix.main_entry:train",
+            "strix-train-from-cfg = strix.main_entry:train_cfg",
+            "strix-train-and-test = strix.main_entry:train_and_test",
+            "strix-test-from-cfg = strix.main_entry:test_cfg",
+            "strix-nni-search = strix.nni_search:nni_search",
+            "strix-check-data = strix.data_checker:check_data",
+            "strix-gradcam-from-cfg = strix.interpreter:gradcam",
         ],
     },
     # ext_modules=get_extensions(),

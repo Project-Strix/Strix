@@ -5,9 +5,9 @@ from functools import partial
 from monai_ex.transforms import *
 from monai_ex.data import *
 from monai_ex.utils import ensure_tuple, first
-import medlp.utilities.oyaml as yaml
-from medlp.utilities.enum import DIMS, FRAMEWORKS, PHASES
-from medlp.data_io.dataio import DATASET_MAPPING
+import strix.utilities.oyaml as yaml
+from strix.utilities.enum import DIMS, FRAMEWORKS, PHASES
+from strix.data_io.dataio import DATASET_MAPPING
 from utils_cw import get_items_from_file
 
 root_tree = {

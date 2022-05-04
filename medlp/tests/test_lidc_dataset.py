@@ -1,5 +1,5 @@
 import json
-from medlp.data_io import DATASET_MAPPING
+from strix.data_io import DATASET_MAPPING
 
 
 json_file = "/homes/clwang/Data/LIDC-IDRI-Crops/train_datalist_7-3_cls.json"

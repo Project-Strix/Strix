@@ -22,10 +22,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from medlp.models.rcnn.layers import FrozenBatchNorm2d
-from medlp.models.rcnn.layers import Conv2d
-from medlp.models.rcnn.modeling.make_layers import group_norm
-from medlp.models.rcnn.utils.registry import Registry
+from strix.models.rcnn.layers import FrozenBatchNorm2d
+from strix.models.rcnn.layers import Conv2d
+from strix.models.rcnn.modeling.make_layers import group_norm
+from strix.models.rcnn.utils.registry import Registry
 
 
 # ResNet stage specification

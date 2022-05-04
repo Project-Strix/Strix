@@ -4,10 +4,10 @@ import numpy as np
 from functools import partial
 
 import torch
-from medlp.configures import config as cfg
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.utilities.utils import is_avaible_size, output_filename_check
-from medlp.models.cnn.engines.utils import output_onehot_transform
+from strix.configures import config as cfg
+from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from strix.utilities.utils import is_avaible_size, output_filename_check
+from strix.models.cnn.engines.utils import output_onehot_transform
 
 from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
 from monai_ex.engines import multi_gpu_supervised_trainer

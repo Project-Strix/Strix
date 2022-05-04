@@ -3,11 +3,11 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from medlp.models.rcnn.modeling import registry
-from medlp.models.rcnn.modeling.backbone import resnet
-from medlp.models.rcnn.modeling.poolers import Pooler
-from medlp.models.rcnn.modeling.make_layers import group_norm
-from medlp.models.rcnn.modeling.make_layers import make_fc
+from strix.models.rcnn.modeling import registry
+from strix.models.rcnn.modeling.backbone import resnet
+from strix.models.rcnn.modeling.poolers import Pooler
+from strix.models.rcnn.modeling.make_layers import group_norm
+from strix.models.rcnn.modeling.make_layers import make_fc
 
 
 @registry.ROI_BOX_FEATURE_EXTRACTORS.register("ResNet50Conv5ROIFeatureExtractor")

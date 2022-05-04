@@ -5,8 +5,8 @@ from typing import Callable, Dict, Optional, Sequence, Union
 
 import torch
 
-from medlp.configures import config as cfg
-from medlp.utilities.utils import output_filename_check
+from strix.configures import config as cfg
+from strix.utilities.utils import output_filename_check
 from monai_ex.handlers import (
     CheckpointLoader,
     CheckpointSaverEx,
@@ -21,8 +21,8 @@ from monai_ex.utils import ensure_list
 from torch.utils.data import DataLoader
 
 
-class MedlpTrainEngine(ABC):
-    """A base class for medlp inner train engines."""
+class StrixTrainEngine(ABC):
+    """A base class for strix inner train engines."""
 
     @abstractmethod
     def __init__(
@@ -134,8 +134,8 @@ class MedlpTrainEngine(ABC):
         return handlers
 
 
-class MedlpTestEngine(ABC):
-    """A base class for medlp inner test engines."""
+class StrixTestEngine(ABC):
+    """A base class for strix inner test engines."""
 
     @abstractmethod
     def __init__(

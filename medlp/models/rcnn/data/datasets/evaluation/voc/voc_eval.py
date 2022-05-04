@@ -5,8 +5,8 @@ from __future__ import division
 import os
 from collections import defaultdict
 import numpy as np
-from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.models.rcnn.structures.boxlist_ops import boxlist_iou
+from strix.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.boxlist_ops import boxlist_iou
 
 
 def do_voc_evaluation(dataset, predictions, output_folder, logger):

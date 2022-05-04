@@ -14,14 +14,14 @@ from functools import partial
 from torch.utils.tensorboard import SummaryWriter
 from types import SimpleNamespace as sn
 
-from medlp.models import get_engine, get_test_engine
-from medlp.data_io import DATASET_MAPPING
-from medlp.data_io.dataio import get_dataloader
-from medlp.configures import config as cfg
-from medlp.utilities.enum import Phases
-import medlp.utilities.arguments as arguments
-from medlp.utilities.utils import setup_logger
-from medlp.utilities.click_callbacks import (
+from strix.models import get_engine, get_test_engine
+from strix.data_io import DATASET_MAPPING
+from strix.data_io.dataio import get_dataloader
+from strix.configures import config as cfg
+from strix.utilities.enum import Phases
+import strix.utilities.arguments as arguments
+from strix.utilities.utils import setup_logger
+from strix.utilities.click_callbacks import (
     get_unknown_options,
     get_exp_name,
     input_cropsize,
@@ -135,8 +135,8 @@ def train_core(cargs, files_train, files_valid):
     callback=partial(
         confirmation,
         output_dir_ctx="experiment_path",
-        save_code=(cfg.get_medlp_cfg("mode") == "dev"),
-        save_dir=cfg.get_medlp_cfg("external_network_dir"),
+        save_code=(cfg.get_strix_cfg("mode") == "dev"),
+        save_dir=cfg.get_strix_cfg("external_network_dir"),
         checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )

@@ -2,10 +2,10 @@
 import torch
 from torch.nn import functional as F
 
-from medlp.models.rcnn.layers import smooth_l1_loss
-from medlp.models.rcnn.modeling.matcher import Matcher
-from medlp.models.rcnn.structures.boxlist_ops import boxlist_iou
-from medlp.models.rcnn.modeling.utils import cat
+from strix.models.rcnn.layers import smooth_l1_loss
+from strix.models.rcnn.modeling.matcher import Matcher
+from strix.models.rcnn.structures.boxlist_ops import boxlist_iou
+from strix.models.rcnn.modeling.utils import cat
 
 
 def project_masks_on_boxes(segmentation_masks, proposals, discretization_size):

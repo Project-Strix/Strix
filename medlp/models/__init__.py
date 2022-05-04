@@ -1,7 +1,7 @@
 from pathlib import Path
 from utils_cw import check_dir
 import torch
-from medlp.utilities.registry import NetworkRegistry
+from strix.utilities.registry import NetworkRegistry
 
 CLASSIFICATION_ARCHI = NetworkRegistry()
 SEGMENTATION_ARCHI = NetworkRegistry()
@@ -17,21 +17,21 @@ ARCHI_MAPPING = {
     "siamese": SIAMESE_ARCHI,
 }
 
-from medlp.models.cnn.utils import print_network, PolynomialLRDecay
-from medlp.models.cnn.layers.radam import RAdam
-from medlp.models.cnn.layers.ranger21 import Ranger21
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from medlp.data_io import DATASET_MAPPING
-from medlp.utilities.utils import get_attr_
-from medlp.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
-from medlp.utilities.imports import import_file
-from medlp.utilities.enum import Frameworks
-from medlp.configures import config as cfg
-from medlp.models.cnn.cnn_nets import *
-from medlp.models.transformer.transformer_nets import *
+from strix.models.cnn.utils import print_network, PolynomialLRDecay
+from strix.models.cnn.layers.radam import RAdam
+from strix.models.cnn.layers.ranger21 import Ranger21
+from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from strix.data_io import DATASET_MAPPING
+from strix.utilities.utils import get_attr_
+from strix.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
+from strix.utilities.imports import import_file
+from strix.utilities.enum import Frameworks
+from strix.configures import config as cfg
+from strix.models.cnn.cnn_nets import *
+from strix.models.transformer.transformer_nets import *
 
 
-external_network_dir = Path(cfg.get_medlp_cfg("EXTERNAL_NETWORK_DIR"))
+external_network_dir = Path(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"))
 if external_network_dir.is_dir():
     for f in external_network_dir.glob("*.py"):
         import_file(f.stem, str(f))

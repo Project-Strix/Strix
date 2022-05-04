@@ -10,18 +10,18 @@ import torch
 from torch.utils.data import DataLoader
 from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
-from medlp.configures import config as cfg
-from medlp.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
-from medlp.models.cnn.engines.engine import MedlpTestEngine, MedlpTrainEngine
-from medlp.models.cnn.engines.utils import (
+from strix.configures import config as cfg
+from strix.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
+from strix.models.cnn.engines.engine import StrixTestEngine, StrixTrainEngine
+from strix.models.cnn.engines.utils import (
     get_models,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
 )
-from medlp.models.cnn.utils import onehot_process
-from medlp.utilities.enum import Phases
-from medlp.utilities.transforms import decollate_transform_adaptor as DTA
-from medlp.utilities.utils import output_filename_check, setup_logger, get_attr_
+from strix.models.cnn.utils import onehot_process
+from strix.utilities.enum import Phases
+from strix.utilities.transforms import decollate_transform_adaptor as DTA
+from strix.utilities.utils import output_filename_check, setup_logger, get_attr_
 from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
 from monai_ex.handlers import (
     ROCAUC,
@@ -46,7 +46,7 @@ from monai_ex.utils import ensure_tuple
 
 
 @TRAIN_ENGINES.register("classification")
-class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
+class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
     def __init__(
         self,
         opts,
@@ -80,7 +80,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        val_handlers = MedlpTrainEngine.get_basic_handlers(
+        val_handlers = StrixTrainEngine.get_basic_handlers(
             phase="val",
             model_dir=model_dir,
             net=net,
@@ -144,7 +144,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             ),
         ]
 
-        train_handlers += MedlpTrainEngine.get_basic_handlers(
+        train_handlers += StrixTrainEngine.get_basic_handlers(
             phase="train",
             model_dir=model_dir,
             net=net,
@@ -277,7 +277,7 @@ class ClassificationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
 
 @TEST_ENGINES.register("classification")
-class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
+class ClassificationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
     def __init__(
         self,
         opts,
@@ -314,7 +314,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         )
         additional_metric_names = list(additional_val_metrics.keys())
 
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
@@ -505,7 +505,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
 
 
 @ENSEMBLE_TEST_ENGINES.register("classification")
-class ClassificationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+class ClassificationEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
     def __init__(
         self,
         opts: SimpleNamespace,
@@ -561,7 +561,7 @@ class ClassificationEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
             opts.phase, opts.output_nc, decollate, output_dir=opts.out_dir, metric_names=["auc", "prec", "recall", "roc"]
         )
 
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=best_models,

@@ -6,7 +6,7 @@ from torch import nn
 from .inference import make_fcos_postprocessor
 from .loss import make_fcos_loss_evaluator
 
-from medlp.models.rcnn.layers import Scale
+from strix.models.rcnn.layers import Scale
 
 
 class FCOSHead(torch.nn.Module):

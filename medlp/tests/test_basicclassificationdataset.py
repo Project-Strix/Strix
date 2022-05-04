@@ -1,5 +1,5 @@
 from monai.data import Dataset
-from medlp.data_io import BasicClassificationDataset
+from strix.data_io import BasicClassificationDataset
 
 filelist = [
     {

@@ -1,5 +1,5 @@
 import torch 
-from medlp.models import ARCHI_MAPPING
+from strix.models import ARCHI_MAPPING
 
 
 model_type = ARCHI_MAPPING['classification']['2D']['HESAM']

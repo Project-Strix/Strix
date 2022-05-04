@@ -10,7 +10,7 @@ from monai_ex.transforms import (
     ToTensorD,
 )
 
-from medlp.data_io import (
+from strix.data_io import (
     SEGMENTATION_DATASETS,
     CLASSIFICATION_DATASETS,
     BasicSegmentationDataset,

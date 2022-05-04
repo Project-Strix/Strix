@@ -3,11 +3,11 @@ import copy
 from pathlib import Path 
 import torch
 import logging
-from medlp.configures import config as cfg
-from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngine, MedlpTrainEngine, ENSEMBLE_TEST_ENGINES
-from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
-from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
-from medlp.utilities.enum import Phases
+from strix.configures import config as cfg
+from strix.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, StrixTestEngine, StrixTrainEngine, ENSEMBLE_TEST_ENGINES
+from strix.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
+from strix.utilities.utils import setup_logger, output_filename_check, get_attr_
+from strix.utilities.enum import Phases
 from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluator
 from monai_ex.transforms import MeanEnsembleD, MultitaskMeanEnsembleD
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
@@ -17,7 +17,7 @@ from monai_ex.inferers import SimpleInfererEx as SimpleInferer
 
 
 @TRAIN_ENGINES.register("multitask")
-class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
+class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
     def __init__(
         self,
         opts,
@@ -69,7 +69,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             opts.output_nc[1], decollate, 1, label_key=multi_output_keys[1]
         )
 
-        val_handlers = MedlpTrainEngine.get_basic_handlers(
+        val_handlers = StrixTrainEngine.get_basic_handlers(
             phase=Phases.VALID.value,
             model_dir=model_dir,
             net=net,
@@ -134,7 +134,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
                 step_transform=lr_step_transform,
             ),
         ]
-        train_handlers += MedlpTrainEngine.get_basic_handlers(
+        train_handlers += StrixTrainEngine.get_basic_handlers(
             phase=Phases.TRAIN.value,
             model_dir=model_dir,
             net=net,
@@ -171,7 +171,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
 
 
 @TEST_ENGINES.register("multitask")
-class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
+class MultiTaskTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
     def __init__(
         self,
         opts,
@@ -208,7 +208,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
             subtask1_val_metric = subtask2_val_metric = None
 
         
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=model_path,
@@ -252,7 +252,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
 
 
 @ENSEMBLE_TEST_ENGINES.register("multitask")
-class MultitaskEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
+class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
     def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
         if opts.slidingwindow:
             raise ValueError("Not implemented yet")
@@ -315,7 +315,7 @@ class MultitaskEnsembleTestEngine(MedlpTestEngine, EnsembleEvaluator):
                 phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
             )
 
-        handlers = MedlpTestEngine.get_basic_handlers(
+        handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
             model_path=best_models,

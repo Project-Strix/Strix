@@ -9,7 +9,7 @@ from torch.nn import init
 import numpy as np
 
 from monai.networks.blocks import Convolution, UpSample
-from medlp.models.cnn.nets.dynunet import DynUNet
+from strix.models.cnn.nets.dynunet import DynUNet
 from monai_ex.networks.layers import Act, Norm, Conv, Pool
 from monai_ex.networks.blocks import ResidualUnitEx as ResidualUnit
 from torch.nn.modules.activation import ReLU

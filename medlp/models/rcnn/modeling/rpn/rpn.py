@@ -3,10 +3,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from medlp.models.rcnn.modeling import registry
-from medlp.models.rcnn.modeling.box_coder import BoxCoder
-from medlp.models.rcnn.modeling.rpn.retinanet.retinanet import build_retinanet
-from medlp.models.rcnn.modeling.rpn.fcos.fcos import build_fcos
+from strix.models.rcnn.modeling import registry
+from strix.models.rcnn.modeling.box_coder import BoxCoder
+from strix.models.rcnn.modeling.rpn.retinanet.retinanet import build_retinanet
+from strix.models.rcnn.modeling.rpn.fcos.fcos import build_fcos
 from .loss import make_rpn_loss_evaluator
 from .anchor_generator import make_anchor_generator
 from .inference import make_rpn_postprocessor

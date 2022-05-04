@@ -5,9 +5,9 @@ import torch
 from collections import OrderedDict
 from tqdm import tqdm
 
-from medlp.models.rcnn.modeling.roi_heads.mask_head.inference import Masker
-from medlp.models.rcnn.structures.bounding_box import BoxList
-from medlp.models.rcnn.structures.boxlist_ops import boxlist_iou
+from strix.models.rcnn.modeling.roi_heads.mask_head.inference import Masker
+from strix.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.boxlist_ops import boxlist_iou
 
 
 def do_coco_evaluation(
@@ -19,7 +19,7 @@ def do_coco_evaluation(
     expected_results,
     expected_results_sigma_tol,
 ):
-    logger = logging.getLogger("medlp.models.rcnn.inference")
+    logger = logging.getLogger("strix.models.rcnn.inference")
 
     if box_only:
         logger.info("Evaluating bbox proposals")
@@ -404,7 +404,7 @@ def check_expected_results(results, expected_results, sigma_tol):
     if not expected_results:
         return
 
-    logger = logging.getLogger("medlp.models.rcnn.inference")
+    logger = logging.getLogger("strix.models.rcnn.inference")
     for task, metric, (mean, std) in expected_results:
         actual_val = results.results[task][metric]
         lo = mean - sigma_tol * std

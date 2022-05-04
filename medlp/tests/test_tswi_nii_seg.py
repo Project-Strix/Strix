@@ -1,6 +1,6 @@
 import os
 from monai_ex.transforms import LabelMorphologyD
-from medlp.data_io import DATASET_MAPPING
+from strix.data_io import DATASET_MAPPING
 
 from utils_cw import get_items_from_file
 import nibabel as nib

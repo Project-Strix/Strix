@@ -11,8 +11,8 @@ except:
     from torch.hub import urlparse
     from torch.hub import HASH_REGEX
 
-from medlp.models.rcnn.utils.comm import is_main_process
-from medlp.models.rcnn.utils.comm import synchronize
+from strix.models.rcnn.utils.comm import is_main_process
+from strix.models.rcnn.utils.comm import synchronize
 
 
 # very similar to https://github.com/pytorch/pytorch/blob/master/torch/utils/model_zoo.py
@@ -32,7 +32,7 @@ def cache_url(url, model_dir=None, progress=True):
         model_dir (string, optional): directory in which to save the object
         progress (bool, optional): whether or not to display a progress bar to stderr
     Example:
-        >>> cached_file = medlp.models.rcnn.utils.model_zoo.cache_url('https://s3.amazonaws.com/pytorch/models/resnet18-5c106cde.pth')
+        >>> cached_file = strix.models.rcnn.utils.model_zoo.cache_url('https://s3.amazonaws.com/pytorch/models/resnet18-5c106cde.pth')
     """
     if model_dir is None:
         torch_home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))

@@ -11,7 +11,7 @@ else:
     import xml.etree.ElementTree as ET
 
 
-from medlp.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.bounding_box import BoxList
 
 
 class PascalVOCDataset(torch.utils.data.Dataset):

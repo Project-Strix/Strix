@@ -7,7 +7,7 @@ from ignite.engine import Engine, Events
 from torch.utils.tensorboard import SummaryWriter
 
 from monai.handlers import TensorBoardStatsHandler
-from medlp.models.cnn import *
+from strix.models.cnn import *
 from monai_ex.handlers import TensorboardDumper
 
 

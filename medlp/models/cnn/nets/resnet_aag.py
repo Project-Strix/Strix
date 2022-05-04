@@ -2,9 +2,9 @@ import os
 
 import torch
 import torch.nn as nn
-from medlp.models.cnn.nets.resnet import ResNet, BasicBlock, Bottleneck
-from medlp.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate as AAG
-from medlp.models.cnn.utils import set_trainable
+from strix.models.cnn.nets.resnet import ResNet, BasicBlock, Bottleneck
+from strix.models.cnn.layers.anatomical_gate import AnatomicalAttentionGate as AAG
+from strix.models.cnn.utils import set_trainable
 from monai.networks.blocks.dynunet_block import get_conv_layer
 
 

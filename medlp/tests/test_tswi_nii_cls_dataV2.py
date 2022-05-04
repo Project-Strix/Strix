@@ -1,5 +1,5 @@
 import os
-from medlp.data_io import CLASSIFICATION_DATASETS
+from strix.data_io import CLASSIFICATION_DATASETS
 from monai_ex.transforms import *
 from monai_ex.data import DataLoader
 

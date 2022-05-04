@@ -3,12 +3,12 @@ from pathlib import Path
 from configparser import ConfigParser
 
 
-DEFAULT_MEDLP_CONFIG = {
+DEFAULT_STRIX_CONFIG = {
     "MODE": "dev",  # release
-    "CONFIG_FNAME": "medlp_configures.cfg",
-    "OUTPUT_DIR": str(Path.home() / "MeDLP" / "medlp_exp"),
-    "EXTERNAL_DATASET_DIR": str(Path.home() / "MeDLP" / "medlp_datasets"),
-    "EXTERNAL_NETWORK_DIR": str(Path.home() / "MeDLP" / "medlp_networks"),
+    "CONFIG_FNAME": "strix_configures.cfg",
+    "OUTPUT_DIR": str(Path.home() / "Strix" / "strix_exp"),
+    "EXTERNAL_DATASET_DIR": str(Path.home() / "Strix" / "strix_datasets"),
+    "EXTERNAL_NETWORK_DIR": str(Path.home() / "Strix" / "strix_networks"),
 }
 
 
@@ -23,7 +23,7 @@ def init(add_path=True):
     global _config_dict
 
     try:
-        fname = DEFAULT_MEDLP_CONFIG["CONFIG_FNAME"]
+        fname = DEFAULT_STRIX_CONFIG["CONFIG_FNAME"]
         cfg_file = Path(__file__).parent.joinpath(fname)
         conf = ConfigParser()
         conf.optionxform = str
@@ -36,16 +36,16 @@ def init(add_path=True):
         raise Exception(f"Error occured during reading config: {e}")
 
     if add_path:
-        sys.path.append(_config_dict["MEDLP_CONFIG"]["EXTERNAL_DATASET_DIR"])
-        sys.path.append(_config_dict["MEDLP_CONFIG"]["EXTERNAL_NETWORK_DIR"])
+        sys.path.append(_config_dict["STRIX_CONFIG"]["EXTERNAL_DATASET_DIR"])
+        sys.path.append(_config_dict["STRIX_CONFIG"]["EXTERNAL_NETWORK_DIR"])
 
 
 def get_cfg(section_name, keyword):
     return _config_dict[section_name][keyword.upper()]
 
 
-def get_medlp_cfg(keyword):
-    return _config_dict["MEDLP_CONFIG"][keyword.upper()]
+def get_strix_cfg(keyword):
+    return _config_dict["STRIX_CONFIG"][keyword.upper()]
 
 
 def get_key(key_name):

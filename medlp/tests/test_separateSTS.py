@@ -5,7 +5,7 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 
-from medlp.utilities.transforms import SeparateCropSTSdataD, ExtractSTSlicesD
+from strix.utilities.transforms import SeparateCropSTSdataD, ExtractSTSlicesD
 from monai_ex.data import DataLoader, Dataset
 from monai_ex.transforms import (
     Compose,
@@ -17,7 +17,7 @@ from monai_ex.transforms import (
 
 #%%
 folder = Path(
-    # "/homes/clwang/Data/medlp_exp/segmentation/rjh_tswi_v2/res-unet-CE-DCE-BN-radam-plateau-1229_2131-CV5/0-th/Test@0104_1213"
+    # "/homes/clwang/Data/strix_exp/segmentation/rjh_tswi_v2/res-unet-CE-DCE-BN-radam-plateau-1229_2131-CV5/0-th/Test@0104_1213"
     "/homes/yliu/Data/clwang_data/rjh_tswi_v2"
 )
 

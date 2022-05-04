@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
-from medlp.models.rcnn.utils.registry import Registry
+from strix.models.rcnn.utils.registry import Registry
 
 BACKBONES = Registry()
 RPN_HEADS = Registry()

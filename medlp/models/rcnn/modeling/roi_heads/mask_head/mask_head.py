@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 
-from medlp.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.bounding_box import BoxList
 
 from .roi_mask_feature_extractors import make_roi_mask_feature_extractor
 from .roi_mask_predictors import make_roi_mask_predictor

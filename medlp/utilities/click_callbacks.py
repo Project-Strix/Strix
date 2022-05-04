@@ -11,13 +11,13 @@ from types import SimpleNamespace as sn
 
 from click import Choice, ParamType, prompt
 from click.types import convert_type
-from medlp.data_io import DATASET_MAPPING
-from medlp.models import ARCHI_MAPPING
-from medlp.models.cnn.losses import LOSS_MAPPING
-from medlp.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
-from medlp.utilities.utils import is_avaible_size
-from medlp.utilities.enum import BUILTIN_TYPES
-from medlp.utilities.click import NumericChoice
+from strix.data_io import DATASET_MAPPING
+from strix.models import ARCHI_MAPPING
+from strix.models.cnn.losses import LOSS_MAPPING
+from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
+from strix.utilities.utils import is_avaible_size
+from strix.utilities.enum import BUILTIN_TYPES
+from strix.utilities.click import NumericChoice
 from utils_cw import Print, check_dir, get_items_from_file
 
 

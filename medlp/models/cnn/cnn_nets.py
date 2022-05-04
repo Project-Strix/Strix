@@ -3,18 +3,18 @@ from typing import Any
 import os
 import torch
 
-from medlp.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
-from medlp.models.cnn.nets.resnet import resnet18, resnet34, resnet50
-from medlp.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
-from medlp.models.cnn.nets.dynunet import DynUNet
-from medlp.models.cnn.nets.drn import drn_a_50
-from medlp.models.cnn.nets.hesam import HESAM
-from medlp.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
+from strix.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
+from strix.models.cnn.nets.resnet import resnet18, resnet34, resnet50
+from strix.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
+from strix.models.cnn.nets.dynunet import DynUNet
+from strix.models.cnn.nets.drn import drn_a_50
+from strix.models.cnn.nets.hesam import HESAM
+from strix.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
 
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet18")
 @CLASSIFICATION_ARCHI.register("3D", "resnet18")
-def medlp_resnet18(
+def strix_resnet18(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -39,7 +39,7 @@ def medlp_resnet18(
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet34")
 @CLASSIFICATION_ARCHI.register("3D", "resnet34")
-def medlp_resnet50(
+def strix_resnet50(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -64,7 +64,7 @@ def medlp_resnet50(
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet50")
 @CLASSIFICATION_ARCHI.register("3D", "resnet50")
-def medlp_resnet50(
+def strix_resnet50(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -89,7 +89,7 @@ def medlp_resnet50(
 
 @CLASSIFICATION_ARCHI.register("2D", "vgg9")
 @CLASSIFICATION_ARCHI.register("3D", "vgg9")
-def medlp_vgg9_bn(
+def strix_vgg9_bn(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -116,7 +116,7 @@ def medlp_vgg9_bn(
 
 @CLASSIFICATION_ARCHI.register("2D", "vgg11")
 @CLASSIFICATION_ARCHI.register("3D", "vgg11")
-def medlp_vgg11_bn(
+def strix_vgg11_bn(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -145,7 +145,7 @@ def medlp_vgg11_bn(
 # @SELFLEARNING_ARCHI.register('3D', 'unet')
 @SEGMENTATION_ARCHI.register("2D", "unet")
 @SEGMENTATION_ARCHI.register("3D", "unet")
-def medlp_dyn_unet(
+def strix_dyn_unet(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -190,7 +190,7 @@ def medlp_dyn_unet(
 
 @SEGMENTATION_ARCHI.register("2D", "res-unet")
 @SEGMENTATION_ARCHI.register("3D", "res-unet")
-def medlp_dyn_resunet(
+def strix_dyn_resunet(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -235,7 +235,7 @@ def medlp_dyn_resunet(
 
 @CLASSIFICATION_ARCHI.register("2D", "DRN_a50")
 @CLASSIFICATION_ARCHI.register("3D", "DRN_a50")
-def medlp_drn_a_50(
+def strix_drn_a_50(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -258,7 +258,7 @@ def medlp_drn_a_50(
 
 @CLASSIFICATION_ARCHI.register("2D", "HESAM")
 @CLASSIFICATION_ARCHI.register("3D", "HESAM")
-def medlp_hesam(
+def strix_hesam(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -303,7 +303,7 @@ def medlp_hesam(
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet_aag_34")
 @CLASSIFICATION_ARCHI.register("3D", "resnet_aag_34")
-def medlp_resnetaag_34(
+def strix_resnetaag_34(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,
@@ -340,7 +340,7 @@ def medlp_resnetaag_34(
 
 @CLASSIFICATION_ARCHI.register("2D", "resnet_aag_50")
 @CLASSIFICATION_ARCHI.register("3D", "resnet_aag_50")
-def medlp_resnetaag_50(
+def strix_resnetaag_50(
     spatial_dims: int,
     in_channels: int,
     out_channels: int,

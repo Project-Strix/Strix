@@ -1,4 +1,4 @@
-from medlp.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from monai_ex.engines import GanTrainer
 
 @TRAIN_ENGINES.register('gan')

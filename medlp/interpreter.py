@@ -11,13 +11,13 @@ from utils_cw import get_items_from_file, Print, check_dir
 from ignite.engine import Events
 from ignite.utils import setup_logger
 
-from medlp.models import get_test_engine
-from medlp.data_io.dataio import get_dataloader
-from medlp.utilities.utils import get_specify_file
-from medlp.utilities.enum import Phases
-from medlp.utilities.click_callbacks import parse_input_str
-from medlp.utilities.click import NumericChoice as Choice
-from medlp.utilities.arguments import get_trained_models
+from strix.models import get_test_engine
+from strix.data_io.dataio import get_dataloader
+from strix.utilities.utils import get_specify_file
+from strix.utilities.enum import Phases
+from strix.utilities.click_callbacks import parse_input_str
+from strix.utilities.click import NumericChoice as Choice
+from strix.utilities.arguments import get_trained_models
 from monai_ex.handlers import GradCamHandler
 
 

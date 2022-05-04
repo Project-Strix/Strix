@@ -10,11 +10,11 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from medlp.data_io import DATASET_MAPPING
-from medlp.utilities.click import NumericChoice as Choice
-from medlp.utilities.arguments import data_select
-from medlp.utilities.enum import FRAMEWORKS, Phases
-from medlp.configures import config as cfg
+from strix.data_io import DATASET_MAPPING
+from strix.utilities.click import NumericChoice as Choice
+from strix.utilities.arguments import data_select
+from strix.utilities.enum import FRAMEWORKS, Phases
+from strix.configures import config as cfg
 from monai_ex.data import DatasetSummaryEx
 
 

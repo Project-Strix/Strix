@@ -5,7 +5,7 @@ Simple dataset class that wraps a list of path names
 
 from PIL import Image
 
-from medlp.models.rcnn.structures.bounding_box import BoxList
+from strix.models.rcnn.structures.bounding_box import BoxList
 
 
 class ListDataset(object):

@@ -11,13 +11,13 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-from medlp.models.rcnn.layers import (
+from strix.models.rcnn.layers import (
     BatchNorm2d,
     Conv2d,
     FrozenBatchNorm2d,
     interpolate,
 )
-from medlp.models.rcnn.layers.misc import _NewEmptyTensorOp
+from strix.models.rcnn.layers.misc import _NewEmptyTensorOp
 
 
 logger = logging.getLogger(__name__)

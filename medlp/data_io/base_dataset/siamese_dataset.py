@@ -10,7 +10,7 @@ from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
 from monai_ex.config import KeysCollection
 from numpy.lib.npyio import load
-from medlp.data_io.base_dataset.classification_dataset import BasicClassificationDataset
+from strix.data_io.base_dataset.classification_dataset import BasicClassificationDataset
 
 
 class SiameseDatasetWrapper(Dataset):

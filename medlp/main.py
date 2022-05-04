@@ -22,10 +22,10 @@ def main():
 if __name__ == "__main__":
     assert sys.version_info >= (3, 6), "Python ver. >=3.6 is required!"
 
-    from medlp.main_entry import train
-    from medlp.main_entry import train_cfg
-    from medlp.main_entry import test_cfg
-    from medlp.main_entry import train_and_test
+    from strix.main_entry import train
+    from strix.main_entry import train_cfg
+    from strix.main_entry import test_cfg
+    from strix.main_entry import train_and_test
     from nni_search import nni_search
     from nni_search import train_nni
     from data_checker import check_data

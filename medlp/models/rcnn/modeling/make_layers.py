@@ -6,9 +6,9 @@ Miscellaneous utility functions
 import torch
 from torch import nn
 from torch.nn import functional as F
-from medlp.models.rcnn.config import cfg
-from medlp.models.rcnn.layers import Conv2d
-from medlp.models.rcnn.modeling.poolers import Pooler
+from strix.models.rcnn.config import cfg
+from strix.models.rcnn.layers import Conv2d
+from strix.models.rcnn.modeling.poolers import Pooler
 
 
 def get_group_gn(dim, dim_per_gp, num_groups):

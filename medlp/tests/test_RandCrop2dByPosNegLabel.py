@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from utils_cw.augmentations import Compose
-from medlp.utilities.transforms import RandCrop2dByPosNegLabelD, bbox_3D
+from strix.utilities.transforms import RandCrop2dByPosNegLabelD, bbox_3D
 from utils_cw import get_items_from_file
 import nibabel as nib
 from monai_ex.data import DataLoader, Dataset

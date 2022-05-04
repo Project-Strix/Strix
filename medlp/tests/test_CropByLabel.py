@@ -1,8 +1,8 @@
 
 #%%
 import os
-from medlp.data_io.rjh_dataset import get_rjh_tswi_seg_dataset
-from medlp.utilities.transforms import MarginalCropByMaskD, bbox_3D
+from strix.data_io.rjh_dataset import get_rjh_tswi_seg_dataset
+from strix.utilities.transforms import MarginalCropByMaskD, bbox_3D
 
 from utils_cw import get_items_from_file
 import nibabel as nib
@@ -10,7 +10,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 file = "/homes/clwang/Data/RJH/STS_tSWI/datalist_wi_mask@1124_1034.json"
-#file = "/homes/clwang/Data/medlp_exp/segmentation/rjh_tswi/res-unet-96,96,64-CE-DCE-BN-adamw-plateau-1123_1609-Dil-Elastic-3cls/train_files"
+#file = "/homes/clwang/Data/strix_exp/segmentation/rjh_tswi/res-unet-96,96,64-CE-DCE-BN-adamw-plateau-1123_1609-Dil-Elastic-3cls/train_files"
 data_list = get_items_from_file(file, format='json')
 
 # sizes = np.zeros([len(data_list), 3])

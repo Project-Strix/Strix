@@ -4,12 +4,12 @@ from pathlib import Path
 
 import click
 from click import option, prompt, UNPROCESSED
-from medlp.configures import config as cfg
-from medlp.utilities.click_callbacks import NumericChoice as Choice, framework_select
-from medlp.utilities.click_callbacks import (
+from strix.configures import config as cfg
+from strix.utilities.click_callbacks import NumericChoice as Choice, framework_select
+from strix.utilities.click_callbacks import (
     data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc
 )
-from medlp.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
+from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS
 from utils_cw import prompt_when
 
 import click
@@ -76,7 +76,7 @@ def common_params(func):
     @option("--train-list", type=click.Path(exists=True), default=None, help="Specified training datalist")
     @option("--valid-list", type=click.Path(exists=True), default=None, help="Specified validation datalist")
     @option("-W", "--pretrained-model-path", type=str, default="", help="pretrained model path")
-    @option("--out-dir", type=str, prompt=True, show_default=True, default=cfg.get_medlp_cfg("OUTPUT_DIR"))
+    @option("--out-dir", type=str, prompt=True, show_default=True, default=cfg.get_strix_cfg("OUTPUT_DIR"))
     @option("--augment-ratio", type=float, default=0.3, help="Data augumentation ratio")
     @option("-P", "--partial", type=float, default=1, help="Only load part of data")
     @option("-V", "--visualize", is_flag=True, help="Visualize the network architecture")

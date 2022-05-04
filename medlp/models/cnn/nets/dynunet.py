@@ -14,7 +14,7 @@ from typing import List, Optional, Sequence, Union
 
 import torch.nn as nn
 
-from medlp.models.cnn.blocks.dynunet_block import *
+from strix.models.cnn.blocks.dynunet_block import *
 
 
 class DynUNet(nn.Module):

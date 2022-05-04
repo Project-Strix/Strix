@@ -1,5 +1,5 @@
 import os
-from medlp.data_io.picc_dataset import PICC_nii_seg_dataset
+from strix.data_io.picc_dataset import PICC_nii_seg_dataset
 from utils_cw import get_items_from_file
 import nibabel as nib
 import numpy as np

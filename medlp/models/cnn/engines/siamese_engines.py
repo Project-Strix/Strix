@@ -4,14 +4,14 @@ from ignite import engine
 from monai_ex import handlers
 
 import torch
-from medlp.models.cnn.engines import (
+from strix.models.cnn.engines import (
     TRAIN_ENGINES,
     TEST_ENGINES,
     ENSEMBLE_TEST_ENGINES
 )
-from medlp.models.cnn.engines.utils import output_onehot_transform
-from medlp.models.cnn.losses.losses import ContrastiveLoss
-from medlp.configures import config as cfg
+from strix.models.cnn.engines.utils import output_onehot_transform
+from strix.models.cnn.losses.losses import ContrastiveLoss
+from strix.configures import config as cfg
 
 from monai_ex.inferers import SimpleInferer
 from ignite.metrics import Accuracy

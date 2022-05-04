@@ -1,9 +1,9 @@
-# Datasets for MeDLP 
+# Datasets for Strix 
 
-### Here is a simple example for creating a custom dataset for MeDLP using python script.
+### Here is a simple example for creating a custom dataset for Strix using python script.
 
     
-    from medlp.data_io import CLASSIFICATION_DATASETS, BasicClassificationDataset
+    from strix.data_io import CLASSIFICATION_DATASETS, BasicClassificationDataset
     from monai_ex.transforms import *
 
     @CLASSIFICATION_DATASETS.register('2D', 'my_dataset', '\homes\my_dataset_fname.json')
@@ -30,13 +30,13 @@
 
         return dataset
 
-In the given example, `my_dataset` has been registered to a `2D classification` MeDLP dataset. Major steps to implement a MeDLP dataset should be:
+In the given example, `my_dataset` has been registered to a `2D classification` Strix dataset. Major steps to implement a Strix dataset should be:
 
 1. import base dataset type `CLASSIFICATION_DATASETS`/`SEGMENTATION_DATASETS`/`SELFLEARNING_DATASETS`/`MULTITASK_DATASETS`.
 2. Define your dataset function, with 3 arguments:
     - files_list: handle your input data list
     - phase: including 4 different stages `Phases.TRAIN`, `Phases.VALID`, `Phases.TEST_IN` and `Phases.TEST_EX`
-      - `Phases` is imported from `medlp.utilities.enum import Phases`
+      - `Phases` is imported from `strix.utilities.enum import Phases`
       - `Phases.TEST_IN` means internal test w/ ground-truth, `Phases.TEST_EX` means external test w/o gt.
     - opts: including all options from input arguments. 
 3. Add decorator to your function like the given example. Dataset decorator should have 3 arguments: 
@@ -54,7 +54,7 @@ In the given example, `my_dataset` has been registered to a `2D classification` 
             pass
 
 
-- ### Notice that ONLY registered dataset can used in MeDLP. If you want remove one dataset, you can simply remove its decorator instead.
+- ### Notice that ONLY registered dataset can used in Strix. If you want remove one dataset, you can simply remove its decorator instead.
         # @CLASSIFICATION_DATASETS.register('2D', 'my_dataset', '/homes/my_dataset_fname.json') <- Comment this!
         def get_my_dataset(files_list, phase, opts):
             print("Not used")
@@ -72,7 +72,7 @@ In the given example, `my_dataset` has been registered to a `2D classification` 
         def get_my_dataset(files_list, phase, opts):
             pass
 
-- ### MeDLP support multiple inputs/outputs now! Use `multi_in` & `multi_out` decorators. Make sure the keys are in the filelist (.json/.yaml).
+- ### Strix support multiple inputs/outputs now! Use `multi_in` & `multi_out` decorators. Make sure the keys are in the filelist (.json/.yaml).
         @CLASSIFICATION_DATASETS.snapshot
         @CLASSIFICATION_DATASETS.multi_in('image', 'mask')
         @CLASSIFICATION_DATASETS.register('2D', 'my_dataset', '/homes/my_dataset_fname.json')

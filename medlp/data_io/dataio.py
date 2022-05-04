@@ -1,10 +1,10 @@
 import torch
 from torch.utils.data import DataLoader as _TorchDataLoader
 from torch.utils.data.sampler import WeightedRandomSampler
-from medlp.utilities.registry import DatasetRegistry
-from medlp.utilities.enum import Phases
+from strix.utilities.registry import DatasetRegistry
+from strix.utilities.enum import Phases
 from monai_ex.data import DataLoader
-from medlp.configures import config as cfg
+from strix.configures import config as cfg
 import pandas as pd
 
 CLASSIFICATION_DATASETS = DatasetRegistry()

@@ -1,4 +1,4 @@
-from medlp.models.rcnn.data import datasets
+from strix.models.rcnn.data import datasets
 
 from .coco import coco_evaluation
 from .voc import voc_evaluation

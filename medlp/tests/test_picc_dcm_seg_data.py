@@ -4,7 +4,7 @@ import numpy as np
 from utils_cw import get_items_from_file
 from monai_ex.transforms import *
 from monai_ex.data import DataLoader
-from medlp.data_io.segmentation_dataset import SegmentationDataset2D
+from strix.data_io.segmentation_dataset import SegmentationDataset2D
 import torchvision
 import matplotlib.pyplot as plt
 

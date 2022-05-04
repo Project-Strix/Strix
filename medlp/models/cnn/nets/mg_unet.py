@@ -2,8 +2,8 @@ from typing import List, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
-from medlp.models.cnn.nets.dynunet import DynUNet
-from medlp.models.cnn.blocks.dynunet_block_ex import *
+from strix.models.cnn.nets.dynunet import DynUNet
+from strix.models.cnn.blocks.dynunet_block_ex import *
 
 
 # @SEGMENTATION_ARCHI.register('2D', 'mg_unet')

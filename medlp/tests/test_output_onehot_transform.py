@@ -1,5 +1,5 @@
 import torch  
-from medlp.models.cnn.utils import output_onehot_transform
+from strix.models.cnn.utils import output_onehot_transform
 
 output = {}
 output["pred"] = torch.rand([5,2])
