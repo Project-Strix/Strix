@@ -70,7 +70,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
         )
 
         val_handlers = MedlpTrainEngine.get_basic_handlers(
-            phase=Phases.VALID,
+            phase=Phases.VALID.value,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -134,7 +134,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             ),
         ]
         train_handlers += MedlpTrainEngine.get_basic_handlers(
-            phase=Phases.TRAIN,
+            phase=Phases.TRAIN.value,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
