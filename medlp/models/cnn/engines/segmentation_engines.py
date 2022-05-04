@@ -22,7 +22,7 @@ from medlp.models.cnn.engines.engine import MedlpTrainEngine, MedlpTestEngine
 
 from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInferer
 
-from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluatorEx, EnsembleEvaluator
 
 from monai_ex.transforms import (
     Compose,
@@ -112,7 +112,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        evaluator = SupervisedEvaluator(
+        evaluator = SupervisedEvaluatorEx(
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -124,6 +124,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
             val_handlers=val_handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict()
         )
         evaluator.logger = setup_logger(logger_name)
 
@@ -263,7 +264,7 @@ class SegmentationTrainEngine(MedlpTrainEngine, SupervisedTrainerEx):
 
 
 @TEST_ENGINES.register("segmentation")
-class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
+class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
     def __init__(
         self,
         opts,
@@ -322,7 +323,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
         else:
             inferer = SimpleInferer()
 
-        SupervisedEvaluator.__init__(
+        SupervisedEvaluatorEx.__init__(
             self,
             device=device,
             val_data_loader=test_loader,
@@ -334,6 +335,7 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             val_handlers=handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict()
         )
 
     @staticmethod
@@ -405,16 +407,21 @@ class SegmentationTestEngine(MedlpTestEngine, SupervisedEvaluator):
             ]
         
         if opts.save_label:
-            _label = cfg.get_key("label")
+            multi_output_keys = kwargs.get("multi_output_keys", None)
+            if multi_output_keys and item_index is not None:
+                _label = multi_output_keys[item_index]
+            else:
+                _label = cfg.get_key("label")
+
             extra_handlers += [
                 ImageBatchSaver(
                     output_dir=opts.out_dir,
                     output_ext=".nii.gz",
                     output_postfix=f"{suffix}_label",
-                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
-                    resample=opts.resample,
+                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_label+"_meta_dict"),
+                    resample=False,  # opts.resample,
                     mode="bilinear",
-                    image_batch_transform=from_engine([_label, _label + "_meta_dict"]),
+                    image_batch_transform=from_engine([_label, _label+"_meta_dict"]),
                 )                
             ]
 

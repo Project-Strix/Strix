@@ -8,7 +8,7 @@ from medlp.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, MedlpTestEngin
 from medlp.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
 from medlp.utilities.utils import setup_logger, output_filename_check, get_attr_
 from medlp.utilities.enum import Phases
-from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluator, EnsembleEvaluator
+from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluator
 from monai_ex.transforms import MeanEnsembleD, MultitaskMeanEnsembleD
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -104,7 +104,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
 
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-        evaluator = SupervisedEvaluator(
+        evaluator = SupervisedEvaluatorEx(
             device=device,
             val_data_loader=test_loader,
             network=net,
@@ -117,6 +117,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
             val_handlers=val_handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
         )
         evaluator.logger = setup_logger(logger_name)
 
@@ -170,7 +171,7 @@ class MultiTaskTrainEngine(MedlpTrainEngine, MultiTaskTrainer):
 
 
 @TEST_ENGINES.register("multitask")
-class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
+class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
     def __init__(
         self,
         opts,
@@ -232,7 +233,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
         if subtask2_extra_handlers:
             handlers += subtask2_extra_handlers
 
-        SupervisedEvaluator.__init__(
+        SupervisedEvaluatorEx.__init__(
             self,
             device=device,
             val_data_loader=test_loader,
@@ -246,6 +247,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
             val_handlers=handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict()
         )
 
 
