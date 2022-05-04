@@ -196,15 +196,16 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
 
         if is_supervised:
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+            subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+                phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+            )
+            subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+                phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+            )
         else:
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
+            subtask1_val_metric = subtask2_val_metric = None
 
-        subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
-            phase=opts.phase, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
-        )
-        subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
-            phase=opts.phase, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
-        )
         
         handlers = MedlpTestEngine.get_basic_handlers(
             phase=opts.phase,
@@ -214,7 +215,7 @@ class MultiTaskTestEngine(MedlpTestEngine, SupervisedEvaluator):
             logger_name=logger_name,
             stats_dicts={"Metrics": lambda x: None},
             save_image=opts.save_image,
-            image_resample=False,
+            image_resample=opts.resample,
             test_loader=test_loader,
             image_batch_transform=from_engine([_image, _image + "_meta_dict"]),
         )

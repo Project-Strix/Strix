@@ -436,7 +436,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
                 batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
                 else from_engine(_image + "_meta_dict"),
-                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(output_nc),
+                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(output_nc, item_index=item_index),
             )
         ]
 
@@ -447,7 +447,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
                     filename=f"{suffix}_prob.csv" if suffix else "prob.csv",
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
-                        output_nc, discrete=False
+                        output_nc, discrete=False, item_index=item_index
                     ),
                 )
             ]
@@ -469,13 +469,20 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
         return extra_handlers
 
     @staticmethod
-    def get_cls_saver_post_transform(output_nc: int, discrete: bool = True, logit_thresh: float = 0.5):
+    def get_cls_saver_post_transform(
+        output_nc: int, discrete: bool = True, logit_thresh: float = 0.5, item_index: Optional[int] = None,
+    ):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
+        if item_index is not None:
+            select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))]
+        else:
+            select_item_transform = []
+
         if output_nc == 1:
             return Compose(
-                [
+                select_item_transform + [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, sigmoid=True),
                     AsDiscreteD(keys=_pred, threshold=logit_thresh) if discrete else lambda x: x,
@@ -485,7 +492,7 @@ class ClassificationTestEngine(MedlpTestEngine, SupervisedEvaluatorEx):
             )
         else:
             return Compose(
-                [
+                select_item_transform + [
                     EnsureTypeD(keys=[_pred, _label]),
                     ActivationsD(keys=_pred, softmax=True),
                     AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)  # ? dim=1, keepdim=True

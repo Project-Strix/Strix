@@ -238,10 +238,9 @@ def output_filename_check(torch_dataset, meta_key="image_meta_dict"):
     if isinstance(next_data, list):
         next_data = next_data[0]
 
-    for prev_item, next_item in zip(
-        Path(prev_data[meta_key]["filename_or_obj"]).parents,
-        Path(next_data[meta_key]["filename_or_obj"]).parents,
-    ):
+    prev_parents = list(Path(prev_data[meta_key]["filename_or_obj"]).parents)[::-1]
+    next_parents = list(Path(next_data[meta_key]["filename_or_obj"]).parents)[::-1]
+    for (prev_item, next_item) in zip(prev_parents, next_parents):
         if prev_item.stem != next_item.stem:
             return prev_item.parent
 
