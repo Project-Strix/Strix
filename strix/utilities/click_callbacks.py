@@ -8,8 +8,9 @@ from functools import partial
 from pathlib import Path
 from time import strftime
 from types import SimpleNamespace as sn
+from termcolor import colored
 
-from click import Choice, ParamType, prompt
+from click import Choice, prompt
 from click.types import convert_type
 from strix.data_io import DATASET_MAPPING
 from strix.models import ARCHI_MAPPING
@@ -416,6 +417,6 @@ def check_loss(ctx_params):
 
 
 def check_lr_policy(ctx_params):
-    if ctx_params.get("lr_policy") == "plateau" and ctx_params("valid_interval") != 1:
+    if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
         Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
     return True

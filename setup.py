@@ -68,8 +68,8 @@ setup(
         "nibabel",
         "pytorch-ignite==0.4.7",
         # "nni",
-        "monai_ex==0.0.4",
-        "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
+        "monai_ex",
+        "utils_cw",
     ],
     entry_points={
         "console_scripts": [
