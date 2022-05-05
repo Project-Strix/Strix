@@ -30,7 +30,7 @@
 <br />
 <p align="center">
   <a href="https://gitlab.com/ChingRyu/Strix">
-    <img src="images/logo.png" alt="Logo" height="80">
+    <img src="images/banner.png" alt="Logo" height="200">
   </a>
 
   <h3 align="center">Strix</h3>
