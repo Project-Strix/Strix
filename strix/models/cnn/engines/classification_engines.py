@@ -30,8 +30,6 @@ from monai_ex.handlers import (
     EarlyStopHandler,
     LatentCodeSaver,
     LrScheduleTensorboardHandler,
-    SegmentationSaver,
-    StatsHandler,
     ValidationHandler,
 )
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -66,12 +64,10 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
         decollate = False
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _loss = cfg.get_key("loss")
-
-        logger_name = get_attr_(opts, 'logger_name', logger_name)
-        self.logger = setup_logger(logger_name)
 
         key_val_metric = ClassificationTrainEngine.get_metric("val", opts.output_nc, decollate)
         val_metric_name = list(key_val_metric.keys())[0]
@@ -140,6 +136,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
+                name=logger_name,
                 step_transform=lr_step_transform,
             ),
         ]
@@ -180,6 +177,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             custom_keys=cfg.get_keys_dict(),
             ensure_dims=True,
         )
+        self.logger = setup_logger(logger_name)
 
     @staticmethod
     def get_metric(phase: str, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):

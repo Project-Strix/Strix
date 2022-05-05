@@ -70,7 +70,6 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         _loss = cfg.get_key("loss")
         decollate = False
         logger_name = get_attr_(opts, 'logger_name', logger_name)
-        self.logger = setup_logger(logger_name)
 
         val_metric = SegmentationTrainEngine.get_metric(Phases.VALID, output_nc=opts.output_nc, decollate=decollate)
         train_metric = SegmentationTrainEngine.get_metric(Phases.TRAIN, output_nc=opts.output_nc, decollate=decollate)
@@ -138,6 +137,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
+                name=logger_name,
                 step_transform=lr_step_transform,
             ),
         ]
@@ -176,6 +176,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             custom_keys=cfg.get_keys_dict(),
             ensure_dims=True,
         )
+        self.logger = setup_logger(logger_name)
 
     @staticmethod
     def get_metric(phase: Phases, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):

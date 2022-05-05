@@ -42,7 +42,6 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
         _loss = cfg.get_key("loss")
         decollate = False
         logger_name = get_attr_(opts, 'logger_name', logger_name)
-        self.logger = setup_logger(logger_name)
 
         if multi_output_keys is None:
             raise ValueError("No 'multi_output_keys' was specified for MultiTask!")
@@ -131,6 +130,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             LrScheduleTensorboardHandler(
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
+                name=logger_name,
                 step_transform=lr_step_transform,
             ),
         ]
@@ -168,6 +168,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             decollate=decollate,
             custom_keys=cfg.get_keys_dict(),
         )
+        self.logger = setup_logger(logger_name)
 
 
 @TEST_ENGINES.register("multitask")
