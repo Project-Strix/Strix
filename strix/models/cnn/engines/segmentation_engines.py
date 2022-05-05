@@ -238,8 +238,6 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                     DTA(ActivationsD(keys=_pred, sigmoid=True)),
                     DTA(AsDiscreteD(keys=_pred, threshold=0.5)),
                     from_engine(_pred)
-                    if item_index is None
-                    else from_engine(_pred, transforms=lambda x: x[item_index]),
                 ],
                 map_items=not decollate,
             )
@@ -250,8 +248,6 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                     DTA(ActivationsD(keys=_pred, softmax=True)),
                     DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
                     from_engine(_pred)
-                    if item_index is None
-                    else from_engine(_pred, transforms=lambda x: x[item_index]),
                 ],
                 map_items=not decollate,
             )
