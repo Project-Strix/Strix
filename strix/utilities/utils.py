@@ -1,9 +1,14 @@
 import os
+import sys
+import json
+import yaml
 import socket
 import struct
 import logging
+import traceback
 from pathlib import Path
-from typing import List, Optional, Tuple, Union, TextIO
+from functools import partial
+from typing import List, Optional, Tuple, Union, TextIO, Any
 
 import matplotlib
 import pylab
@@ -20,7 +25,53 @@ import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
 from strix.utilities.enum import LR_SCHEDULES
 from monai.networks import one_hot
-from monai_ex.utils import ensure_list
+from monai_ex.utils import ensure_list, GenericException as StrixException
+from utils_cw import catch_exception, get_items_from_file, Print
+
+trycatch = partial(catch_exception, handled_exception_type=StrixException)
+
+@trycatch()
+def get_items(filelist, format="auto", sep="\n"):
+    """Wrapper of utils_cw's `get_items_from_file` function with `trycatch` decorator.
+    """
+    try:
+        return get_items_from_file(filelist, format, sep)
+    except json.JSONDecodeError as e:
+        raise StrixException("Content of your json file cannot be parsed. Please recheck it!")
+    except yaml.YAMLError as e:
+        if hasattr(e, 'problem_mark'):
+            mark = e.problem_mark
+        raise StrixException(
+            f"Content of your yaml file cannot be parsed. Please recheck it!\n"
+            f"Error parsing at line {mark.line}, column {mark.column+1}."
+        )
+
+
+# class ExceptionCatcher:
+#     def __init__(self, handled_exception) -> None:
+#         self.handled_exception = handled_exception
+
+#     def catch(self, module_instance):
+#         self.instance = module_instance
+
+#     def __getattr__(self, k):
+#         def wrapper(*args, **kwargs):
+#             try:
+#                 return getattr(self.instance, k)(*args, **kwargs)
+#             except self.handled_exception as e:
+#                 log_info = f"\n{'! '*30}\nError occurred! Please check your code! Msg:\n{colored(e, color='red')}\n{'! '*30}"
+#                 print(log_info)
+#                 sys.exit(-1)
+#             except Exception as e:
+#                 exc_type, exc_obj, exc_tb = sys.exc_info()
+#                 Print("Exception trace:", color="r")
+#                 print(" ".join(traceback.format_tb(exc_tb, limit=2)[-1:]))
+#                 sys.exit(-1)
+
+#         if hasattr(self.instance, k):
+#             return wrapper
+#         else:
+#             raise AttributeError(f'No such field/method: {k}')
 
 
 def get_attr_(obj, name, default = None):

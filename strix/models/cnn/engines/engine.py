@@ -12,7 +12,7 @@ from monai_ex.handlers import (
     CheckpointSaverEx,
     NNIReporterHandler,
     ImageBatchSaver,
-    StatsHandler,
+    StatsHandlerEx as StatsHandler,
     TensorboardDumper,
     TensorBoardImageHandlerEx,
     TensorBoardStatsHandler,

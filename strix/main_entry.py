@@ -1,8 +1,6 @@
 import os
 import gc
-import sys
 import shutil
-from turtle import Terminator
 import yaml
 import logging
 import time
@@ -20,7 +18,7 @@ from strix.data_io.dataio import get_dataloader
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
 import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger
+from strix.utilities.utils import setup_logger, get_items
 from strix.utilities.click_callbacks import (
     get_unknown_options,
     get_exp_name,
@@ -39,7 +37,6 @@ from utils_cw import (
     PathlibEncoder,
     confirmation,
     check_dir,
-    get_items_from_file,
     split_train_test,
 )
 
@@ -119,7 +116,12 @@ def train_core(cargs, files_train, files_valid):
                 ),
             )
 
-    trainer.run()
+    try:
+        trainer.run()
+    except SystemExit as e:
+        print(f"Training exited with {e}!")
+    except RuntimeError as e:
+        print("Run time error occured!", e)
 
 
 @click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -175,8 +177,8 @@ def train(ctx, **args):
 
     # ! Manually specified train&valid datalist
     if cargs.train_list and cargs.valid_list:
-        files_train = get_items_from_file(cargs.train_list, format="auto")
-        files_valid = get_items_from_file(cargs.valid_list, format="auto")
+        files_train = get_items(cargs.train_list, format="auto")
+        files_valid = get_items(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)
         return cargs
 
@@ -193,7 +195,7 @@ def train(ctx, **args):
         ]
     else:
         assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-        train_datalist = get_items_from_file(data_list, format="auto")
+        train_datalist = get_items(data_list, format="auto")
 
     if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
         logger.warn(
@@ -252,7 +254,7 @@ def train(ctx, **args):
     # ! Do testing
     if cargs.do_test > 0:
         if test_file and os.path.isfile(test_file):
-            test_datalist = get_items_from_file(test_file, format="auto")
+            test_datalist = get_items(test_file, format="auto")
         elif len(test_datalist) > 0:
             test_file = cargs.experiment_path.joinpath("test_files.yml")
             with test_file.open("w") as f:
@@ -285,7 +287,7 @@ def train_cfg(**args):
     if len(args.get("additional_args")) != 0:  # parse additional args
         Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
-    configures = get_items_from_file(args["config"], format="json")
+    configures = get_items(args["config"], format="json")
 
     configures["smi"] = False
     gpu_id = click.prompt(f"Current GPU id", default=configures["gpus"])
@@ -326,7 +328,7 @@ def test_cfg(**args):
         ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
         ValueError: Test file not exist error.
     """
-    configures = get_items_from_file(args["config"], format="json")
+    configures = get_items(args["config"], format="json")
 
     logger_name = f"{configures['tensor_dim']}-Tester"
     logging_level = logging.DEBUG if configures["debug"] else logging.INFO
@@ -342,7 +344,7 @@ def test_cfg(**args):
 
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
-        test_files = get_items_from_file(args["test_files"], format="auto")
+        test_files = get_items(args["test_files"], format="auto")
     elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
@@ -351,7 +353,7 @@ def test_cfg(**args):
         test_fpaths = list(exp_dir.glob("valid_files*"))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
-            test_files = get_items_from_file(test_fpath, format="auto")
+            test_files = get_items(test_fpath, format="auto")
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 

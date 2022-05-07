@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 from typing import Optional, Union, Sequence, Dict
 import re
-import logging
 import copy
 from pathlib import Path
 
@@ -25,7 +24,7 @@ from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInf
 from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluatorEx, EnsembleEvaluator
 
 from monai_ex.transforms import (
-    Compose,
+    ComposeEx as Compose,
     ActivationsD,
     AsDiscreteD,
     MeanEnsembleD,
