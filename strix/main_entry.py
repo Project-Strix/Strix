@@ -86,13 +86,6 @@ def train_core(cargs, files_train, files_valid):
         handler=lambda x: print("\n", "-" * 15, os.path.basename(cargs.experiment_path), "-" * 15),
     )
 
-    if cargs.visualize:
-        logger.info("Visualize the architecture to tensorboard")
-        trainer.add_event_handler(
-            event_name=Events.ITERATION_COMPLETED(once=1),
-            handler=TensorboardGraphHandler(net, writer, lambda x: x["image"]),
-        )
-
     if cargs.snip:
         if cargs.snip_percent == 0.0 or cargs.snip_percent == 1.0:
             logger.warn("Invalid snip_percent. Skip SNIP!")

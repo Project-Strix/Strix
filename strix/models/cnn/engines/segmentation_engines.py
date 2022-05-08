@@ -154,6 +154,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
                 output_nc=opts.output_nc, decollate=decollate
             ),
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
         )
 
         SupervisedTrainerEx.__init__(

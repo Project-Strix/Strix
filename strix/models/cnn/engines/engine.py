@@ -16,6 +16,7 @@ from monai_ex.handlers import (
     TensorboardDumper,
     TensorBoardImageHandlerEx,
     TensorBoardStatsHandler,
+    TensorboardGraphHandler,
 )
 from monai_ex.utils import ensure_list
 from torch.utils.data import DataLoader
@@ -62,6 +63,7 @@ class StrixTrainEngine(ABC):
         tensorboard_image_kwargs: Optional[Union[Dict, Sequence[Dict]]] = None,
         tensorboard_image_names: Optional[Union[Dict, Sequence[Dict]]] = "",
         dump_tensorboard: bool = False,
+        graph_batch_transform: Optional[Callable] = None,
         record_nni: bool = False,
         nni_kwargs: Optional[Dict] = None,
     ):
@@ -125,6 +127,16 @@ class StrixTrainEngine(ABC):
                     log_dir=tb_summary_writer.log_dir,
                     epoch_level=True,
                     logger_name=logger_name,
+                ),
+            ]
+        
+        if graph_batch_transform:
+            handlers += [
+                TensorboardGraphHandler(
+                    net=net,
+                    writer=tb_summary_writer,
+                    batch_transform=graph_batch_transform,
+                    logger_name=logger_name
                 ),
             ]
 

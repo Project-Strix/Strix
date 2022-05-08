@@ -147,6 +147,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             ckeckpoint_n_saved=1,
             tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
             tensorboard_image_names=["Subtask1", "Subtask2"],
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
         )
 
         MultiTaskTrainer.__init__(
