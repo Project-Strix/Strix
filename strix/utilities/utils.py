@@ -25,10 +25,10 @@ import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
 from strix.utilities.enum import LR_SCHEDULES
 from monai.networks import one_hot
-from monai_ex.utils import ensure_list, GenericException as StrixException
+from monai_ex.utils import ensure_list, GenericException
 from utils_cw import catch_exception, get_items_from_file, Print
 
-trycatch = partial(catch_exception, handled_exception_type=StrixException)
+trycatch = partial(catch_exception, handled_exception_type=GenericException)
 
 @trycatch()
 def get_items(filelist, format="auto", sep="\n"):
@@ -37,14 +37,16 @@ def get_items(filelist, format="auto", sep="\n"):
     try:
         return get_items_from_file(filelist, format, sep)
     except json.JSONDecodeError as e:
-        raise StrixException("Content of your json file cannot be parsed. Please recheck it!")
+        raise GenericException("Content of your json file cannot be parsed. Please recheck it!")
     except yaml.YAMLError as e:
         if hasattr(e, 'problem_mark'):
             mark = e.problem_mark
-        raise StrixException(
+        raise GenericException(
             f"Content of your yaml file cannot be parsed. Please recheck it!\n"
             f"Error parsing at line {mark.line}, column {mark.column+1}."
         )
+    except TypeError as e:
+        raise GenericException("Your data path not exists! Please recheck!") from e
 
 
 # class ExceptionCatcher:
@@ -455,13 +457,22 @@ def get_bound_2d(mask, connectivity=1):
                 zeros.append(True)
         return (coord, np.any(zeros))
 
-    labels = np.unique(mask[mask > 0])
     boundaries = []
-    for label in labels:
-        coords = torch.nonzero(mask == label)
-        bounds = Parallel(n_jobs=5)(delayed(is_bound)(mask, c, offset) for c in coords)
-        boundary = list(filter(lambda x: x[1], bounds))
-        boundaries.append(list(map(lambda x: x[0], boundary)))
+    if mask.ndim == 3 and mask.shape[0] > 1:
+        for channel in mask[1:,...]:
+            coords = torch.nonzero(channel[None])
+            if len(coords) == 0:
+                continue
+            bounds = Parallel(n_jobs=5)(delayed(is_bound)(channel[None], c, offset) for c in coords)
+            boundary = list(filter(lambda x: x[1], bounds))
+            boundaries.append(list(map(lambda x: x[0], boundary)))
+    else:
+        labels = np.unique(mask[mask > 0])
+        for label in labels:
+            coords = torch.nonzero(mask == label)
+            bounds = Parallel(n_jobs=5)(delayed(is_bound)(mask, c, offset) for c in coords)
+            boundary = list(filter(lambda x: x[1], bounds))
+            boundaries.append(list(map(lambda x: x[0], boundary)))
     return boundaries
 
 
@@ -488,6 +499,7 @@ def __check_image_mask(image, masks):
     if masks.ndim == 3:
         if len(mask_value_range) > 1 and masks.shape[0] == 1:
             masks = one_hot(masks, len(mask_value_range), dim=0).type(torch.bool)
+    masks = masks.type(torch.bool)
     if masks.ndim != 3:
         raise ValueError("masks must be of shape (H, W) or (batch_size, H, W)")
     if masks.dtype != torch.bool:
@@ -558,6 +570,8 @@ def draw_segmentation_masks(
 
     img_to_draw = image.detach().clone()
     # TODO: There might be a way to vectorize this
+    if masks.ndim == 3 and masks.shape[0] > 1:
+        masks = masks[1:,...]  # skip 0-th channel for onehotted mask
     for mask, color in zip(masks, colors_):
         img_to_draw[:, mask] = color[:, None]
 

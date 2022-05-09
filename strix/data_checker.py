@@ -8,7 +8,7 @@ import nibabel as nib
 from tqdm import tqdm
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
-from utils_cw import get_items_from_file, Print, check_dir
+from utils_cw import check_dir
 
 import torch
 from torchvision.utils import save_image
@@ -22,9 +22,13 @@ from strix.utilities.utils import (
     draw_segmentation_contour,
     norm_tensor,
     get_colors,
+    setup_logger,
+    get_items,
+    trycatch
 )
 from strix.data_io import DATASET_MAPPING
 from strix.configures import config as cfg
+from monai.networks import one_hot
 from monai_ex.utils import first
 from monai_ex.data import DataLoader
 
@@ -117,7 +121,7 @@ def save_3d_image_grid(
 
         data_slice = torch.cat(
             [
-                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.size()[0], mask_num_classes))).unsqueeze(0)
+                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.shape[0], mask_num_classes))).unsqueeze(0)
                 for img, msk in zip(data_slice, mask_slice)
             ]
         ).float()
@@ -154,44 +158,42 @@ def check_data(ctx, **args):
     cargs.out_dir = check_dir(cargs.out_dir, "data checking")
     auxilary_params.update({"experiment_path": str(cargs.out_dir)})
 
-    data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
-    dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
-    files_list = get_items_from_file(dataset_list, format="auto")
+    logger_name = f"check-{cargs.data_list}"
+    logger = setup_logger(logger_name)
 
-    files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+    @trycatch()
+    def get_train_valid_datasets():
+        data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
+        dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
+        files_list = get_items(dataset_list, format="auto")
+        files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
 
-    try:
         train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)
         valid_ds = dataset_fn(files_valid, Phases.VALID, auxilary_params)
-    except Exception as e:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        Print(f"Creating dataset '{cargs.data_list}' failed! \nMsg: {repr(e)}", color="r")
-        Print("Exception trace:", color="r")
-        print("\n".join(traceback.format_tb(exc_tb)))
-        return
-    else:
-        Print(f"Creating dataset '{cargs.data_list}' successfully!", color="g")
+        return train_ds, valid_ds
+    
+    train_dataset, valid_dataset = get_train_valid_datasets()
+    logger.info(f"Creating dataset '{cargs.data_list}' successfully!")
 
-    train_num = min(cargs.n_batch, len(train_ds))
-    valid_num = min(cargs.n_batch, len(valid_ds))
-    train_dataloader = DataLoader(train_ds, num_workers=1, batch_size=train_num, shuffle=True)
-    valid_dataloader = DataLoader(valid_ds, num_workers=1, batch_size=valid_num, shuffle=False)
+    train_num = min(cargs.n_batch, len(train_dataset))
+    valid_num = min(cargs.n_batch, len(valid_dataset))
+    train_dataloader = DataLoader(train_dataset, num_workers=1, batch_size=train_num, shuffle=True)
+    valid_dataloader = DataLoader(valid_dataset, num_workers=1, batch_size=valid_num, shuffle=False)
     train_data = first(train_dataloader)
-    # valid_data = first(valid_dataloader)
 
     img_key = cfg.get_key("IMAGE")
     msk_key = cfg.get_key("MASK") if cargs.mask_key is None else cargs.mask_key
     data_shape = train_data[img_key][0].shape
     exist_mask = train_data.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
-    print("Channel:", channel, "Shape:", shape)
+    logger.info(f"Data Channel: {channel}, Shape: {shape}")
 
     if cargs.mask_overlap and cargs.contour_overlap:
         raise ValueError("mask_overlap/contour_overlap can only choose one!")
     overlap = cargs.mask_overlap or cargs.contour_overlap
 
     if overlap and not exist_mask:
-        Print(f"{msk_key} is not found in datalist.", color="y")
+        logger.warn(f"{msk_key} is not found in datalist.")
 
     if cargs.mask_overlap:
         overlap_m = draw_segmentation_masks
@@ -207,7 +209,13 @@ def check_data(ctx, **args):
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
-                msk = data[msk_key] if exist_mask and overlap else None
+                if exist_mask and overlap:
+                    mask_class_num = len(data[msk_key].unique())
+                    if mask_class_num > 2:
+                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                else:
+                    msk = None
+
                 output_fpath = save_2d_image_grid(
                     data[img_key],
                     int(np.ceil(np.sqrt(bs))),
@@ -244,7 +252,13 @@ def check_data(ctx, **args):
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
-                msk = data[msk_key] if exist_mask and overlap else None
+                if exist_mask and overlap:
+                    mask_class_num = len(data[msk_key].unique())
+                    if mask_class_num > 2:
+                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                else:
+                    msk = None
+
                 if cargs.save_raw:
                     if isinstance(data[img_key], torch.Tensor):
                         out_data = data[img_key].cpu().numpy()
@@ -284,7 +298,13 @@ def check_data(ctx, **args):
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
-                msk = data[msk_key] if exist_mask and overlap else None
+                if exist_mask and overlap:
+                    mask_class_num = len(data[msk_key].unique())
+                    if mask_class_num > 2:
+                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                else:
+                    msk = None
+
                 for slice_idx in range(shape[z_axis]):
                     output_fpath = save_3d_image_grid(
                         data[img_key],
