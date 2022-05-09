@@ -29,7 +29,7 @@ from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
 from strix.models.cnn.cnn_nets import *
 from strix.models.transformer.transformer_nets import *
-
+from monai_ex.utils import WorkflowException
 
 external_network_dir = Path(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"))
 if external_network_dir.is_dir():
@@ -245,7 +245,10 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         "multi_output_keys": multi_output_keys,
     }
 
-    engine = TRAIN_ENGINES[opts.framework](**params)
+    try:
+        engine = TRAIN_ENGINES[opts.framework](**params)
+    except Exception as e:
+        raise WorkflowException() from e
 
     return engine, net
 

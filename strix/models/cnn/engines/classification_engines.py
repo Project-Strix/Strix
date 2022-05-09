@@ -155,6 +155,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             tensorboard_image_kwargs=ClassificationTrainEngine.get_tensorboard_image_transform(
                 opts.output_nc, decollate
             ),
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
         )
 
         SupervisedTrainerEx.__init__(

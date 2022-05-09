@@ -16,10 +16,10 @@ from strix.data_io import DATASET_MAPPING
 from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
-from strix.utilities.utils import is_avaible_size
+from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES
 from strix.utilities.click import NumericChoice
-from utils_cw import Print, check_dir, get_items_from_file
+from utils_cw import Print, check_dir
 
 
 #######################################################################
@@ -104,8 +104,9 @@ def get_exp_name(ctx, param, value):
     partial_data = "-partial" if "partial" in ctx.params and ctx.params["partial"] < 1 else ""
 
     if "debug" in ctx.params and ctx.params["debug"]:
-        Print("You are in Debug mode with preload=0, out_dir=debug", color="y")
+        Print("You are in Debug mode with preload=0, out_dir=debug, n_worker=0", color="y")
         ctx.params["preload"] = 0.0  # emmm...
+        ctx.params["n_worker"] = 0
         return check_dir(ctx.params["out_dir"], "debug")
 
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
@@ -145,7 +146,7 @@ def get_exp_name(ctx, param, value):
 
 
 def get_nni_exp_name(ctx, param, value):
-    param_list = get_items_from_file(ctx.params["param_list"], format="json")
+    param_list = get_items(ctx.params["param_list"], format="json")
     param_list["out_dir"] = ctx.params["out_dir"]
     param_list["timestamp"] = strftime("%m%d_%H%M")
     context_ = sn(**{"params": param_list})
@@ -342,7 +343,7 @@ def input_cropsize(ctx, param, value):
     if value is False:
         return value
 
-    configures = get_items_from_file(ctx.params["config"], format="json")
+    configures = get_items(ctx.params["config"], format="json")
     if is_avaible_size(configures.get("crop_size", None)) or value is False:
         return value
 
@@ -384,8 +385,8 @@ def check_batchsize(ctx_params):
     )
     if train_list and valid_list:
         print(valid_list, train_list)
-        files_train = get_items_from_file(train_list, format="auto")
-        files_valid = get_items_from_file(valid_list, format="auto")
+        files_train = get_items(train_list, format="auto")
+        files_valid = get_items(valid_list, format="auto")
         len_train, len_valid = len(files_train), len(files_valid)
     elif data_name in ["RandomData", "SyntheticData"]:
         all_cases = 100
@@ -393,7 +394,7 @@ def check_batchsize(ctx_params):
         len_train = all_cases - len_valid
     else:
         datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
-        all_data_list = get_items_from_file(datalist_fname, format="auto")
+        all_data_list = get_items(datalist_fname, format="auto")
         len_valid = int(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
     

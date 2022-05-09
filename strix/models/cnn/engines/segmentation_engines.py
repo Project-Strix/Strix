@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 from typing import Optional, Union, Sequence, Dict
 import re
-import logging
 import copy
 from pathlib import Path
 
@@ -25,7 +24,7 @@ from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInf
 from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluatorEx, EnsembleEvaluator
 
 from monai_ex.transforms import (
-    Compose,
+    ComposeEx as Compose,
     ActivationsD,
     AsDiscreteD,
     MeanEnsembleD,
@@ -155,6 +154,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
                 output_nc=opts.output_nc, decollate=decollate
             ),
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
         )
 
         SupervisedTrainerEx.__init__(
