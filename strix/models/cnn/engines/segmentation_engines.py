@@ -26,17 +26,15 @@ from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluatorEx, Ensembl
 from monai_ex.transforms import (
     ComposeEx as Compose,
     ActivationsD,
-    AsDiscreteD,
+    AsDiscreteExD as AsDiscreteD,
     MeanEnsembleD,
     GetItemD,
 )
 from monai_ex.handlers import (
     ValidationHandler,
     LrScheduleTensorboardHandler,
-    CheckpointLoader,
     SegmentationSaver,
     MeanDice,
-    ROCAUC,
     stopping_fn_from_metric,
     from_engine_ex as from_engine,
     EarlyStopHandler,
@@ -214,7 +212,9 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                 select_item_transform
                 + [
                     DTA(ActivationsD(keys=_pred, softmax=True)),
-                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
+                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc))
+                    if decollate
+                    else AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True),
                     get_dice_metric_transform_fn(
                         output_nc,
                         pred_key=_pred,
@@ -247,7 +247,9 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                 [
                     DTA(GetItemD(keys=_pred, index=item_index)) if item_index is not None else lambda x: x,
                     DTA(ActivationsD(keys=_pred, softmax=True)),
-                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc)),
+                    DTA(AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc))
+                    if decollate 
+                    else AsDiscreteD(keys=_pred, argmax=True, to_onehot=output_nc, dim=1, keepdim=True),
                     from_engine(_pred)
                 ],
                 map_items=not decollate,
