@@ -1,7 +1,8 @@
-import imp
 from typing import Callable
 
 import re
+import math
+import json
 import inspect
 import subprocess
 from functools import partial
@@ -19,7 +20,7 @@ from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES
 from strix.utilities.click import NumericChoice
-from utils_cw import Print, check_dir
+from utils_cw import Print, check_dir, PathlibEncoder
 
 
 #######################################################################
@@ -395,7 +396,7 @@ def check_batchsize(ctx_params):
     else:
         datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
         all_data_list = get_items(datalist_fname, format="auto")
-        len_valid = int(len(all_data_list) * split)
+        len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
     
     ret = True
@@ -420,4 +421,11 @@ def check_loss(ctx_params):
 def check_lr_policy(ctx_params):
     if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
         Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
+    return True
+
+
+def dump_params(ctx_params, output_fname=None):
+    if output_fname:
+        with open(output_fname, 'w') as f:
+            json.dump(ctx_params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return True
