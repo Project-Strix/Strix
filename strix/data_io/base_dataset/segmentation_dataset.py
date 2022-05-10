@@ -7,7 +7,6 @@ from monai_ex.utils import ensure_list
 from strix.data_io.base_dataset.utils import get_input_data
 
 
-# TODO: Need to be refactored like BasicClassificationDataset
 class BasicSegmentationDataset(object):
     def __new__(
         self,

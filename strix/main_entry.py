@@ -154,7 +154,8 @@ def train(ctx, **args):
             json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
-        logger.warn("CUDA_VISIBLE_DEVICES specified, ignoring --gpu flag")
+        logger.warn(f"CUDA_VISIBLE_DEVICES specified to {os.environ['CUDA_VISIBLE_DEVICES']}, ignoring --gpus flag")
+        cargs.gpus = os.environ["CUDA_VISIBLE_DEVICES"]
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
 

@@ -28,7 +28,7 @@ from monai.networks import one_hot
 from monai_ex.utils import ensure_list, GenericException
 from utils_cw import catch_exception, get_items_from_file, Print
 
-trycatch = partial(catch_exception, handled_exception_type=GenericException)
+trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords='strix')
 
 @trycatch()
 def get_items(filelist, format="auto", sep="\n"):
