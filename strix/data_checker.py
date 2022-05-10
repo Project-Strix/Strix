@@ -1,6 +1,4 @@
 import os
-import sys
-import traceback
 import yaml
 import click
 import numpy as np
@@ -33,7 +31,14 @@ from monai_ex.utils import first
 from monai_ex.data import DataLoader
 
 
-def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index):
+def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index, logger_name=None):
+    if isinstance(data, torch.Tensor):
+        data = data.cpu().numpy()
+
+    if logger_name:
+        logger = setup_logger(logger_name)
+        logger.info(f"Saving {phase} image to {out_dir}...")
+
     for i, patch in enumerate(data):
         out_fname = check_dir(
             out_dir,
@@ -161,7 +166,7 @@ def check_data(ctx, **args):
     logger_name = f"check-{cargs.data_list}"
     logger = setup_logger(logger_name)
 
-    @trycatch()
+    @trycatch(show_details=False)
     def get_train_valid_datasets():
         data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
         dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
@@ -227,19 +232,15 @@ def check_data(ctx, **args):
                     mask=msk,
                 )
 
-                if cargs.save_raw:
-                    if isinstance(data[img_key], torch.Tensor):
-                        out_data = data[img_key].cpu().numpy()
-                    else:
-                        out_data = data[img_key]
-
+                if cargs.save_raw:                  
                     save_raw_image(
-                        out_data,
+                        data[img_key],
                         data[f"{img_key}_meta_dict"],
                         cargs.out_dir,
                         phase,
                         cargs.data_list,
                         i,
+                        logger_name
                     )
 
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
@@ -260,18 +261,14 @@ def check_data(ctx, **args):
                     msk = None
 
                 if cargs.save_raw:
-                    if isinstance(data[img_key], torch.Tensor):
-                        out_data = data[img_key].cpu().numpy()
-                    else:
-                        out_data = data[img_key]
-
                     save_raw_image(
-                        out_data,
+                        data[img_key],
                         data[f"{img_key}_meta_dict"],
                         cargs.out_dir,
                         phase,
                         cargs.data_list,
                         i,
+                        logger_name
                     )
 
                 for ch_idx in range(channel):
@@ -318,6 +315,17 @@ def check_data(ctx, **args):
                         multichannel=False,
                         overlap_method=overlap_m,
                         mask=msk,
+                    )
+                
+                if cargs.save_raw:
+                    save_raw_image(
+                        data[img_key],
+                        data[f"{img_key}_meta_dict"],
+                        cargs.out_dir,
+                        phase,
+                        cargs.data_list,
+                        i,
+                        logger_name
                     )
 
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
