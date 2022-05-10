@@ -6,6 +6,7 @@ from configparser import ConfigParser
 DEFAULT_STRIX_CONFIG = {
     "MODE": "dev",  # release
     "CONFIG_FNAME": "strix_configures.cfg",
+    "CACHE_DIR": str(Path.home() / "Strix"),
     "OUTPUT_DIR": str(Path.home() / "Strix" / "strix_exp"),
     "EXTERNAL_DATASET_DIR": str(Path.home() / "Strix" / "strix_datasets"),
     "EXTERNAL_NETWORK_DIR": str(Path.home() / "Strix" / "strix_networks"),
