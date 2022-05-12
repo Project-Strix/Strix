@@ -80,7 +80,10 @@ class OptionEx(Option):
         # The value wasn't set, or used the param's default, prompt if
         # prompting is enabled.
         elif (
-            (source in {None, ParameterSource.DEFAULT} or prompt_in_default_map)
+            (
+                source in {None, ParameterSource.DEFAULT} or \
+                (prompt_in_default_map and source == ParameterSource.DEFAULT_MAP)
+            )
             and self.prompt is not None
             and (self.required or self.prompt_required)
             and not ctx.resilient_parsing
