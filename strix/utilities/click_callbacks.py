@@ -1,3 +1,4 @@
+from email.policy import default
 from typing import Callable
 
 import re
@@ -25,6 +26,19 @@ from utils_cw import Print, check_dir, PathlibEncoder
 
 #######################################################################
 
+def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
+    keyword = sub_option_keyword if sub_option_keyword else param.name
+    force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+    if sub_option_keyword:  #like subtask option
+        default_value =  ctx.params.get(keyword)
+        return (force_prompt and not default_value) or (not force_prompt and not default_value)  # avoid second-time enter
+    elif ctx.default_map is None:
+        default_value = ctx.params.get(keyword)
+    else:
+        default_value = ctx.default_map.get(keyword, ctx.params.get(keyword))
+
+    prompt_flag = force_prompt or (not force_prompt and not default_value)
+    return prompt_flag
 
 def select_gpu(ctx, parma, value):
     if value is not None:
@@ -230,11 +244,27 @@ def multi_ouputnc(ctx, param, value):
 
 
 def framework_select(ctx, param, value):
-    if value == Frameworks.MULTITASK.value and not ctx.params.get('subtask1'):
+    # force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+    # prompt_subtask = (force_prompt and not ctx.params.get('subtask1')) or (not force_prompt and not ctx.params.get('subtask1'))
+    prompt_subtask = _get_prompt_flag(ctx, param, value, "subtask1")
+
+    if value == Frameworks.MULTITASK.value and prompt_subtask:
         if "multitask" in FRAMEWORKS:
             FRAMEWORKS.remove("multitask")
-        subtask1 = prompt(f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=2)
-        subtask2 = prompt(f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=1)
+        
+        if ctx.default_map:
+            default_subtask1 = ctx.default_map.get("subtask1", ctx.params.get('subtask1', 2))
+            default_subtask2 = ctx.default_map.get("subtask2", ctx.params.get('subtask2', 1))
+        else:
+            default_subtask1 = ctx.params.get('subtask1', 2)
+            default_subtask2 = ctx.params.get('subtask2', 1)
+
+        subtask1 = prompt(
+            f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask1
+        )
+        subtask2 = prompt(
+            f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask2
+        )
         ctx.params['subtask1'] = subtask1
         ctx.params['subtask2'] = subtask2
     return value
@@ -334,10 +364,15 @@ def data_select(ctx, param, value):
         )
         ctx.exit()
 
+    if _get_prompt_flag(ctx, param, value):
+        return prompt("Data list", type=NumericChoice(datalist))  #default="1"
+    else:
+        return value
+
     if value is not None and value in datalist:
         return value
     else:
-        return prompt("Data list", type=NumericChoice(datalist))
+        return prompt("Data list", type=NumericChoice(datalist), default="1", show_default=False)
 
 
 def input_cropsize(ctx, param, value):
@@ -367,6 +402,12 @@ def input_cropsize(ctx, param, value):
     ctx.params["crop_size"] = crop_size
     return value
 
+
+def dump_params(ctx, param, value, output_path=None):
+    if output_path:
+        with open(output_path, 'w') as f:
+            json.dump(ctx.params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+    return value
 
 #######################################################################
 ##                    checklist callbacks
@@ -421,11 +462,4 @@ def check_loss(ctx_params):
 def check_lr_policy(ctx_params):
     if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
         Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
-    return True
-
-
-def dump_params(ctx_params, output_fname=None):
-    if output_fname:
-        with open(output_fname, 'w') as f:
-            json.dump(ctx_params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return True

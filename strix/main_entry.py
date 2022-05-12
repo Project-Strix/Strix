@@ -44,7 +44,7 @@ from utils_cw import (
 
 import click
 from ignite.engine import Events
-from monai_ex.handlers import TensorboardGraphHandler, SNIP_prune_handler
+from monai_ex.handlers import SNIP_prune_handler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 option = partial(click.option, cls=OptionEx)
@@ -136,6 +136,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_c
 @option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
 @option("--experiment-path", type=str, callback=get_exp_name, default="")
+@option("--dump-params", hidden=True, is_flag=True, default=False, callback=partial(dump_params, output_path=train_cmd_history))
 @option(
     "--confirm",
     callback=partial(
@@ -143,9 +144,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_c
         output_dir_ctx="experiment_path",
         save_code_dir=cfg.get_strix_cfg("external_network_dir")
         if cfg.get_strix_cfg("mode") == "dev" else None,
-        checklist=[
-            check_batchsize, check_loss, check_lr_policy, partial(dump_params, output_fname=train_cmd_history)
-        ]
+        checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )
 @click.pass_context

@@ -4,6 +4,7 @@ import click
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
+from functools import partial
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
 from utils_cw import check_dir
@@ -12,8 +13,9 @@ import torch
 from torchvision.utils import save_image
 
 from strix.utilities.arguments import data_select
+from strix.utilities.click import OptionEx, CommandEx
 from strix.utilities.click import NumericChoice as Choice
-from strix.utilities.click_callbacks import get_unknown_options
+from strix.utilities.click_callbacks import get_unknown_options, dump_params
 from strix.utilities.enum import FRAMEWORKS, Phases
 from strix.utilities.utils import (
     draw_segmentation_masks,
@@ -142,20 +144,31 @@ def save_3d_image_grid(
     return output_path
 
 
-@click.command("check-data", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@click.option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
-@click.option(
+option = partial(click.option, cls=OptionEx)
+command = partial(click.command, cls=CommandEx)
+check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_cmd_history')
+
+
+@command(
+    "check-data", 
+    context_settings={
+        "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
+        "default_map": get_items(check_cmd_history, format='json', allow_filenotfound=True)
+    })
+@option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
+@option(
     "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
-@click.option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
-@click.option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
-@click.option("--split", type=float, default=0.2, help="Training/testing split ratio")
-@click.option("--save-raw", is_flag=True, help="Save processed raw image to local")
-@click.option("--mask-overlap", is_flag=True, help="Overlapping mask if exists")
-@click.option("--contour-overlap", is_flag=True, help="Overlapping mask's contour")
-@click.option("--mask-key", type=str, default="mask", help="Specify mask key, default is 'mask'")
-@click.option("--seed", type=int, default=101, help="random seed")
-@click.option("--out-dir", type=str, prompt=True, default=cfg.get_strix_cfg("OUTPUT_DIR"))
+@option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
+@option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
+@option("--split", type=float, default=0.2, help="Training/testing split ratio")
+@option("--save-raw", is_flag=True, help="Save processed raw image to local")
+@option("--mask-overlap", is_flag=True, help="Overlapping mask if exists")
+@option("--contour-overlap", is_flag=True, help="Overlapping mask's contour")
+@option("--mask-key", type=str, default="mask", help="Specify mask key, default is 'mask'")
+@option("--seed", type=int, default=101, help="random seed")
+@option("--out-dir", type=str, prompt=True, default=cfg.get_strix_cfg("OUTPUT_DIR"))
+@option("--dump-params", hidden=True, is_flag=True, default=False, callback=partial(dump_params, output_path=check_cmd_history))
 @click.pass_context
 def check_data(ctx, **args):
     cargs = sn(**args)
