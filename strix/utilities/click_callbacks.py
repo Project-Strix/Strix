@@ -276,11 +276,13 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         losslist = list(LOSS_MAPPING[framework].keys())
 
         assert len(losslist) > 0, f"No loss available for {framework}! Abort!"
-        if value is not None and value in losslist:
+
+        if not _get_prompt_flag(ctx, param, value):
+        # if value is not None and value in losslist:
             return value
 
         prompts = f"Loss_fn for {colored(meta_key_postfix[1:], 'yellow')}" if meta_key_postfix else "Loss_fn"
-        value = prompt(prompts, type=NumericChoice(losslist))
+        value = prompt(prompts, type=NumericChoice(losslist), default=1)
 
         meta_key = f"loss_params{meta_key_postfix}"
 
@@ -321,12 +323,15 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         return value
 
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
-        if not isinstance(value, list):
+        force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+        if not isinstance(value, list) or force_prompt:
+            value1 = value[0] if isinstance(value, list) else value
             loss1 = _single_loss_select(
-                ctx, ctx.params["subtask1"], value, prompt_all_args, '_task1'
+                ctx, ctx.params["subtask1"], value1, prompt_all_args, '_task1'
             )
+            value2 = value[1] if isinstance(value, list) else value
             loss2 = _single_loss_select(
-                ctx, ctx.params["subtask2"], value, prompt_all_args, '_task2'
+                ctx, ctx.params["subtask2"], value2, prompt_all_args, '_task2'
             )
             return [loss1, loss2]
         else:

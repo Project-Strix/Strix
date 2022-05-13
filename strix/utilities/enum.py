@@ -86,7 +86,7 @@ LR_SCHEDULES = get_enums(LrSchedule)
 class Frameworks(Enum):
     SEGMENTATION = "segmentation"
     CLASSIFICATION = "classification"
-    SIAMESE = "siamese"
+    # SIAMESE = "siamese"
     SELFLEARNING = "selflearning"
     DETECTION = "detection"
     MULTITASK = "multitask"
