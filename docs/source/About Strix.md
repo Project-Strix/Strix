@@ -51,20 +51,6 @@
   </p>
 </p>
 
-<!-- ## Table of Contents
-
-* [About the Project](#about-the-project)
-  * [Built With](#built-with)
-* [Getting Started](#getting-started)
-  * [Prerequisites](#prerequisites)
-  * [Installation](#installation)
-* [Usage](#usage)
-* [Roadmap](#roadmap)
-* [Contributing](#contributing)
-* [License](#license)
-* [Contact](#contact)
-* [Acknowledgements](#acknowledgements) -->
-
 <br />
 
 <!-- ABOUT THE PROJECT -->
@@ -127,8 +113,6 @@ More details please refer to [install](./install.md).
 <!-- USAGE EXAMPLES -->
 # Usage
 
-_For more examples, please refer to the [Documentation](https://example.com)_
-
 ### Strix has 7 different commands: 
 
 - `strix-train`: Main train entry. Use this command for general DL training process.
@@ -140,7 +124,7 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 - `strix-gradcam-from-cfg`: Gradcam visualization.
 
 **Here is a usage example!**\
-<img src="images/usage-example.png" alt="Usage-example" width="650">
+![alt usage example](_static/usage-example.png)
 
 ### How to use my own dataset & network?
 

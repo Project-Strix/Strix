@@ -80,8 +80,8 @@ html_static_path = ['_static']
 #     "**": ["localtoc.html", "relations.html", "searchbox.html", "ethicalads.html"],
 # }
 # singlehtml_sidebars = {"index": ["project.html", "localtoc.html", "ethicalads.html"]}
-# html_static_path = ["_static"]
-# html_favicon = "_static/icon.png"
-# html_logo = "_static/logo.png"
+html_static_path = ["_static"]
+html_favicon = "_static/icon.png"
+html_logo = "_static/logo.png"
 # html_title = f"Click Documentation (0.1.0)"
 # html_show_sourcelink = False
