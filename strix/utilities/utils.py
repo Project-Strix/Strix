@@ -31,7 +31,7 @@ from utils_cw import catch_exception, get_items_from_file, Print
 trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords='strix')
 
 @trycatch()
-def get_items(filelist, format="auto", sep="\n"):
+def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = False):
     """Wrapper of utils_cw's `get_items_from_file` function with `trycatch` decorator.
     """
     try:
@@ -47,7 +47,11 @@ def get_items(filelist, format="auto", sep="\n"):
         )
     except TypeError as e:
         raise GenericException("Your data path not exists! Please recheck!") from e
-
+    except FileNotFoundError as e:
+        if allow_filenotfound:
+            return None
+        else:
+            raise GenericException(f"File not found! {filelist}")
 
 # class ExceptionCatcher:
 #     def __init__(self, handled_exception) -> None:
@@ -361,6 +365,7 @@ def plot_summary(summary, output_fpath):
             )
 
         # plt.ylim([0., 1.])
+        plt.figure()
         ax = plt.axes()
         ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
         ax.yaxis.set_major_formatter(ScalarFormatter())

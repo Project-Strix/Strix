@@ -17,6 +17,7 @@ from strix.data_io import DATASET_MAPPING
 from strix.data_io.dataio import get_dataloader
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
+from strix.utilities.click import OptionEx, CommandEx
 import strix.utilities.arguments as arguments
 from strix.utilities.utils import setup_logger, get_items
 from strix.utilities.click_callbacks import (
@@ -26,7 +27,8 @@ from strix.utilities.click_callbacks import (
     select_gpu,
     check_batchsize,
     check_loss,
-    check_lr_policy
+    check_lr_policy,
+    dump_params
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -42,9 +44,11 @@ from utils_cw import (
 
 import click
 from ignite.engine import Events
-from monai_ex.handlers import TensorboardGraphHandler, SNIP_prune_handler
+from monai_ex.handlers import SNIP_prune_handler
 from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
+option = partial(click.option, cls=OptionEx)
+command = partial(click.command, cls=CommandEx)
 
 def train_core(cargs, files_train, files_valid):
     """Main train function.
@@ -116,22 +120,30 @@ def train_core(cargs, files_train, files_valid):
     except RuntimeError as e:
         print("Run time error occured!", e)
 
+train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_cmd_history')
 
-@click.command("train", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@command(
+    "train",
+    context_settings={
+        "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
+        "default_map": get_items(train_cmd_history, format='json', allow_filenotfound=True)
+    }
+)
 @arguments.hidden_auxilary_params
 @arguments.common_params
 @arguments.solver_params
 @arguments.network_params
-@click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
-@click.option("--experiment-path", type=str, callback=get_exp_name, default="")
-@click.option(
+@option("--smi", default=True, callback=print_smi, help="Print GPU usage")
+@option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
+@option("--experiment-path", type=str, callback=get_exp_name, default="")
+@option("--dump-params", hidden=True, is_flag=True, default=False, callback=partial(dump_params, output_path=train_cmd_history))
+@option(
     "--confirm",
     callback=partial(
         confirmation,
         output_dir_ctx="experiment_path",
-        save_code=(cfg.get_strix_cfg("mode") == "dev"),
-        save_dir=cfg.get_strix_cfg("external_network_dir"),
+        save_code_dir=cfg.get_strix_cfg("external_network_dir")
+        if cfg.get_strix_cfg("mode") == "dev" else None,
         checklist=[check_batchsize, check_loss, check_lr_policy]
     ),
 )
@@ -274,7 +286,7 @@ def train(ctx, **args):
 
 
 @click.command("train-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@click.option("--config", type=click.Path(exists=True))
+@option("--config", type=click.Path(exists=True))
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     """Entry of train-from-cfg command"""
@@ -288,33 +300,36 @@ def train_cfg(**args):
     configures["gpus"] = gpu_id
     configures["config"] = args["config"]
 
-    train(default_map=configures)
+    train(
+        default_map=configures,
+        # context_settings={"allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True}
+    )
 
 
 @click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@click.option("--config", type=click.Path(exists=True), default="YourConfigFle")
-@click.option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
-@click.option("--out-dir", type=str, default=None, help="Optional output dir to save results")
-@click.option(  # TODO: automatically decide when using patchdataset
+@option("--config", type=click.Path(exists=True), default="YourConfigFle")
+@option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
+@option("--out-dir", type=str, default=None, help="Optional output dir to save results")
+@option(  # TODO: automatically decide when using patchdataset
     "--slidingwindow",
     is_flag=True,
     callback=input_cropsize,
     help="Use slidingwindow sampling",
 )
-@click.option("--with-label", is_flag=True, help="whether test data has label")
-@click.option("--save-image", is_flag=True, help="Save the tested image data")
-@click.option("--save-label", is_flag=True, help="Save the tested label data (image type)")
-@click.option("--save-latent", is_flag=True, help="Save the latent code")
-@click.option("--save-prob", is_flag=True, help="Save predicted probablity")
-@click.option(
+@option("--with-label", is_flag=True, help="whether test data has label")
+@option("--save-image", is_flag=True, help="Save the tested image data")
+@option("--save-label", is_flag=True, help="Save the tested label data (image type)")
+@option("--save-latent", is_flag=True, help="Save the latent code")
+@option("--save-prob", is_flag=True, help="Save predicted probablity")
+@option(
     "--target-layer",
     type=str,
     callback=partial(prompt_when, keyword="save_latent"),
     help="Target layer of saving latent code",
 )
-@click.option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
-@click.option("--smi", default=True, callback=print_smi, help="Print GPU usage")
-@click.option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
+@option("--use-best-model", is_flag=True, help="Automatically select best model for testing")
+@option("--smi", default=True, callback=print_smi, help="Print GPU usage")
+@option("--gpus", prompt="Choose GPUs[eg: 0]", type=str, help="The ID of active GPU")
 def test_cfg(**args):
     """Entry of test-from-cfg command.
 

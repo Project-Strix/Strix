@@ -1,7 +1,9 @@
-import imp
+from email.policy import default
 from typing import Callable
 
 import re
+import math
+import json
 import inspect
 import subprocess
 from functools import partial
@@ -19,11 +21,24 @@ from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES
 from strix.utilities.click import NumericChoice
-from utils_cw import Print, check_dir
+from utils_cw import Print, check_dir, PathlibEncoder
 
 
 #######################################################################
 
+def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
+    keyword = sub_option_keyword if sub_option_keyword else param.name
+    force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+    if sub_option_keyword:  #like subtask option
+        default_value =  ctx.params.get(keyword)
+        return (force_prompt and not default_value) or (not force_prompt and not default_value)  # avoid second-time enter
+    elif ctx.default_map is None:
+        default_value = ctx.params.get(keyword)
+    else:
+        default_value = ctx.default_map.get(keyword, ctx.params.get(keyword))
+
+    prompt_flag = force_prompt or (not force_prompt and not default_value)
+    return prompt_flag
 
 def select_gpu(ctx, parma, value):
     if value is not None:
@@ -229,11 +244,27 @@ def multi_ouputnc(ctx, param, value):
 
 
 def framework_select(ctx, param, value):
-    if value == Frameworks.MULTITASK.value and not ctx.params.get('subtask1'):
+    # force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+    # prompt_subtask = (force_prompt and not ctx.params.get('subtask1')) or (not force_prompt and not ctx.params.get('subtask1'))
+    prompt_subtask = _get_prompt_flag(ctx, param, value, "subtask1")
+
+    if value == Frameworks.MULTITASK.value and prompt_subtask:
         if "multitask" in FRAMEWORKS:
             FRAMEWORKS.remove("multitask")
-        subtask1 = prompt(f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=2)
-        subtask2 = prompt(f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=1)
+        
+        if ctx.default_map:
+            default_subtask1 = ctx.default_map.get("subtask1", ctx.params.get('subtask1', 2))
+            default_subtask2 = ctx.default_map.get("subtask2", ctx.params.get('subtask2', 1))
+        else:
+            default_subtask1 = ctx.params.get('subtask1', 2)
+            default_subtask2 = ctx.params.get('subtask2', 1)
+
+        subtask1 = prompt(
+            f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask1
+        )
+        subtask2 = prompt(
+            f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask2
+        )
         ctx.params['subtask1'] = subtask1
         ctx.params['subtask2'] = subtask2
     return value
@@ -245,11 +276,13 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         losslist = list(LOSS_MAPPING[framework].keys())
 
         assert len(losslist) > 0, f"No loss available for {framework}! Abort!"
-        if value is not None and value in losslist:
+
+        if not _get_prompt_flag(ctx, param, value):
+        # if value is not None and value in losslist:
             return value
 
         prompts = f"Loss_fn for {colored(meta_key_postfix[1:], 'yellow')}" if meta_key_postfix else "Loss_fn"
-        value = prompt(prompts, type=NumericChoice(losslist))
+        value = prompt(prompts, type=NumericChoice(losslist), default=1)
 
         meta_key = f"loss_params{meta_key_postfix}"
 
@@ -290,12 +323,15 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         return value
 
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
-        if not isinstance(value, list):
+        force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
+        if not isinstance(value, list) or force_prompt:
+            value1 = value[0] if isinstance(value, list) else value
             loss1 = _single_loss_select(
-                ctx, ctx.params["subtask1"], value, prompt_all_args, '_task1'
+                ctx, ctx.params["subtask1"], value1, prompt_all_args, '_task1'
             )
+            value2 = value[1] if isinstance(value, list) else value
             loss2 = _single_loss_select(
-                ctx, ctx.params["subtask2"], value, prompt_all_args, '_task2'
+                ctx, ctx.params["subtask2"], value2, prompt_all_args, '_task2'
             )
             return [loss1, loss2]
         else:
@@ -333,10 +369,15 @@ def data_select(ctx, param, value):
         )
         ctx.exit()
 
+    if _get_prompt_flag(ctx, param, value):
+        return prompt("Data list", type=NumericChoice(datalist))  #default="1"
+    else:
+        return value
+
     if value is not None and value in datalist:
         return value
     else:
-        return prompt("Data list", type=NumericChoice(datalist))
+        return prompt("Data list", type=NumericChoice(datalist), default="1", show_default=False)
 
 
 def input_cropsize(ctx, param, value):
@@ -367,6 +408,12 @@ def input_cropsize(ctx, param, value):
     return value
 
 
+def dump_params(ctx, param, value, output_path=None):
+    if output_path:
+        with open(output_path, 'w') as f:
+            json.dump(ctx.params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+    return value
+
 #######################################################################
 ##                    checklist callbacks
 #######################################################################
@@ -395,7 +442,7 @@ def check_batchsize(ctx_params):
     else:
         datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
         all_data_list = get_items(datalist_fname, format="auto")
-        len_valid = int(len(all_data_list) * split)
+        len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
     
     ret = True

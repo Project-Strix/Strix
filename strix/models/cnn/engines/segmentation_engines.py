@@ -274,8 +274,7 @@ class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
         **kwargs,
     ):
         crop_size = get_attr_(opts, "crop_size", None)
-        n_batch = opts.n_batch
-        use_slidingwindow = opts.slidingwindow
+        use_slidingwindow = get_attr_(opts, "slidingwindow", None)
         multi_input_keys = kwargs.get("multi_input_keys", None)
         multi_output_keys = kwargs.get("multi_output_keys", None)
         _image = cfg.get_key("image")
@@ -318,7 +317,7 @@ class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         if use_slidingwindow:
-            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=n_batch, overlap=0.5)
+            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=opts.n_batch, overlap=0.5)
         else:
             inferer = SimpleInferer()
 

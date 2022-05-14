@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 from click import option, prompt, UNPROCESSED
 from strix.configures import config as cfg
+from strix.utilities.click import OptionEx
 from strix.utilities.click_callbacks import NumericChoice as Choice, framework_select
 from strix.utilities.click_callbacks import (
     data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc
@@ -13,8 +14,9 @@ from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, O
 from utils_cw import prompt_when
 
 import click
-from click import option, prompt
+from click import prompt
 
+option = partial(click.option, cls=OptionEx)
 
 def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
     model_rootdir = Path(exp_folder)

@@ -8,7 +8,7 @@ from strix.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, StrixTestEngin
 from strix.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
 from strix.utilities.utils import setup_logger, output_filename_check, get_attr_
 from strix.utilities.enum import Phases
-from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluator
+from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluatorEx
 from monai_ex.transforms import MeanEnsembleD, MultitaskMeanEnsembleD
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -254,7 +254,7 @@ class MultiTaskTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
 
 
 @ENSEMBLE_TEST_ENGINES.register("multitask")
-class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
+class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluatorEx):
     def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
         if opts.slidingwindow:
             raise ValueError("Not implemented yet")
@@ -341,7 +341,7 @@ class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
         if subtask2_extra_handlers:
             handlers += subtask2_extra_handlers
         
-        EnsembleEvaluator.__init__(
+        EnsembleEvaluatorEx.__init__(
             self,
             device=device,
             val_data_loader=test_loader,
@@ -355,4 +355,5 @@ class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
             val_handlers=handlers,
             amp=opts.amp,
             decollate=decollate,
+            custom_keys=cfg.get_keys_dict()
         )
