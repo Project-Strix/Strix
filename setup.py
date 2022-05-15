@@ -1,6 +1,5 @@
-# import os
-# import torch
 from setuptools import setup, find_namespace_packages
+import versioneer
 
 # from pathlib import Path
 # from torch.utils.cpp_extension import CUDA_HOME
@@ -47,11 +46,17 @@ from setuptools import setup, find_namespace_packages
 
 #     return ext_modules
 
+def get_cmds():
+    cmds = versioneer.get_cmdclass()
+
+    return cmds
+
+    # cmds.update({"build_ext": BuildExtension.with_options(no_python_abi_suffix=True)})
 
 setup(
     name="strix",
     packages=find_namespace_packages(include=["strix", "strix.*"]),
-    version="0.0.7",
+    version=versioneer.get_version(),
     description="Medical Deep Learning Platform",
     author="Chenglong Wang",
     author_email="clwang@phy.ecnu.edu.cn",
@@ -83,7 +88,7 @@ setup(
         ],
     },
     # ext_modules=get_extensions(),
-    # cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
+    cmdclass=get_cmds(),
     keywords=[
         "deep learning",
         "medical image classification",
