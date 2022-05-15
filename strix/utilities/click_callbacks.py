@@ -13,7 +13,6 @@ from types import SimpleNamespace as sn
 from termcolor import colored
 
 from click import Choice, prompt
-from click.types import convert_type
 from strix.data_io import DATASET_MAPPING
 from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
@@ -30,8 +29,8 @@ def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
     keyword = sub_option_keyword if sub_option_keyword else param.name
     force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
     if sub_option_keyword:  #like subtask option
-        default_value =  ctx.params.get(keyword)
-        return (force_prompt and not default_value) or (not force_prompt and not default_value)  # avoid second-time enter
+        prev_value =  ctx.meta.get(keyword)  # avoid callback fn fires twice github.com/pallets/click/issues/2259
+        return (force_prompt and not prev_value) or (not force_prompt and not prev_value)
     elif ctx.default_map is None:
         default_value = ctx.params.get(keyword)
     else:
@@ -40,8 +39,8 @@ def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
     prompt_flag = force_prompt or (not force_prompt and not default_value)
     return prompt_flag
 
-def select_gpu(ctx, parma, value):
-    if value is not None:
+def select_gpu(ctx, param, value):
+    if not _get_prompt_flag(ctx, param, value):
         return value
 
     # check mig status
@@ -82,7 +81,7 @@ def select_gpu(ctx, parma, value):
             gpu_tables = {str(i): str(i) for i, s in enumerate(statuses)}
             choice_type: Callable = Choice
 
-        selected_idx = prompt("Choose GPU from", type=choice_type(gpu_tables.keys()))
+        selected_idx = prompt("Choose GPU from", type=choice_type(gpu_tables.keys()), default=None)
         return gpu_tables[selected_idx]
 
 
@@ -200,27 +199,26 @@ def _prompt(prompt_str, data_type, default_value, value_proc=None, color=None):
 
 
 def lr_schedule_params(ctx, param, value):
-    if ctx.params.get("lr_policy_params", None) is not None:  # loaded config from specified file
+    if not _get_prompt_flag(ctx, param, value, "lr_policy_params"):  # loaded config from specified file
         return value
 
     if value == "step":
         iters = _prompt("step iter", int, 50)
         gamma = _prompt("step gamma", float, 0.1)
-        ctx.params["lr_policy_params"] = {"step_size": iters, "gamma": gamma}
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"step_size": iters, "gamma": gamma}
     elif value == "multistep":
         steps = _prompt("steps", tuple, (100, 300), value_proc=lambda x: list(map(int, x.split(","))))
         gamma = _prompt("step gamma", float, 0.1)
-        ctx.params["lr_policy_params"] = {"milestones": steps, "gamma": gamma}
-        # print("lr_policy_params", ctx.params["lr_policy_params"])
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"milestones": steps, "gamma": gamma}
     elif value == "SGDR":
         t0 = _prompt("SGDR T-0", int, 50)
         eta = _prompt("SGDR Min LR", float, 1e-4)
         tmul = _prompt("SGDR T-mult", int, 1)
         # dcay = _prompt('SGDR decay', float, 1)
-        ctx.params["lr_policy_params"] = {"T_0": t0, "eta_min": eta, "T_mult": tmul}
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"T_0": t0, "eta_min": eta, "T_mult": tmul}
     elif value == "plateau":
         patience = _prompt("patience", int, 50)
-        ctx.params["lr_policy_params"] = {"patience": patience}
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"patience": patience}
     elif value == "CLR":
         raise NotImplementedError
 
@@ -244,8 +242,6 @@ def multi_ouputnc(ctx, param, value):
 
 
 def framework_select(ctx, param, value):
-    # force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
-    # prompt_subtask = (force_prompt and not ctx.params.get('subtask1')) or (not force_prompt and not ctx.params.get('subtask1'))
     prompt_subtask = _get_prompt_flag(ctx, param, value, "subtask1")
 
     if value == Frameworks.MULTITASK.value and prompt_subtask:
@@ -265,8 +261,9 @@ def framework_select(ctx, param, value):
         subtask2 = prompt(
             f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask2
         )
-        ctx.params['subtask1'] = subtask1
-        ctx.params['subtask2'] = subtask2
+        ctx.params['subtask1'] = ctx.meta['subtask1'] = subtask1
+        ctx.params['subtask2'] = ctx.meta['subtask2'] = subtask2
+
     return value
 
 
@@ -374,11 +371,6 @@ def data_select(ctx, param, value):
     else:
         return value
 
-    if value is not None and value in datalist:
-        return value
-    else:
-        return prompt("Data list", type=NumericChoice(datalist), default="1", show_default=False)
-
 
 def input_cropsize(ctx, param, value):
     if value is False:
@@ -408,10 +400,13 @@ def input_cropsize(ctx, param, value):
     return value
 
 
-def dump_params(ctx, param, value, output_path=None):
+def dump_params(ctx, param, value, output_path=None, skip_flag=True):
     if output_path:
+        dump_dict = ctx.params.copy()
         with open(output_path, 'w') as f:
-            json.dump(ctx.params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+            for flag in [p.name for p in ctx.command.params if p.is_flag and p.name in dump_dict]:
+                    dump_dict.pop(flag)
+            json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return value
 
 #######################################################################
