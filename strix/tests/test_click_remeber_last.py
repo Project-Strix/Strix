@@ -19,9 +19,10 @@ def test_prompt_remember_last_choice(runner, tmp_path):
     out_path = tmp_path/'history.json'
 
     @command()
+    @option("-d", is_flag=True, default=True)
     @option("-g", type=Choice(["none", "day", "week", "month"]), default='day', prompt=True, show_default=True)
     @option("-dump", type=bool, default=True, callback=partial(dump_params, output_path=out_path))
-    def cli_remeber_case(g):
+    def cli_remeber_case(d, g):
         pass
 
     result = runner.invoke(cli_normal_case, [], input="none")

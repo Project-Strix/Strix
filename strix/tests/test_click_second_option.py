@@ -15,6 +15,7 @@ def test_click_subtasks_option(runner, tmp_path):
     last_options = {"framework": "multitask", "subtask1": "selflearning", "subtask2": "classification"}
 
     @command(context_settings={"default_map": last_options, "prompt_in_default_map": True})
+    @option("--subtask1", hidden=True, default=None)
     @option("--framework", prompt=True, type=Choice(FRAMEWORKS), default="classification", callback=framework_select)
     def cli_remeber_case(framework):
         pass
@@ -30,8 +31,8 @@ def test_click_subtasks_option(runner, tmp_path):
     assert "[selflearning]:" in result.output.split("\n")[-3]
     assert "[multitask]" in result.output.split("\n")[-4]
 
-    result = runner.invoke(cli_normal_case, [], input="5")
-    # print(result.output.split("\n"))
+    result = runner.invoke(cli_normal_case, [], input="5\n2\n")
+    print('\n',result.output.split("\n"))
     assert "[1]:" in result.output.split("\n")[-2]
     assert "[2]:" in result.output.split("\n")[-3]
     assert "[classification]: 5" in result.output.split("\n")[-4]
