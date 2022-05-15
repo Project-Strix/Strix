@@ -23,13 +23,14 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/Project-Strix/Strix/blob/master/LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/Project-Strix/Strix)](https://github.com/Project-Strix/Strix/issues) 
+[![Documentation Status](https://readthedocs.org/projects/strix/badge/?version=latest)](https://strix.readthedocs.io/en/latest/?badge=latest)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Project-Strix/Strix?style=social) 
 
 
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://gitlab.com/ChingRyu/Strix">
+  <a href="https://github.com/Project-Strix/Strix">
     <img src="images/banner.png" alt="Logo" height="200">
   </a>
 
@@ -40,14 +41,14 @@
     <br />
     <i>Make deep-learning easier for medical problems</i>
     <br />
-    <a href="https://gitlab.com/ChingRyu/Strix"><strong>Explore the docs »</strong></a>
+    <a href="https://strix.readthedocs.io"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://gitlab.com/ChingRyu/Strix">View Demo</a>
+    <a href="https://github.com/Project-Strix/Strix">View Demo</a>
     ·
-    <a href="https://gitlab.com/ChingRyu/Strix/issues">Report Bug</a>
+    <a href="https://github.com/Project-Strix/Strix/issues">Report Bug</a>
     ·
-    <a href="https://gitlab.com/ChingRyu/Strix/issues">Request Feature</a>
+    <a href="https://github.com/Project-Strix/Strix/issues">Request Feature</a>
   </p>
 </p>
 
@@ -127,7 +128,7 @@ More details please refer to [install](./install.md).
 <!-- USAGE EXAMPLES -->
 # Usage
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+_For more examples, please refer to the [Documentation](https://strix.readthedocs.io/)_
 
 ### Strix has 7 different commands: 
 
