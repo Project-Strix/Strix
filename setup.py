@@ -48,7 +48,6 @@ import versioneer
 
 def get_cmds():
     cmds = versioneer.get_cmdclass()
-
     return cmds
 
     # cmds.update({"build_ext": BuildExtension.with_options(no_python_abi_suffix=True)})
@@ -61,21 +60,6 @@ setup(
     author="Chenglong Wang",
     author_email="clwang@phy.ecnu.edu.cn",
     license="Apache License Version 2.0, January 2004",
-    install_requires=[
-        "torch>=1.6.0",
-        "tb-nightly",
-        "click",
-        "tqdm",
-        "scikit-image>=0.14",
-        "scipy",
-        "numpy",
-        "scikit-learn",
-        "nibabel",
-        "pytorch-ignite==0.4.7",
-        # "nni",
-        "monai_ex",
-        "utils_cw",
-    ],
     entry_points={
         "console_scripts": [
             "strix-train = strix.main_entry:train",
