@@ -1,6 +1,5 @@
-# import os
-# import torch
 from setuptools import setup, find_namespace_packages
+import versioneer
 
 # from pathlib import Path
 # from torch.utils.cpp_extension import CUDA_HOME
@@ -8,7 +7,7 @@ from setuptools import setup, find_namespace_packages
 # from torch.utils.cpp_extension import CUDAExtension
 
 # def get_extensions():
-#     extensions_dir = Path(__file__).parent.joinpath('medlp/models/rcnn/csrc')
+#     extensions_dir = Path(__file__).parent.joinpath('strix/models/rcnn/csrc')
 
 #     main_file = list(extensions_dir.glob("*.cpp"))
 #     source_cpu = list((extensions_dir/"cpu").glob("*.cpp"))
@@ -37,7 +36,7 @@ from setuptools import setup, find_namespace_packages
 
 #     ext_modules = [
 #         extension(
-#             "medlp.models.rcnn._C",
+#             "strix.models.rcnn._C",
 #             sources,
 #             include_dirs=include_dirs,
 #             define_macros=define_macros,
@@ -47,43 +46,33 @@ from setuptools import setup, find_namespace_packages
 
 #     return ext_modules
 
+def get_cmds():
+    cmds = versioneer.get_cmdclass()
+    return cmds
+
+    # cmds.update({"build_ext": BuildExtension.with_options(no_python_abi_suffix=True)})
 
 setup(
-    name="medlp",
-    packages=find_namespace_packages(include=["medlp", "medlp.*"]),
-    version="0.0.7",
+    name="strix",
+    packages=find_namespace_packages(include=["strix", "strix.*"]),
+    version=versioneer.get_version(),
     description="Medical Deep Learning Platform",
     author="Chenglong Wang",
     author_email="clwang@phy.ecnu.edu.cn",
     license="Apache License Version 2.0, January 2004",
-    install_requires=[
-        "torch>=1.6.0",
-        "tb-nightly",
-        "click",
-        "tqdm",
-        "scikit-image>=0.14",
-        "scipy",
-        "numpy",
-        "scikit-learn",
-        "nibabel",
-        "pytorch-ignite==0.4.7",
-        # "nni",
-        "monai_ex==0.0.4",
-        "utils_cw @ git+https://gitlab.com/ChingRyu/py_utils_cw@master#egg=utils_cw",
-    ],
     entry_points={
         "console_scripts": [
-            "medlp-train = medlp.main_entry:train",
-            "medlp-train-from-cfg = medlp.main_entry:train_cfg",
-            "medlp-train-and-test = medlp.main_entry:train_and_test",
-            "medlp-test-from-cfg = medlp.main_entry:test_cfg",
-            "medlp-nni-search = medlp.nni_search:nni_search",
-            "medlp-check-data = medlp.data_checker:check_data",
-            "medlp-gradcam-from-cfg = medlp.interpreter:gradcam",
+            "strix-train = strix.main_entry:train",
+            "strix-train-from-cfg = strix.main_entry:train_cfg",
+            "strix-train-and-test = strix.main_entry:train_and_test",
+            "strix-test-from-cfg = strix.main_entry:test_cfg",
+            "strix-nni-search = strix.nni_search:nni_search",
+            "strix-check-data = strix.data_checker:check_data",
+            "strix-gradcam-from-cfg = strix.interpreter:gradcam",
         ],
     },
     # ext_modules=get_extensions(),
-    # cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
+    cmdclass=get_cmds(),
     keywords=[
         "deep learning",
         "medical image classification",

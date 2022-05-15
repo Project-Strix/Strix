@@ -4,7 +4,7 @@
 *** an issue with the tag "enhancement".
 *** Thanks again! Now go create something AMAZING! :D
 *** To avoid retyping too much info. Do a search and replace for the following:
-*** ChingRyu, MeDLP, twitter_handle, email
+*** ChingRyu, Strix, twitter_handle, email
 -->
 
 
@@ -29,25 +29,25 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://gitlab.com/ChingRyu/MeDLP">
-    <img src="images/logo.png" alt="Logo" height="80">
+  <a href="https://gitlab.com/ChingRyu/Strix">
+    <img src="images/banner.png" alt="Logo" height="200">
   </a>
 
-  <h3 align="center">MeDLP</h3>
+  <h3 align="center">Strix</h3>
 
   <p align="center">
     A Medical Deep Learning Platform
     <br />
     <i>Make deep-learning easier for medical problems</i>
     <br />
-    <a href="https://gitlab.com/ChingRyu/MeDLP"><strong>Explore the docs »</strong></a>
+    <a href="https://gitlab.com/ChingRyu/Strix"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://gitlab.com/ChingRyu/MeDLP">View Demo</a>
+    <a href="https://gitlab.com/ChingRyu/Strix">View Demo</a>
     ·
-    <a href="https://gitlab.com/ChingRyu/MeDLP/issues">Report Bug</a>
+    <a href="https://gitlab.com/ChingRyu/Strix/issues">Report Bug</a>
     ·
-    <a href="https://gitlab.com/ChingRyu/MeDLP/issues">Request Feature</a>
+    <a href="https://gitlab.com/ChingRyu/Strix/issues">Request Feature</a>
   </p>
 </p>
 
@@ -79,7 +79,7 @@
 
 ## Design Concept:
 *We aim to disentangle both Data scientist & Archi Engineer, Networks & Pipelines.* \
-You can easily put your own datasets and networks into MeDLP and run it!
+You can easily put your own datasets and networks into Strix and run it!
 - Data scientists can focus on data collection, analysis and preprocessing.
 - Architecture engineers can focus on exploring network architectures.
 
@@ -92,8 +92,8 @@ You can easily put your own datasets and networks into MeDLP and run it!
 # Getting Started
 
 ### Prerequisites
-MeDLP is powered by [Pytorch](https://pytorch.org), [MONAI](https://monai.io) and [Ignite](https://pytorch-ignite.ai).\
-MeDLP relies heavily on following packages to make it work. Theoretically, these packages will be automatically installed via pip installation. If not, please manually install them.
+Strix is powered by [Pytorch](https://pytorch.org), [MONAI](https://monai.io) and [Ignite](https://pytorch-ignite.ai).\
+Strix relies heavily on following packages to make it work. Theoretically, these packages will be automatically installed via pip installation. If not, please manually install them.
 * pytorch
 * tb-nightly
 * click
@@ -112,13 +112,13 @@ MeDLP relies heavily on following packages to make it work. Theoretically, these
 
 For developers, we suggest you to get a local copy up and install.
 ```
-git clone https://gitlab.com/ChingRyu/MeDLP.git
-pip install -e ./MeDLP
+git clone https://gitlab.com/ChingRyu/Strix.git
+pip install -e ./Strix
 ```
 
 For users, you can just install via pip.
 ```
-pip install git+https://gitlab.com/ChingRyu/MeDLP.git
+pip install git+https://gitlab.com/ChingRyu/Strix.git
 ```
 More details please refer to [install](./install.md).
 
@@ -129,30 +129,30 @@ More details please refer to [install](./install.md).
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
-### MeDLP has 7 different commands: 
+### Strix has 7 different commands: 
 
-- `medlp-train`: Main train entry. Use this command for general DL training process.
-- `medlp-train-from-cfg`: Begin a training process from specified configure file, usually used for reproduction.
-- `medlp-train-and-test`: Begin a full training&testing process automatically.
-- `medlp-test-from-cfg`: Begin a testing processing from specified configure file.
-- `medlp-nni-search`: Use [NNI](https://nni.readthedocs.io) for automatic hyper-parameter tuning. 
-- `medlp-check-data`: Visualize preprocessed input dataset.
-- `medlp-gradcam-from-cfg`: Gradcam visualization.
+- `strix-train`: Main train entry. Use this command for general DL training process.
+- `strix-train-from-cfg`: Begin a training process from specified configure file, usually used for reproduction.
+- `strix-train-and-test`: Begin a full training&testing process automatically.
+- `strix-test-from-cfg`: Begin a testing processing from specified configure file.
+- `strix-nni-search`: Use [NNI](https://nni.readthedocs.io) for automatic hyper-parameter tuning. 
+- `strix-check-data`: Visualize preprocessed input dataset.
+- `strix-gradcam-from-cfg`: Gradcam visualization.
 
 **Here is a usage example!**\
 <img src="images/usage-example.png" alt="Usage-example" width="650">
 
 ### How to use my own dataset & network?
 
-- If you want use your own dataset, first you need to create a simple python script of a configuration to generate your dataset. For more details, please refer to this [readme](medlp/datasets/README.md)
-- If you want try your own network, you need to follow this [steps](medlp/models/README.md) to easily register your network to MeDLP.
+- If you want use your own dataset, first you need to create a simple python script of a configuration to generate your dataset. For more details, please refer to this [readme](strix/datasets/README.md)
+- If you want try your own network, you need to follow this [steps](strix/models/README.md) to easily register your network to Strix.
 - After preparation, just simply put own dataset/network file into custom folder, and run!
 
 
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://gitlab.com/ChingRyu/MeDLP/issues) for a list of proposed features (and known issues).
+See the [open issues](https://gitlab.com/ChingRyu/Strix/issues) for a list of proposed features (and known issues).
 
 
 
@@ -181,7 +181,7 @@ Distributed under the GNU GPL v3.0 License. See `LICENSE` for more information.
 
 Chenglong Wang - clwang@phy.ecnu.edu.cn
 
-Project Link: [https://gitlab.com/ChingRyu/MeDLP](https://gitlab.com/ChingRyu/MeDLP)
+Project Link: [https://gitlab.com/ChingRyu/Strix](https://gitlab.com/ChingRyu/Strix)
 
 
 <!-- ACKNOWLEDGEMENTS -->
@@ -201,7 +201,7 @@ Project Link: [https://gitlab.com/ChingRyu/MeDLP](https://gitlab.com/ChingRyu/Me
 [stars-shield]: https://img.shields.io/github/stars/ChingRyu/repo.svg?style=flat-square
 [stars-url]: https://gitlab.com/ChingRyu/repo/stargazers
 [issues-shield]: https://img.shields.io/github/issues/ChingRyu/repo.svg?style=flat-square
-[issues-url]: https://gitlab.com/ChingRyu/medlp/-/issues
+[issues-url]: https://gitlab.com/ChingRyu/strix/-/issues
 [license-shield]: https://img.shields.io/github/license/ChingRyu/repo.svg?style=flat-square
-[license-url]: https://gitlab.com/ChingRyu/medlp/-/blob/master/LICENSE
+[license-url]: https://gitlab.com/ChingRyu/strix/-/blob/master/LICENSE
 [product-screenshot]: images/screenshot.png
