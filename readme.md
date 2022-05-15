@@ -20,10 +20,10 @@
 <!-- [![Contributors][contributors-shield]][contributors-url] -->
 <!-- [![Forks][forks-shield]][forks-url] -->
 <!-- [![Stargazers][stars-shield]][stars-url] -->
-[![MIT License][license-shield]][license-url]
-[![Issues][issues-shield]][issues-url]
 
-
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/Project-Strix/Strix/blob/master/LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/Project-Strix/Strix)](https://github.com/Project-Strix/Strix/issues) 
+![GitHub Repo stars](https://img.shields.io/github/stars/Project-Strix/Strix?style=social) 
 
 
 <!-- PROJECT LOGO -->
@@ -112,13 +112,13 @@ Strix relies heavily on following packages to make it work. Theoretically, these
 
 For developers, we suggest you to get a local copy up and install.
 ```
-git clone https://gitlab.com/ChingRyu/Strix.git
+git clone https://github.com/Project-Strix/Strix.git
 pip install -e ./Strix
 ```
 
 For users, you can just install via pip.
 ```
-pip install git+https://gitlab.com/ChingRyu/Strix.git
+pip install git+https://github.com/Project-Strix/Strix.git
 ```
 More details please refer to [install](./install.md).
 
@@ -152,7 +152,7 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://gitlab.com/ChingRyu/Strix/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/Project-Strix/Strix/issues) for a list of proposed features (and known issues).
 
 
 
@@ -181,7 +181,7 @@ Distributed under the GNU GPL v3.0 License. See `LICENSE` for more information.
 
 Chenglong Wang - clwang@phy.ecnu.edu.cn
 
-Project Link: [https://gitlab.com/ChingRyu/Strix](https://gitlab.com/ChingRyu/Strix)
+Project Link: [https://github.com/Project-Strix/Strix](https://github.com/Project-Strix/Strix)
 
 
 <!-- ACKNOWLEDGEMENTS -->
@@ -194,14 +194,5 @@ Project Link: [https://gitlab.com/ChingRyu/Strix](https://gitlab.com/ChingRyu/St
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/ChingRyu/repo.svg?style=flat-square
-[contributors-url]: https://gitlab.com/ChingRyu/repo/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/ChingRyu/repo.svg?style=flat-square
-[forks-url]: https://gitlab.com/ChingRyu/repo/network/members
-[stars-shield]: https://img.shields.io/github/stars/ChingRyu/repo.svg?style=flat-square
-[stars-url]: https://gitlab.com/ChingRyu/repo/stargazers
-[issues-shield]: https://img.shields.io/github/issues/ChingRyu/repo.svg?style=flat-square
-[issues-url]: https://gitlab.com/ChingRyu/strix/-/issues
-[license-shield]: https://img.shields.io/github/license/ChingRyu/repo.svg?style=flat-square
-[license-url]: https://gitlab.com/ChingRyu/strix/-/blob/master/LICENSE
-[product-screenshot]: images/screenshot.png
+
+
