@@ -301,8 +301,7 @@ def train_cfg(**args):
     configures["config"] = args["config"]
 
     train(
-        default_map=configures,
-        # context_settings={"allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True}
+        default_map=configures, prompt_in_default_map=False,
     )
 
 

@@ -34,15 +34,22 @@ def test_prompt_remember_last_choice(runner, tmp_path):
 
     print(get_items(out_path, allow_filenotfound=True))
 
+@pytest.mark.parametrize('prompt', [True, False])
+def test_remeber_options(prompt, runner, tmp_path):
     @command(context_settings={
-        "prompt_in_default_map": True,
-        "default_map": get_items(out_path, allow_filenotfound=True)
-        }
-    )
+        "prompt_in_default_map": prompt,
+        "default_map": {"g": "day"}
+    })
     @option("-g", type=Choice(["none", "day", "week", "month"]), default='day', prompt=True, show_default=True)
     def cli_remeber_case2(g):
         pass
 
     result = runner.invoke(cli_remeber_case2, [], input="none")
     print(result.output)
-    assert "(1: none, 2: day, 3: week, 4: month) [week]: none" in result.output
+    if prompt:
+        assert "(1: none, 2: day, 3: week, 4: month) [day]: none" in result.output
+    else:
+        assert len(result.output) == 0
+
+
+

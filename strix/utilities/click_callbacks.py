@@ -27,16 +27,15 @@ from utils_cw import Print, check_dir, PathlibEncoder
 
 def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
     keyword = sub_option_keyword if sub_option_keyword else param.name
-    force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
-    if sub_option_keyword:  #like subtask option
-        prev_value =  ctx.meta.get(keyword)  # avoid callback fn fires twice github.com/pallets/click/issues/2259
-        return (force_prompt and not prev_value) or (not force_prompt and not prev_value)
+    remeber_mode = ctx.default_map is not None and ctx.prompt_in_default_map
+    if sub_option_keyword and remeber_mode:  #like subtask option
+        return ctx.meta.get(keyword) is None # avoid callback fn fires twice github.com/pallets/click/issues/2259
     elif ctx.default_map is None:
         default_value = ctx.params.get(keyword)
     else:
         default_value = ctx.default_map.get(keyword, ctx.params.get(keyword))
 
-    prompt_flag = force_prompt or (not force_prompt and not default_value)
+    prompt_flag = remeber_mode or (not remeber_mode and default_value is None)
     return prompt_flag
 
 def select_gpu(ctx, param, value):
