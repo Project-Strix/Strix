@@ -4,8 +4,8 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-from pallets_sphinx_themes import get_version
-from pallets_sphinx_themes import ProjectLink
+# from pallets_sphinx_themes import get_version
+# from pallets_sphinx_themes import ProjectLink
 
 # -- Path setup --------------------------------------------------------------
 
@@ -36,7 +36,7 @@ release = '0.1.0'
 extensions = [
     'recommonmark',
     'sphinx_markdown_tables',
-    "pallets_sphinx_themes",
+    # "pallets_sphinx_themes",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
