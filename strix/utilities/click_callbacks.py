@@ -403,8 +403,8 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
     if output_path:
         dump_dict = ctx.params.copy()
         with open(output_path, 'w') as f:
-            for flag in [p.name for p in ctx.command.params if p.is_flag and p.name in dump_dict]:
-                    dump_dict.pop(flag)
+            for flag in [p.name for p in ctx.command.params if (not p.prompt or p.is_flag) and p.name in dump_dict]:
+                dump_dict.pop(flag)
             json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return value
 
