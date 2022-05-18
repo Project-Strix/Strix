@@ -49,4 +49,5 @@ SIAMESE_LOSS.register('ContrastiveBCELoss', ContrastiveBCELoss)
 
 SELFLEARNING_LOSS.register('MSE', torch.nn.MSELoss)
 
-MULTITASK_LOSS.register("CombinationLoss", CombinationLoss)
+MULTITASK_LOSS.register("Uniform", CombinationLoss)
+MULTITASK_LOSS.register("Weighted", CombinationLoss)
