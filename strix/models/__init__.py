@@ -156,9 +156,9 @@ def get_engine(opts, train_loader, test_loader, writer=None):
 
     loss = lr_scheduler = None
     if opts.framework == Frameworks.MULTITASK.value:
-        subloss1 = get_loss_fn(opts.subtask1, opts.criterion[0], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision)
-        subloss2 = get_loss_fn(opts.subtask2, opts.criterion[1], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision)
-        loss = LOSS_MAPPING[opts.framework]["CombinationLoss"](subloss1, subloss2, aggregate="sum")
+        subloss1 = get_loss_fn(opts.subtask1, opts.criterion[1], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision)
+        subloss2 = get_loss_fn(opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision)
+        loss = LOSS_MAPPING[opts.framework][opts.criterion[0]](subloss1, subloss2, aggregate="sum", **opts.loss_params)
     else:
         loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, opts.deep_supervision)
 

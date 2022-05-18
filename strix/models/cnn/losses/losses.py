@@ -147,12 +147,13 @@ class DeepSupervisionLoss(Module):
 
 
 class CombinationLoss(Module):
-    def __init__(self, loss1: Callable, loss2: Callable, aggregate: str = "sum", ensure_dim: bool = True):
+    def __init__(self, loss1: Callable, loss2: Callable, aggregate: str = "sum", weight: float = 1.0, ensure_dim: bool = True):
         super(CombinationLoss, self).__init__()
         self.aggregate = aggregate
         self.ensure_dim = ensure_dim
         self.loss1 = loss1
         self.loss2 = loss2
+        self.weight = weight
 
     def forward(self, net_output, target):
         if not isinstance(net_output, tuple) or len(net_output) != 2:
@@ -169,7 +170,7 @@ class CombinationLoss(Module):
             loss2_output = self.loss2(net_output[1], target[1])
 
         if self.aggregate == "sum":
-            result = loss1_output + loss2_output
+            result = self.weight * loss1_output + loss2_output
         else:
             raise NotImplementedError
         return result

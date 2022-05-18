@@ -297,6 +297,11 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         elif value == "GDL":
             w_type = _prompt("Weight type(square, simple, uniform)", str, "square")
             ctx.params[meta_key] = {"w_type": w_type}
+        elif value == "Weighted":
+            weight = _prompt("Weight (task1/task2)", float, 1.0)
+            ctx.params[meta_key] = {"weight": weight}
+        elif value == "Uniform":
+            ctx.params[meta_key] = {"weight": 1}
         else:  #! custom loss
             func = LOSS_MAPPING[framework][value]
             sig = inspect.signature(func)
@@ -318,18 +323,18 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
         return value
 
+    #Todo: need refactor this part
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
         force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
         if not isinstance(value, list) or force_prompt:
-            value1 = value[0] if isinstance(value, list) else value
-            loss1 = _single_loss_select(
-                ctx, ctx.params["subtask1"], value1, prompt_all_args, '_task1'
-            )
-            value2 = value[1] if isinstance(value, list) else value
-            loss2 = _single_loss_select(
-                ctx, ctx.params["subtask2"], value2, prompt_all_args, '_task2'
-            )
-            return [loss1, loss2]
+            value0 = value[0] if isinstance(value, list) else value
+            loss = _single_loss_select(ctx, ctx.params["framework"], value0, prompt_all_args)
+
+            value1 = value[1] if isinstance(value, list) else value
+            loss1 = _single_loss_select(ctx, ctx.params["subtask1"], value1, prompt_all_args, '_task1')
+            value2 = value[2] if isinstance(value, list) else value
+            loss2 = _single_loss_select(ctx, ctx.params["subtask2"], value2, prompt_all_args, '_task2')
+            return [loss, loss1, loss2]
         else:
             return value
     else:
