@@ -15,14 +15,15 @@ def test_prompt_remember_last_choice(runner, tmp_path):
     )
     def cli_normal_case(g):
         pass
-    
-    out_path = tmp_path/'history.json'
+
+    out_path = tmp_path / 'history.json'
 
     @command()
     @option("-d", is_flag=True, default=True)
+    @option("-p", prompt=False, type=str, default="yes")
     @option("-g", type=Choice(["none", "day", "week", "month"]), default='day', prompt=True, show_default=True)
     @option("-dump", type=bool, default=True, callback=partial(dump_params, output_path=out_path))
-    def cli_remeber_case(d, g):
+    def cli_remeber_case(d, p, g):
         pass
 
     result = runner.invoke(cli_normal_case, [], input="none")
@@ -32,7 +33,8 @@ def test_prompt_remember_last_choice(runner, tmp_path):
     print(result.output)
     assert "(1: none, 2: day, 3: week, 4: month) [day]:" in result.output
 
-    print(get_items(out_path, allow_filenotfound=True))
+    dumped_options = (get_items(out_path, allow_filenotfound=True))
+    assert "d" not in dumped_options and "p" not in dumped_options
 
 @pytest.mark.parametrize('prompt', [True, False])
 def test_remeber_options(prompt, runner, tmp_path):
