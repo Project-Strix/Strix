@@ -129,7 +129,7 @@ class OptionEx(Option):
             and (self.required or self.prompt_required)
             and not ctx.resilient_parsing
         ):
-            if self.prompt_cond(ctx):
+            if self.prompt_cond is None or self.prompt_cond(ctx):
                 value = self.prompt_for_value(ctx)
                 source = ParameterSource.PROMPT
 

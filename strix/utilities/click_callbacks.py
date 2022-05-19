@@ -18,7 +18,7 @@ from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from strix.utilities.utils import is_avaible_size, get_items
-from strix.utilities.enum import BUILTIN_TYPES
+from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
 from utils_cw import Print, check_dir, PathlibEncoder
 
@@ -37,6 +37,28 @@ def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
 
     prompt_flag = remeber_mode or (not remeber_mode and default_value is None)
     return prompt_flag
+
+
+def freeze_option(ctx, param, value):
+    if not _get_prompt_flag(ctx, param, value, "freeze_params"):
+        return value
+
+    if value == Freezers.UNTIL.value:
+        epochs = _prompt("freeze net until ? epochs", int, 10)
+        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: epochs}
+    elif value == Freezers.FULL.value:
+        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: 0}
+    elif value == Freezers.AUTO.value:
+        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: 0}
+    elif value == Freezers.SUBTASK.value:
+        subtask = _prompt("freeze subtask (1/2)", int, 1)
+        epochs = _prompt("freeze task until ? epochs", int, 10)
+        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: (subtask, epochs)}
+    else:
+        raise ValueError(f"Not recognized freeze value: {value}")
+
+    return value
+
 
 def select_gpu(ctx, param, value):
     if not _get_prompt_flag(ctx, param, value):
@@ -185,7 +207,7 @@ def parse_input_str(ctx, param, value, dtype=str):
 
 
 def _prompt(prompt_str, data_type, default_value, value_proc=None, color=None):
-    prompt_str = f"\tInput {prompt_str} ({data_type})"
+    prompt_str = f"\tInput {prompt_str} ({data_type.__name__})"
     if color is not None:
         prompt_str = colored(prompt_str, color=color)
 
