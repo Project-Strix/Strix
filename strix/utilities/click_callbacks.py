@@ -25,11 +25,12 @@ from utils_cw import Print, check_dir, PathlibEncoder
 
 #######################################################################
 
+
 def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
     keyword = sub_option_keyword if sub_option_keyword else param.name
     remeber_mode = ctx.default_map is not None and ctx.prompt_in_default_map
-    if sub_option_keyword and remeber_mode:  #like subtask option
-        return ctx.meta.get(keyword) is None # avoid callback fn fires twice github.com/pallets/click/issues/2259
+    if sub_option_keyword and remeber_mode:  # like subtask option
+        return ctx.meta.get(keyword) is None  # avoid callback fn fires twice github.com/pallets/click/issues/2259
     elif ctx.default_map is None:
         default_value = ctx.params.get(keyword)
     else:
@@ -45,15 +46,15 @@ def freeze_option(ctx, param, value):
 
     if value == Freezers.UNTIL.value:
         epochs = _prompt("freeze net until ? epochs", int, 10)
-        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: epochs}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: epochs}
     elif value == Freezers.FULL.value:
-        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: 0}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: 0}
     elif value == Freezers.AUTO.value:
-        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: 0}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: 0}
     elif value == Freezers.SUBTASK.value:
         subtask = _prompt("freeze subtask (1/2)", int, 1)
         epochs = _prompt("freeze task until ? epochs", int, 10)
-        ctx.params['freeze_params'] = ctx.meta["freeze_params"] = {value: (subtask, epochs)}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: (subtask, epochs)}
     else:
         raise ValueError(f"Not recognized freeze value: {value}")
 
@@ -150,9 +151,9 @@ def get_exp_name(ctx, param, value):
     timestamp = strftime("%m%d_%H%M") if ctx.params.get("config") is not None else ctx.params["timestamp"]
 
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
-        loss_fn = '_'.join(ctx.params['criterion'])
+        loss_fn = "_".join(ctx.params["criterion"])
     else:
-        loss_fn = ctx.params['criterion'].split('_')[0]
+        loss_fn = ctx.params["criterion"].split("_")[0]
 
     exp_name = (
         f"{model_name}-{loss_fn}-{layer_norm}-{ctx.params['optim']}-"
@@ -250,11 +251,10 @@ def multi_ouputnc(ctx, param, value):
     if isinstance(value, str) and value.isnumeric():
         value = int(value)
 
-    if ctx.params['framework'] != Frameworks.MULTITASK.value:
+    if ctx.params["framework"] != Frameworks.MULTITASK.value:
         return value
 
-    if ctx.params['framework'] == Frameworks.MULTITASK.value and\
-       not isinstance(value, list):
+    if ctx.params["framework"] == Frameworks.MULTITASK.value and not isinstance(value, list):
         subtask1_nc = prompt(f"Output nc for {colored('task1', 'yellow')}", type=int, default=value)
         subtask2_nc = prompt(f"Output nc for {colored('task2', 'yellow')}", type=int, default=value)
         return [subtask1_nc, subtask2_nc]
@@ -268,35 +268,30 @@ def framework_select(ctx, param, value):
     if value == Frameworks.MULTITASK.value and prompt_subtask:
         if "multitask" in FRAMEWORKS:
             FRAMEWORKS.remove("multitask")
-        
-        if ctx.default_map:
-            default_subtask1 = ctx.default_map.get("subtask1", ctx.params.get('subtask1', 2))
-            default_subtask2 = ctx.default_map.get("subtask2", ctx.params.get('subtask2', 1))
-        else:
-            default_subtask1 = ctx.params.get('subtask1', 2)
-            default_subtask2 = ctx.params.get('subtask2', 1)
 
-        subtask1 = prompt(
-            f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask1
-        )
-        subtask2 = prompt(
-            f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask2
-        )
-        ctx.params['subtask1'] = ctx.meta['subtask1'] = subtask1
-        ctx.params['subtask2'] = ctx.meta['subtask2'] = subtask2
+        if ctx.default_map:
+            default_subtask1 = ctx.default_map.get("subtask1", ctx.params.get("subtask1", 2))
+            default_subtask2 = ctx.default_map.get("subtask2", ctx.params.get("subtask2", 1))
+        else:
+            default_subtask1 = ctx.params.get("subtask1", 2)
+            default_subtask2 = ctx.params.get("subtask2", 1)
+
+        subtask1 = prompt(f"Sub {colored('task1', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask1)
+        subtask2 = prompt(f"Sub {colored('task2', 'yellow')}", type=NumericChoice(FRAMEWORKS), default=default_subtask2)
+        ctx.params["subtask1"] = ctx.meta["subtask1"] = subtask1
+        ctx.params["subtask2"] = ctx.meta["subtask2"] = subtask2
 
     return value
 
 
 def loss_select(ctx, param, value, prompt_all_args=False):
-
-    def _single_loss_select(ctx, framework, value, prompt_all_args, meta_key_postfix=''):
+    def _single_loss_select(ctx, framework, value, prompt_all_args, meta_key_postfix=""):
         losslist = list(LOSS_MAPPING[framework].keys())
 
         assert len(losslist) > 0, f"No loss available for {framework}! Abort!"
 
         if not _get_prompt_flag(ctx, param, value):
-        # if value is not None and value in losslist:
+            # if value is not None and value in losslist:
             return value
 
         prompts = f"Loss_fn for {colored(meta_key_postfix[1:], 'yellow')}" if meta_key_postfix else "Loss_fn"
@@ -345,7 +340,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
         return value
 
-    #Todo: need refactor this part
+    # Todo: need refactor this part
     if ctx.params["framework"] == Frameworks.MULTITASK.value:
         force_prompt = ctx.default_map is not None and ctx.prompt_in_default_map
         if not isinstance(value, list) or force_prompt:
@@ -353,9 +348,9 @@ def loss_select(ctx, param, value, prompt_all_args=False):
             loss = _single_loss_select(ctx, ctx.params["framework"], value0, prompt_all_args)
 
             value1 = value[1] if isinstance(value, list) else value
-            loss1 = _single_loss_select(ctx, ctx.params["subtask1"], value1, prompt_all_args, '_task1')
+            loss1 = _single_loss_select(ctx, ctx.params["subtask1"], value1, prompt_all_args, "_task1")
             value2 = value[2] if isinstance(value, list) else value
-            loss2 = _single_loss_select(ctx, ctx.params["subtask2"], value2, prompt_all_args, '_task2')
+            loss2 = _single_loss_select(ctx, ctx.params["subtask2"], value2, prompt_all_args, "_task2")
             return [loss, loss1, loss2]
         else:
             return value
@@ -364,14 +359,9 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    archilist = list(
-        ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
-    )
+    archilist = list(ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
     if len(archilist) == 0:
-        print(
-            f"No architecture available for {ctx.params['tensor_dim']} "
-            f"{ctx.params['framework']} task! Abort!"
-        )
+        print(f"No architecture available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
 
     if value is not None and value in archilist:
@@ -381,19 +371,14 @@ def model_select(ctx, param, value):
 
 
 def data_select(ctx, param, value):
-    datalist = list(
-        DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
-    )
+    datalist = list(DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
 
     if len(datalist) == 0:
-        print(
-            f"No datalist available for {ctx.params['tensor_dim']} "
-            f"{ctx.params['framework']} task! Abort!"
-        )
+        print(f"No datalist available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
 
     if _get_prompt_flag(ctx, param, value):
-        return prompt("Data list", type=NumericChoice(datalist))  #default="1"
+        return prompt("Data list", type=NumericChoice(datalist))  # default="1"
     else:
         return value
 
@@ -429,11 +414,12 @@ def input_cropsize(ctx, param, value):
 def dump_params(ctx, param, value, output_path=None, skip_flag=True):
     if output_path:
         dump_dict = ctx.params.copy()
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             for flag in [p.name for p in ctx.command.params if (not p.prompt or p.is_flag) and p.name in dump_dict]:
                 dump_dict.pop(flag)
             json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return value
+
 
 #######################################################################
 ##                    checklist callbacks
@@ -441,6 +427,14 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
 
 
 def check_batchsize(ctx_params):
+    """Check whether batch size is properly set
+
+    Args:
+        ctx_params (dict): params get from click context
+
+    Returns:
+        bool: return True is check is passed, and vice versa
+    """
     train_list, valid_list, framework, tensor_dim, data_name, split, n_batch_train, n_batch_valid = (
         ctx_params.get("train_list"),
         ctx_params.get("valid_list"),
@@ -465,7 +459,7 @@ def check_batchsize(ctx_params):
         all_data_list = get_items(datalist_fname, format="auto")
         len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
-    
+
     ret = True
     if len_train < n_batch_train:
         print(f"Validation batch size ({n_batch_train}) larger than valid data size ({len_train})!")
@@ -473,11 +467,19 @@ def check_batchsize(ctx_params):
     if len_valid < n_batch_valid:
         print(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!")
         ret = False
-    
+
     return ret
 
 
 def check_loss(ctx_params):
+    """Check whether loss selection is correct
+
+    Args:
+        ctx_params (dict): params from click context
+
+    Returns:
+        bool: return True is check is passed, and vice versa
+    """
     output_nc, loss_fn = ctx_params.get("output_nc"), ctx_params.get("criterion")
     if loss_fn == "CE" and output_nc == 1:
         print("Single output channel should use BCE instead of CE loss.")
@@ -486,6 +488,33 @@ def check_loss(ctx_params):
 
 
 def check_lr_policy(ctx_params):
+    """Check whether LR policy is properly set
+
+    Args:
+        ctx_params (dict): params from click context
+
+    Returns:
+        bool: return True is check is passed, and vice versa
+    """
     if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
         Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
     return True
+
+
+def check_freeze_api(ctx_params):
+    """Check whether network has freeze api for Strix need
+
+    Args:
+        ctx_params (dict): params from click context
+    """
+    if (
+        ctx_params.get("freeze")
+        and ctx_params.get("framework")
+        and ctx_params.get("tensor_dim")
+        and ctx_params.get("model_name")
+    ):
+        model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
+        if "freeze" not in dir(model):
+            Print(f"freeze() member function is not detected in '{model.__name__}', freeze not work in your training!")
+            return False
+        return True
