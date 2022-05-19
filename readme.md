@@ -121,7 +121,8 @@ For users, you can just install via pip.
 ```
 pip install git+https://github.com/Project-Strix/Strix.git
 ```
-More details please refer to [install](./install.md).
+More details please refer to [install](./install.md). \
+_Notice that Strix is only tested on **Linux** only, not on Windows. If you find any problem with the deployment on Windows, please submit an [issue](https://github.com/Project-Strix/Strix/issues)._
 
 
 
