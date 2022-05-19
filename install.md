@@ -14,12 +14,14 @@ conda install pytorch==1.9.1 torchvision==0.10.0 cudatoolkit=11.3 -c conda-forge
 
 ### 3. If you want to develop Strix, you can download Strix project.
 ```
-git clone http://mega/gitlab/project-strix/strix.git
+git clone https://github.com/Project-Strix/Strix.git
 pip install -e ./Strix/MONAI_ex
 pip install -e ./Strix
 ```
 ### 4. If you just want to use Strix, you can directly install Strix by:
 ```
-pip install git+http://mega/gitlab/project-strix/monai_ex.git
-pip install git+http://mega/gitlab/project-strix/strix.git
+pip install git+https://github.com/Project-Strix/MONAI_EX.git
+pip install git+https://github.com/Project-Strix/Strix.git
 ```
+
+_Notice that Strix is only tested on **Linux** only, not on Windows. If you find any problem with the deployment on Windows, please submit an [issue](https://github.com/Project-Strix/Strix/issues)._
