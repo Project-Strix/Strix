@@ -44,6 +44,9 @@ def freeze_option(ctx, param, value):
     if not _get_prompt_flag(ctx, param, value, "freeze_params"):
         return value
 
+    if not param.prompt_cond(ctx):  # put into _get_prompt_flag?
+        return value
+
     if value == Freezers.UNTIL.value:
         epochs = _prompt("freeze net until ? epochs", int, 10)
         ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: epochs}
@@ -415,7 +418,7 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
     if output_path:
         dump_dict = ctx.params.copy()
         with open(output_path, "w") as f:
-            for flag in [p.name for p in ctx.command.params if (not p.prompt or p.is_flag) and p.name in dump_dict]:
+            for flag in [p.name for p in ctx.command.params if (not p.prompt or p.is_flag or p.prompt_cond) and p.name in dump_dict]:
                 dump_dict.pop(flag)
             json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return value
@@ -517,4 +520,4 @@ def check_freeze_api(ctx_params):
         if "freeze" not in dir(model):
             Print(f"freeze() member function is not detected in '{model.__name__}', freeze not work in your training!")
             return False
-        return True
+    return True
