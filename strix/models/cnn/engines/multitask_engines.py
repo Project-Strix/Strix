@@ -41,6 +41,8 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
         _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
+        freeze_mode = get_attr_(opts, "freeze_mode", None)
+        freeze_params = get_attr_(opts, "freeze_params", None)
         logger_name = get_attr_(opts, 'logger_name', logger_name)
 
         if multi_output_keys is None:
@@ -148,6 +150,8 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
             tensorboard_image_names=["Subtask1", "Subtask2"],
             graph_batch_transform=prepare_batch_fn if opts.visualize else None,
+            freeze_mode=freeze_mode,
+            freeze_params=freeze_params,
         )
 
         MultiTaskTrainer.__init__(

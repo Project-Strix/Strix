@@ -65,6 +65,8 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         multi_output_keys = kwargs.get("multi_output_keys", None)
         decollate = False
         logger_name = get_attr_(opts, 'logger_name', logger_name)
+        freeze_mode = get_attr_(opts, "freeze_mode", None)
+        freeze_params=get_attr_(opts, "freeze_params", None)
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _loss = cfg.get_key("loss")
@@ -156,6 +158,8 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                 opts.output_nc, decollate
             ),
             graph_batch_transform=prepare_batch_fn if opts.visualize else None,
+            freeze_mode=freeze_mode,
+            freeze_params=freeze_params,
         )
 
         SupervisedTrainerEx.__init__(

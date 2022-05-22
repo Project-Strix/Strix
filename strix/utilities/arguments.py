@@ -132,8 +132,8 @@ def network_params(func):
     @option("--snip", is_flag=True)
     @option("--freeze", is_flag=True, help="Freeze network layers")
     @option(
-        "--freeze-kwargs", type=Choice(FREEZERS), default=None, prompt=True,
-        prompt_cond=lambda ctx: ctx.params['freeze'], callback=freeze_option, help="Freeze kwargs"
+        "--freeze-mode", type=Choice(FREEZERS), default=None, prompt=True,
+        prompt_cond=lambda ctx: ctx.params['freeze'], callback=freeze_option, help="Freeze mode"
     )
     # @optionex('--layer-order', prompt=True, type=Choice(LAYER_ORDERS), default=1, help='conv layer order')
     # @optionex('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
