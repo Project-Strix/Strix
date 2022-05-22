@@ -1,4 +1,3 @@
-from email.policy import default
 from typing import Callable
 
 import re
@@ -11,6 +10,8 @@ from pathlib import Path
 from time import strftime
 from types import SimpleNamespace as sn
 from termcolor import colored
+
+import torch.nn as nn
 
 from click import Choice, prompt
 from strix.data_io import DATASET_MAPPING
@@ -49,15 +50,15 @@ def freeze_option(ctx, param, value):
 
     if value == Freezers.UNTIL.value:
         epochs = _prompt("freeze net until ? epochs", int, 10)
-        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: epochs}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = epochs
     elif value == Freezers.FULL.value:
-        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: 0}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = 0
     elif value == Freezers.AUTO.value:
-        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: 0}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = 0
     elif value == Freezers.SUBTASK.value:
         subtask = _prompt("freeze subtask (1/2)", int, 1)
         epochs = _prompt("freeze task until ? epochs", int, 10)
-        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = {value: (subtask, epochs)}
+        ctx.params["freeze_params"] = ctx.meta["freeze_params"] = (subtask, epochs)
     else:
         raise ValueError(f"Not recognized freeze value: {value}")
 
@@ -418,7 +419,11 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
     if output_path:
         dump_dict = ctx.params.copy()
         with open(output_path, "w") as f:
-            for flag in [p.name for p in ctx.command.params if (not p.prompt or p.is_flag or p.prompt_cond) and p.name in dump_dict]:
+            for flag in [
+                p.name
+                for p in ctx.command.params
+                if (not p.prompt or p.is_flag or p.prompt_cond) and p.name in dump_dict
+            ]:
                 dump_dict.pop(flag)
             json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
     return value
@@ -517,7 +522,16 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("model_name")
     ):
         model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
-        if "freeze" not in dir(model):
-            Print(f"freeze() member function is not detected in '{model.__name__}', freeze not work in your training!")
+        warning_msg = f"freeze() member function is not detected in '{model.__name__}', freeze wont work in your training!"
+        if (
+            not isinstance(model, nn.Module) and isinstance(model, Callable) and model.__annotations__.get("return")
+        ):  # a strix wrapper func with return annotation
+            if "freeze" not in dir(model.__annotations__["return"]):
+                Print(warning_msg)
+                return False
+        elif isinstance(model, nn.Module) and "freeze" not in dir(model):
+            Print(warning_msg)
             return False
+        else:
+            print(f"check_freeze_api failed to check func {model.__name__}")
     return True
