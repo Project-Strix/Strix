@@ -28,7 +28,8 @@ from strix.utilities.click_callbacks import (
     check_batchsize,
     check_loss,
     check_lr_policy,
-    dump_params
+    check_freeze_api,
+    dump_params,
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -144,7 +145,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_c
         output_dir_ctx="experiment_path",
         save_code_dir=cfg.get_strix_cfg("external_network_dir")
         if cfg.get_strix_cfg("mode") == "dev" else None,
-        checklist=[check_batchsize, check_loss, check_lr_policy]
+        checklist=[check_batchsize, check_loss, check_lr_policy, check_freeze_api]
     ),
 )
 @click.pass_context

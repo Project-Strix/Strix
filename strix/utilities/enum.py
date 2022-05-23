@@ -133,3 +133,11 @@ class Optimizers(Enum):
 
 OPTIMIZERS = get_enums(Optimizers)
 
+
+class Freezers(Enum):
+    UNTIL = "until"
+    AUTO = "auto"
+    FULL = "full"
+    SUBTASK = "subtask"
+
+FREEZERS = get_enums(Freezers)

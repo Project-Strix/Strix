@@ -439,3 +439,16 @@ def apply_leaf(m, f):
 
 def set_trainable(module, b):
     apply_leaf(module, lambda m: set_trainable_attr(m, b))
+
+
+def count_trainable_params(module, show_names: bool=False):
+    if show_names:
+        param_num = 0
+        param_names = []
+        for name, p in module.named_parameters():
+            if p.requires_grad:
+                param_num += p.numel()
+                param_names.append(name)
+        return param_num, param_names
+    else:
+        return sum(p.numel() for p in module.parameters() if p.requires_grad)

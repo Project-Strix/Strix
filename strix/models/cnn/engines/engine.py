@@ -17,6 +17,7 @@ from monai_ex.handlers import (
     TensorBoardImageHandlerEx,
     TensorBoardStatsHandler,
     TensorboardGraphHandler,
+    FreezeNetHandler,
 )
 from monai_ex.utils import ensure_list
 from torch.utils.data import DataLoader
@@ -41,9 +42,7 @@ class StrixTrainEngine(ABC):
         logger_name,
         **kwargs,
     ):
-        raise NotImplementedError(
-            f"Subclass {self.__class__.__name__} must implement this method."
-        )
+        raise NotImplementedError(f"Subclass {self.__class__.__name__} must implement this method.")
 
     @staticmethod
     def get_basic_handlers(
@@ -66,6 +65,8 @@ class StrixTrainEngine(ABC):
         graph_batch_transform: Optional[Callable] = None,
         record_nni: bool = False,
         nni_kwargs: Optional[Dict] = None,
+        freeze_mode: Optional[str] = None,
+        freeze_params: Optional[tuple] = None,
     ):
         handlers = []
 
@@ -118,7 +119,9 @@ class StrixTrainEngine(ABC):
                     summary_writer=tb_summary_writer,
                     prefix_name=name + "-" + phase,
                     **kwargs,
-                ) for kwargs, name in zip(tb_img_kwargs, tb_img_names) if kwargs is not None
+                )
+                for kwargs, name in zip(tb_img_kwargs, tb_img_names)
+                if kwargs is not None
             ]
 
         if dump_tensorboard:
@@ -129,7 +132,7 @@ class StrixTrainEngine(ABC):
                     logger_name=logger_name,
                 ),
             ]
-        
+
         if graph_batch_transform:
             handlers += [
                 TensorboardGraphHandler(
@@ -142,6 +145,16 @@ class StrixTrainEngine(ABC):
 
         if record_nni:
             handlers += [NNIReporterHandler(**nni_kwargs)]
+
+        if freeze_mode:
+            handlers += [
+                FreezeNetHandler(
+                    network=net,
+                    freeze_mode=freeze_mode,
+                    freeze_params=freeze_params,
+                    logger_name=logger_name
+                )
+            ]
 
         return handlers
 
@@ -159,9 +172,7 @@ class StrixTestEngine(ABC):
         logger_name: str,
         **kwargs,
     ):
-        raise NotImplementedError(
-            f"Subclass {self.__class__.__name__} must implement this method."
-        )
+        raise NotImplementedError(f"Subclass {self.__class__.__name__} must implement this method.")
 
     @staticmethod
     def get_basic_handlers(
@@ -177,7 +188,7 @@ class StrixTestEngine(ABC):
         image_batch_transform: Callable = lambda x: (),
     ):
         handlers = []
-        
+
         model_paths, load_dicts = ensure_list(model_path), ensure_list(load_dict)
         for load_path, load_dict in zip(model_paths, load_dicts):
             if os.path.exists(load_path):
@@ -200,7 +211,7 @@ class StrixTestEngine(ABC):
                     output_dir=out_dir,
                     output_ext=".nii.gz",
                     output_postfix=_image,
-                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image+"_meta_dict"),
+                    data_root_dir=output_filename_check(test_loader.dataset, meta_key=_image + "_meta_dict"),
                     resample=image_resample,
                     mode="bilinear",
                     image_batch_transform=image_batch_transform,

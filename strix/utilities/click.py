@@ -1,3 +1,4 @@
+from lib2to3.pgen2.token import OP
 import typing as t
 from click import Choice, ParamType, Option, Context, Parameter, Command
 from click.core import ParameterSource
@@ -5,6 +6,7 @@ from click.parser import _flag_needs_value
 from click.types import convert_type
 
 ###################### Extension of click ################################
+
 
 class ContextEx(Context):
     def __init__(
@@ -43,18 +45,62 @@ class ContextEx(Context):
             help_option_names,
             token_normalize_func,
             color,
-            show_default
+            show_default,
         )
         self.prompt_in_default_map = prompt_in_default_map
+
 
 class CommandEx(Command):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.context_class = ContextEx
 
+
 class OptionEx(Option):
+    def __init__(
+        self,
+        param_decls: t.Optional[t.Sequence[str]] = None,
+        show_default: t.Union[bool, str, None] = None,
+        prompt: t.Union[bool, str] = False,
+        confirmation_prompt: t.Union[bool, str] = False,
+        prompt_required: bool = True,
+        prompt_cond: t.Optional[t.Callable] = None,
+        hide_input: bool = False,
+        is_flag: t.Optional[bool] = None,
+        flag_value: t.Optional[t.Any] = None,
+        multiple: bool = False,
+        count: bool = False,
+        allow_from_autoenv: bool = True,
+        type: t.Optional[t.Union[ParamType, t.Any]] = None,
+        help: t.Optional[str] = None,
+        hidden: bool = False,
+        show_choices: bool = True,
+        show_envvar: bool = False,
+        **attrs: t.Any,
+    ) -> None:
+        super().__init__(
+            param_decls,
+            show_default,
+            prompt,
+            confirmation_prompt,
+            prompt_required,
+            hide_input,
+            is_flag,
+            flag_value,
+            multiple,
+            count,
+            allow_from_autoenv,
+            type,
+            help,
+            hidden,
+            show_choices,
+            show_envvar,
+            **attrs,
+        )
+        self.prompt_cond = prompt_cond
+
     def consume_value(self, ctx: Context, opts: t.Mapping[str, "Parameter"]) -> t.Tuple[t.Any, ParameterSource]:
-        value, source = super().consume_value(ctx, opts)
+        value, source = super(Option, self).consume_value(ctx, opts)
 
         # The parser will emit a sentinel value if the option can be
         # given as a flag without a value. This is different from None
@@ -69,29 +115,26 @@ class OptionEx(Option):
                 value = self.flag_value
                 source = ParameterSource.COMMANDLINE
 
-        elif (
-            self.multiple
-            and value is not None
-            and any(v is _flag_needs_value for v in value)
-        ):
+        elif self.multiple and value is not None and any(v is _flag_needs_value for v in value):
             value = [self.flag_value if v is _flag_needs_value else v for v in value]
             source = ParameterSource.COMMANDLINE
 
-        # The value wasn't set, or used the param's default, prompt if
-        # prompting is enabled.
+        # The value wasn't set, or used the param's default, prompt if prompting is enabled.
         elif (
             (
-                source in {None, ParameterSource.DEFAULT} or \
-                (prompt_in_default_map and source == ParameterSource.DEFAULT_MAP)
+                source in {None, ParameterSource.DEFAULT}
+                or (prompt_in_default_map and source == ParameterSource.DEFAULT_MAP)
             )
             and self.prompt is not None
             and (self.required or self.prompt_required)
             and not ctx.resilient_parsing
         ):
-            value = self.prompt_for_value(ctx)
-            source = ParameterSource.PROMPT
+            if self.prompt_cond is None or self.prompt_cond(ctx):
+                value = self.prompt_for_value(ctx)
+                source = ParameterSource.PROMPT
 
         return value, source
+
 
 class DynamicTuple(ParamType):
     def __init__(self, input_type):
@@ -139,12 +182,6 @@ class NumericChoice(Choice):
         except ValueError as e:
             if value in self.choicemap.values():
                 return value
-            self.fail(
-                f"invaid index choice: {value}. Please input integer index or correct value!"
-                f"Error msg: {e}"
-            )
+            self.fail(f"invaid index choice: {value}. Please input integer index or correct value!" f"Error msg: {e}")
         except KeyError as e:
-            self.fail(
-                f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx
-            )
-
+            self.fail(f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx)
