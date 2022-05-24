@@ -189,11 +189,11 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         """Return classification engine's metrics.
 
         Args:
-            phase (str): phase name.
+            phase (Phases): phase name.
             output_nc (int): output channel number.
             decollate (bool): whether use decollate.
-            item_index (Optional[int], optional): If network's output and label is tuple, specifiy its index,
-                design for multitask compatiblity. Defaults to None.
+            item_index (Optional[int], optional): If network's output and label is tuple, specify its index,
+                design for multitask compatibility. Defaults to None.
 
         Returns:
             dict: {metric_name: metric_fn}
@@ -439,7 +439,9 @@ class ClassificationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
                 batch_transform=from_engine([_image + "_meta_dict", _label])
                 if has_label
                 else from_engine(_image + "_meta_dict"),
-                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(output_nc, item_index=item_index),
+                output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
+                    output_nc, has_label, item_index=item_index
+                ),
             )
         ]
 
@@ -450,7 +452,7 @@ class ClassificationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
                     filename=f"{suffix}_prob.csv" if suffix else "prob.csv",
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=ClassificationTestEngine.get_cls_saver_post_transform(
-                        output_nc, discrete=False, item_index=item_index
+                        output_nc, has_label, discrete=False, item_index=item_index
                     ),
                 )
             ]
@@ -473,20 +475,21 @@ class ClassificationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
 
     @staticmethod
     def get_cls_saver_post_transform(
-        output_nc: int, discrete: bool = True, logit_thresh: float = 0.5, item_index: Optional[int] = None,
+        output_nc: int, with_label: bool, discrete: bool = True, logit_thresh: float = 0.5, item_index: Optional[int] = None,
     ):
         _pred = cfg.get_key("pred")
         _label = cfg.get_key("label")
 
+        pred_label_key = [_pred, _label] if with_label else _pred
         if item_index is not None:
-            select_item_transform = [DTA(GetItemD(keys=[_pred, _label], index=item_index))]
+            select_item_transform = [DTA(GetItemD(keys=pred_label_key, index=item_index))]
         else:
             select_item_transform = []
 
         if output_nc == 1:
             return Compose(
                 select_item_transform + [
-                    EnsureTypeD(keys=[_pred, _label]),
+                    EnsureTypeD(keys=pred_label_key),
                     ActivationsD(keys=_pred, sigmoid=True),
                     AsDiscreteD(keys=_pred, threshold=logit_thresh) if discrete else lambda x: x,
                     from_engine(_pred),
@@ -496,7 +499,7 @@ class ClassificationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
         else:
             return Compose(
                 select_item_transform + [
-                    EnsureTypeD(keys=[_pred, _label]),
+                    EnsureTypeD(keys=pred_label_key),
                     ActivationsD(keys=_pred, softmax=True),
                     AsDiscreteD(keys=_pred, argmax=True, to_onehot=None)  # ? dim=1, keepdim=True
                     if discrete
