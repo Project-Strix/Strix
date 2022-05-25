@@ -1,137 +1,219 @@
-import os, re, logging, copy
-from pathlib import Path
-import numpy as np
-from functools import partial
+from typing import Optional
 
 import torch
 from strix.configures import config as cfg
-from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from strix.utilities.utils import is_avaible_size, output_filename_check
-from strix.models.cnn.engines.utils import output_onehot_transform
+from strix.models.cnn.engines import TRAIN_ENGINES
+from strix.models.cnn.engines.engine import StrixTrainEngine
+from strix.models.cnn.engines.utils import get_prepare_batch_fn
+from strix.utilities.utils import setup_logger, get_attr_
+from strix.utilities.transforms import decollate_transform_adaptor as DTA
+from strix.utilities.enum import Phases
 
-from monai_ex.engines import SupervisedTrainer, SupervisedEvaluator, EnsembleEvaluator
-from monai_ex.engines import multi_gpu_supervised_trainer
-from monai_ex.inferers import SimpleInferer, SlidingWindowClassify, SlidingWindowInferer
-from ignite.metrics import MeanSquaredError
+from monai_ex.engines import SupervisedEvaluatorEx, SupervisedTrainerEx
+from monai_ex.inferers import SimpleInferer
+from monai_ex.transforms import GetItemD, EnsureTypeD, Compose
+from ignite.metrics import MeanSquaredError, SSIM
 
 from monai_ex.handlers import (
-    StatsHandler,
-    TensorBoardStatsHandler,
     ValidationHandler,
     LrScheduleTensorboardHandler,
-    TensorBoardImageHandlerEx,
-    CheckpointSaver,
+    EarlyStopHandler,
+    stopping_fn_from_metric,
+    from_engine_ex as from_engine,
 )
 
 
 @TRAIN_ENGINES.register("selflearning")
-def build_selflearning_engine(**kwargs):
-    opts = kwargs["opts"]
-    train_loader = kwargs["train_loader"]
-    test_loader = kwargs["test_loader"]
-    net = kwargs["net"]
-    loss = kwargs["loss"]
-    optim = kwargs["optim"]
-    lr_scheduler = kwargs["lr_scheduler"]
-    writer = kwargs["writer"]
-    valid_interval = kwargs["valid_interval"]
-    device = kwargs["device"]
-    model_dir = kwargs["model_dir"]
-    logger_name = kwargs.get("logger_name", None)
-    image_ = cfg.get_key("image")
-    label_ = cfg.get_key("label")
-    pred_ = cfg.get_key("pred")
-    loss_ = cfg.get_key("loss")
+class SelflearningTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
+    def __init__(
+        self,
+        opts,
+        train_loader,
+        test_loader,
+        net,
+        loss,
+        optim,
+        lr_scheduler,
+        writer,
+        device,
+        model_dir,
+        logger_name,
+        **kwargs
+    ):
+        valid_interval = kwargs.get("valid_interval", 1)
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        decollate = False
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+        freeze_mode = get_attr_(opts, "freeze_mode", None)
+        freeze_params=get_attr_(opts, "freeze_params", None)
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _loss = cfg.get_key("loss")
 
-    val_handlers = [
-        StatsHandler(output_transform=lambda x: None),
-        TensorBoardStatsHandler(summary_writer=writer, tag_name="val_loss"),
-        TensorBoardImageHandlerEx(
-            summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
-            max_channels=opts.output_nc,
-            prefix_name="Val",
-        ),
-        CheckpointSaver(
-            save_dir=model_dir,
-            save_dict={"net": net},
-            save_key_metric=True,
-            key_metric_name="val_mse",
-            key_metric_mode="min",
-            key_metric_n_saved=2,
-        ),
-    ]
+        key_val_metric = SelflearningTrainEngine.get_metric(Phases.VALID, opts.output_nc, decollate)
+        val_metric_name = list(key_val_metric.keys())[0]
+        key_train_metric = SelflearningTrainEngine.get_metric(Phases.TRAIN, opts.output_nc, decollate)
 
-    prepare_batch_fn = lambda x, device, nb: (
-        x[image_].to(device),
-        x[label_].to(device),
-    )
-    key_metric_transform_fn = lambda x: (x[pred_], x[label_])
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
-    evaluator = SupervisedEvaluator(
-        device=device,
-        val_data_loader=test_loader,
-        network=net,
-        epoch_length=int(opts.n_epoch_len)
-        if opts.n_epoch_len > 1.0
-        else int(opts.n_epoch_len * len(test_loader)),
-        prepare_batch=prepare_batch_fn,
-        inferer=SimpleInferer(),
-        key_val_metric={"val_mse": MeanSquaredError(key_metric_transform_fn)},
-        val_handlers=val_handlers,
-        amp=opts.amp,
-    )
+        val_handlers = StrixTrainEngine.get_basic_handlers(
+            phase="val",
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
+            tb_summary_writer=writer,
+            logger_name=logger_name,
+            stats_dicts={val_metric_name: lambda x: None},
+            save_bestmodel=True,
+            model_file_prefix=val_metric_name,
+            bestmodel_n_saved=opts.save_n_best,
+            tensorboard_image_kwargs=SelflearningTrainEngine.get_tensorboard_image_transform(
+                opts.output_nc, decollate
+            ),
+            dump_tensorboard=True,
+            record_nni=opts.nni,
+            nni_kwargs={
+                "metric_name": val_metric_name,
+                "max_epochs": opts.n_epoch,
+                "logger_name": logger_name,
+            },
+        )
 
-    if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-        lr_step_transform = lambda x: evaluator.state.metrics["val_mse"]
-    else:
-        lr_step_transform = lambda x: ()
+        if opts.early_stop > 0:
+            val_handlers += [
+                EarlyStopHandler(
+                    patience=opts.early_stop,
+                    score_function=stopping_fn_from_metric(val_metric_name),
+                    trainer=self,
+                    min_delta=0.0001,
+                    epoch_level=True,
+                ),
+            ]
 
-    train_handlers = [
-        LrScheduleTensorboardHandler(
-            lr_scheduler=lr_scheduler,
-            summary_writer=writer,
-            step_transform=lr_step_transform,
-        ),
-        ValidationHandler(
-            validator=evaluator, interval=valid_interval, epoch_level=True
-        ),
-        StatsHandler(tag_name="train_loss", output_transform=lambda x: x[loss_]),
-        CheckpointSaver(
-            save_dir=model_dir,
-            save_dict={"net": net, "optim": optim},
-            save_interval=opts.save_epoch_freq,
-            epoch_level=True,
-            n_saved=5,
-        ),
-        TensorBoardStatsHandler(
-            summary_writer=writer,
-            tag_name="train_loss",
-            output_transform=lambda x: x[loss_],
-        ),
-        TensorBoardImageHandlerEx(
-            summary_writer=writer,
-            batch_transform=lambda x: (x[image_], x[label_]),
-            output_transform=lambda x: x[pred_],
-            max_channels=opts.output_nc,
-            prefix_name="train",
-        ),
-    ]
+        evaluator = SupervisedEvaluatorEx(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=None,
+            key_val_metric=key_val_metric,
+            val_handlers=val_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict()
+        )
+        evaluator.logger = setup_logger(logger_name)
 
-    trainer = SupervisedTrainer(
-        device=device,
-        max_epochs=opts.n_epoch,
-        train_data_loader=train_loader,
-        network=net,
-        optimizer=optim,
-        loss_function=loss,
-        epoch_length=int(opts.n_epoch_len)
-        if opts.n_epoch_len > 1.0
-        else int(opts.n_epoch_len * len(train_loader)),
-        prepare_batch=prepare_batch_fn,
-        inferer=SimpleInferer(),
-        train_handlers=train_handlers,
-        amp=opts.amp,
-    )
-    return trainer
+        if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
+        else:
+            lr_step_transform = lambda x: ()
+
+        train_handlers = [
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
+            LrScheduleTensorboardHandler(
+                lr_scheduler=lr_scheduler,
+                summary_writer=writer,
+                name=logger_name,
+                step_transform=lr_step_transform,
+            ),
+        ]
+        train_handlers += StrixTrainEngine.get_basic_handlers(
+            phase="train",
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
+            tb_summary_writer=writer,
+            logger_name=logger_name,
+            stats_dicts={"train_loss": from_engine(_loss, first=True)},
+            save_checkpoint=True,
+            checkpoint_save_interval=opts.save_epoch_freq,
+            ckeckpoint_n_saved=1,
+            tensorboard_image_kwargs=SelflearningTrainEngine.get_tensorboard_image_transform(
+                output_nc=opts.output_nc, decollate=decollate
+            ),
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
+            freeze_mode=freeze_mode,
+            freeze_params=freeze_params,
+        )
+
+        SupervisedTrainerEx.__init__(
+            self,
+            device=device,
+            max_epochs=opts.n_epoch,
+            train_data_loader=train_loader,
+            network=net,
+            optimizer=optim,
+            loss_function=loss,
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(train_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=None,
+            key_train_metric=key_train_metric,
+            train_handlers=train_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+            ensure_dims=True,
+        )
+        self.logger = setup_logger(logger_name)
+
+    @staticmethod
+    def get_metric(phase: Phases, output_nc: int, decollate: bool, item_index: Optional[int] = None, suffix: str = ''):
+        """Return selflearning engine's metrics
+
+        Args:
+            phase (Phases): phase enum.
+            output_nc (int): output channel num.
+            decollate (bool): whether to use decollate.
+            item_index (Optional[int], optional): If network's output and label are tuple, specify its index.
+             design for multitask compatibility. Defaults to None.
+            suffix (str, optional): suffix for subtask. Defaults to ''.
+        """
+        transform = SelflearningTrainEngine.get_mse_post_transform(decollate, item_index)
+        key_metric = MeanSquaredError(transform)
+        return {f"{phase.value}_mse_{suffix}": key_metric} if suffix else {f"{phase.value}_mse": key_metric}
+
+    @staticmethod
+    def get_mse_post_transform(decollate, item_index):
+        _pred = cfg.get_key("pred")
+        _label = cfg.get_key("label")
+
+        if item_index:
+            transforms = [
+                DTA(GetItemD(keys=[_pred, _label], index=item_index)),
+                DTA(EnsureTypeD(keys=[_pred, _label], device="cpu")),
+                from_engine([_pred, _label])
+            ]
+        else:
+            transforms = [
+                DTA(EnsureTypeD(keys=[_pred, _label], device="cpu")),
+                from_engine([_pred, _label]),
+            ]
+
+        return Compose(transforms, map_items=not decollate)
+
+    @staticmethod
+    def get_tensorboard_image_transform(
+        output_nc: int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None
+    ):
+        _image = cfg.get_key("image")
+        _label = label_key if label_key else cfg.get_key("label")
+        _pred = cfg.get_key("pred")
+
+        post_transform = Compose(
+            [
+                DTA(GetItemD(keys=_pred, index=item_index)) if item_index is not None else lambda x: x,
+                from_engine(_pred)
+            ],
+            map_items=not decollate,
+        )
+
+        return {
+            "batch_transform": from_engine([_image, _label]),
+            "output_transform": post_transform,
+            "max_channels": 3,
+        }

@@ -367,6 +367,7 @@ def plot_summary(summary, output_fpath):
         # plt.ylim([0., 1.])
         ax = plt.axes()
         ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(30)) 
         ax.yaxis.set_major_formatter(ScalarFormatter())
         plt.xlabel("Number of iterations per case")
         plt.grid(True)
