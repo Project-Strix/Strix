@@ -3,7 +3,7 @@ from typing import Any
 import os
 import torch
 
-from strix.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI
+from strix.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI, SELFLEARNING_ARCHI
 from strix.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from strix.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from strix.models.cnn.nets.dynunet import DynUNet
@@ -141,8 +141,51 @@ def strix_vgg11_bn(
     return vgg11_bn(pretrained=False, progress=True, **inkwargs)
 
 
-# @SELFLEARNING_ARCHI.register('2D', 'unet')
-# @SELFLEARNING_ARCHI.register('3D', 'unet')
+@SELFLEARNING_ARCHI.register('2D', 'unet')
+@SELFLEARNING_ARCHI.register('3D', 'unet')
+def strix_dyn_unet(
+    spatial_dims: int,
+    in_channels: int,
+    out_channels: int,
+    act: str,
+    norm: str,
+    n_depth: int,
+    n_group: int,
+    drop_out: float,
+    is_prunable: bool,
+    pretrained: bool,
+    pretrained_model_path: str,
+    **kwargs: Any
+):
+    n_depth = 5 if n_depth == -1 else n_depth
+    kernel_size = kwargs.get("kernel_size", (3,) + (3,) * n_depth)
+    strides = kwargs.get("strides", (1,) + (2,) * n_depth)
+    upsample_kernel_size = kwargs.get("upsample_kernel_size", (1,) + (2,) * n_depth)
+    deep_supervision = kwargs.get("deep_supervision", False)
+    deep_supr_num = kwargs.get("deep_supr_num", 1)
+    res_block = False
+    last_activation = "sigmoid"
+    filters = kwargs.get("filters", None)
+    output_bottleneck = kwargs.get("output_bottleneck", False)
+
+    return DynUNet(
+        spatial_dims,
+        in_channels,
+        out_channels,
+        kernel_size,
+        strides,
+        upsample_kernel_size,
+        norm,
+        deep_supervision,
+        deep_supr_num,
+        res_block,
+        last_activation,
+        is_prunable,
+        filters,
+        output_bottleneck,
+    )
+
+
 @SEGMENTATION_ARCHI.register("2D", "unet")
 @SEGMENTATION_ARCHI.register("3D", "unet")
 def strix_dyn_unet(
