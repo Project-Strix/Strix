@@ -13,13 +13,16 @@ from monai_ex.transforms import (
 from strix.data_io import (
     SEGMENTATION_DATASETS,
     CLASSIFICATION_DATASETS,
+    SELFLEARNING_DATASETS,
     BasicSegmentationDataset,
     BasicClassificationDataset,
 )
-
+from strix.utilities.enum import Frameworks
 
 @SEGMENTATION_DATASETS.register("2D", "SyntheticData", None)
 @SEGMENTATION_DATASETS.register("3D", "SyntheticData", None)
+@SELFLEARNING_DATASETS.register("2D", "SyntheticData", None)
+@SELFLEARNING_DATASETS.register("3D", "SyntheticData", None)
 def synthetic_dataset_3d(files_list, phase, opts):
     if opts['output_nc'] in [1, 2]:
         seg_cls = 1
@@ -29,6 +32,9 @@ def synthetic_dataset_3d(files_list, phase, opts):
         raise ValueError(f"Got unexpected output_nc: {opts['output_nc']}")
 
     dim = opts["tensor_dim"]
+
+    if opts["framework"] == Frameworks.SELFLEARNING.value:
+        seg_cls = 0  # to generate two images not label
 
     if dim == "2D":
         loader = GenerateSyntheticDataD(
