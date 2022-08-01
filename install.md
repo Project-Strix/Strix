@@ -18,10 +18,13 @@ git clone --recursive https://github.com/Project-Strix/Strix.git
 pip install -e ./Strix/MONAI_EX
 pip install -e ./Strix
 ```
+
 ### 4. If you just want to use Strix, you can directly install Strix by:
 ```
 pip install git+https://github.com/Project-Strix/MONAI_EX.git
 pip install git+https://github.com/Project-Strix/Strix.git
 ```
 
+
 _Notice that Strix is only tested on **Linux** only, not on Windows. If you find any problem with the deployment on Windows, please submit an [issue](https://github.com/Project-Strix/Strix/issues)._
+
