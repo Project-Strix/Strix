@@ -77,7 +77,10 @@ def select_gpu(ctx, param, value):
     try:
         result = subprocess.check_output(MIG_CMD)
     except subprocess.CalledProcessError:
-        pass
+        # mig query is not support
+        gpu_list = subprocess.check_output(LIST_CMD).decode("utf-8").split("\n")
+        gpu_num = len(list(filter(lambda x: x, gpu_list)))
+        statuses = [False,] * gpu_num
     else:
         modes = result.decode("utf-8").split("\n")
         statuses = ["enabled" == status.lower() for status in modes if status]
