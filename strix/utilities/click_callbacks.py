@@ -333,6 +333,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
                 cond = lambda x: True
 
             loss_params = {}
+            # print("Prompt custom loss for", func, sig.parameters.items())
             for k, v in filter(cond, sig.parameters.items()):
                 if anno.get(k) in BUILTIN_TYPES:
                     default_value = None if v.default is v.empty else v.default

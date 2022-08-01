@@ -10,6 +10,7 @@ DEFAULT_STRIX_CONFIG = {
     "OUTPUT_DIR": str(Path.home() / "Strix" / "strix_exp"),
     "EXTERNAL_DATASET_DIR": str(Path.home() / "Strix" / "strix_datasets"),
     "EXTERNAL_NETWORK_DIR": str(Path.home() / "Strix" / "strix_networks"),
+    "EXTERNAL_LOSS_DIR": str(Path.home() / "Strix" / "strix_losses"),
 }
 
 
@@ -39,6 +40,7 @@ def init(add_path=True):
     if add_path:
         sys.path.append(_config_dict["STRIX_CONFIG"]["EXTERNAL_DATASET_DIR"])
         sys.path.append(_config_dict["STRIX_CONFIG"]["EXTERNAL_NETWORK_DIR"])
+        sys.path.append(_config_dict["STRIX_CONFIG"]["EXTERNAL_LOSS_DIR"])
 
 
 def get_cfg(section_name, keyword):

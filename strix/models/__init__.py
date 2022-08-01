@@ -37,6 +37,12 @@ if external_network_dir.is_dir():
         import_file(f.stem, str(f))
 
 
+external_loss_dir = Path(cfg.get_strix_cfg("EXTERNAL_LOSS_DIR"))
+if external_loss_dir.is_dir():
+    for f in external_loss_dir.glob("*.py"):
+        import_file(f.stem, str(f))
+
+
 def create_feature_maps(init_channel_number, number_of_fmaps):
     return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
 
