@@ -24,7 +24,8 @@ from strix.utilities.utils import (
     get_colors,
     setup_logger,
     get_items,
-    trycatch
+    trycatch,
+    generate_synthetic_datalist,
 )
 from strix.data_io import DATASET_MAPPING
 from strix.configures import config as cfg
@@ -175,6 +176,7 @@ def check_data(ctx, **args):
     auxilary_params = get_unknown_options(ctx, verbose=True)
     cargs.out_dir = check_dir(cargs.out_dir, "data checking")
     auxilary_params.update({"experiment_path": str(cargs.out_dir)})
+    auxilary_params.update(**args)
 
     logger_name = f"check-{cargs.data_list}"
     logger = setup_logger(logger_name)
@@ -183,8 +185,11 @@ def check_data(ctx, **args):
     def get_train_valid_datasets():
         data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
         dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
-        files_list = get_items(dataset_list, format="auto")
-        files_train, files_valid = train_test_split(files_list, test_size=cargs.split, random_state=cargs.seed)
+        if dataset_list is None:  #synthetic data
+            file_list = generate_synthetic_datalist(100, logger)
+        else:
+            file_list = get_items(dataset_list, format="auto")
+        files_train, files_valid = train_test_split(file_list, test_size=cargs.split, random_state=cargs.seed)
 
         train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)
         valid_ds = dataset_fn(files_valid, Phases.VALID, auxilary_params)
