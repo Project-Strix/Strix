@@ -19,7 +19,7 @@ from strix.configures import config as cfg
 from strix.utilities.enum import Phases
 from strix.utilities.click import OptionEx, CommandEx
 import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger, get_items
+from strix.utilities.utils import setup_logger, get_items, generate_synthetic_datalist
 from strix.utilities.click_callbacks import (
     get_unknown_options,
     get_exp_name,
@@ -194,12 +194,7 @@ def train(ctx, **args):
 
     # ! Synthetic test phase
     if data_list is None:
-        train_data_num = 100
-        logger.info(" ==== Using synthetic test data ====")
-        train_datalist = [
-            {"image": f"synthetic_image{i}.nii.gz", "label": f"synthetic_label{i}.nii.gz"}
-            for i in range(train_data_num)
-        ]
+        train_datalist = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
         train_datalist = get_items(data_list, format="auto")

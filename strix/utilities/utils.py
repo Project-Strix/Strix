@@ -28,18 +28,18 @@ from monai.networks import one_hot
 from monai_ex.utils import ensure_list, GenericException
 from utils_cw import catch_exception, get_items_from_file, Print
 
-trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords='strix')
+trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords="strix")
+
 
 @trycatch()
 def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = False):
-    """Wrapper of utils_cw's `get_items_from_file` function with `trycatch` decorator.
-    """
+    """Wrapper of utils_cw's `get_items_from_file` function with `trycatch` decorator."""
     try:
         return get_items_from_file(filelist, format, sep)
     except json.JSONDecodeError as e:
         raise GenericException("Content of your json file cannot be parsed. Please recheck it!")
     except yaml.YAMLError as e:
-        if hasattr(e, 'problem_mark'):
+        if hasattr(e, "problem_mark"):
             mark = e.problem_mark
         raise GenericException(
             f"Content of your yaml file cannot be parsed. Please recheck it!\n"
@@ -53,34 +53,17 @@ def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = Fals
         else:
             raise GenericException(f"File not found! {filelist}")
 
-# class ExceptionCatcher:
-#     def __init__(self, handled_exception) -> None:
-#         self.handled_exception = handled_exception
 
-#     def catch(self, module_instance):
-#         self.instance = module_instance
-
-#     def __getattr__(self, k):
-#         def wrapper(*args, **kwargs):
-#             try:
-#                 return getattr(self.instance, k)(*args, **kwargs)
-#             except self.handled_exception as e:
-#                 log_info = f"\n{'! '*30}\nError occurred! Please check your code! Msg:\n{colored(e, color='red')}\n{'! '*30}"
-#                 print(log_info)
-#                 sys.exit(-1)
-#             except Exception as e:
-#                 exc_type, exc_obj, exc_tb = sys.exc_info()
-#                 Print("Exception trace:", color="r")
-#                 print(" ".join(traceback.format_tb(exc_tb, limit=2)[-1:]))
-#                 sys.exit(-1)
-
-#         if hasattr(self.instance, k):
-#             return wrapper
-#         else:
-#             raise AttributeError(f'No such field/method: {k}')
+def generate_synthetic_datalist(data_num: int = 100, logger=None):
+    if logger:
+        logger.info(" ==== Using synthetic data ====")
+    train_datalist = [
+        {"image": f"synthetic_image{i}.nii.gz", "label": f"synthetic_label{i}.nii.gz"} for i in range(data_num)
+    ]
+    return train_datalist
 
 
-def get_attr_(obj, name, default = None):
+def get_attr_(obj, name, default=None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 
@@ -141,9 +124,7 @@ def create_rgb_summary(label):
 
     cm = pylab.get_cmap("gist_rainbow")
 
-    new_label = np.zeros(
-        (label.shape[0], label.shape[1], label.shape[2], 3), dtype=np.float32
-    )
+    new_label = np.zeros((label.shape[0], label.shape[1], label.shape[2], 3), dtype=np.float32)
 
     for i in range(num_colors):
         color = cm(1.0 * i / num_colors)  # color will now be an RGBA tuple
@@ -203,15 +184,9 @@ def add_3D_overlay_to_summary(
     else:
         center_x, center_y, center_z = centers
 
-    segmentation_overlay_x = np.squeeze(
-        data_[center_x, :, :, :] + mask_[center_x, :, :, :]
-    )
-    segmentation_overlay_y = np.squeeze(
-        data_[:, center_y, :, :] + mask_[:, center_y, :, :]
-    )
-    segmentation_overlay_z = np.squeeze(
-        data_[:, :, center_z, :] + mask_[:, :, center_z, :]
-    )
+    segmentation_overlay_x = np.squeeze(data_[center_x, :, :, :] + mask_[center_x, :, :, :])
+    segmentation_overlay_y = np.squeeze(data_[:, center_y, :, :] + mask_[:, center_y, :, :])
+    segmentation_overlay_z = np.squeeze(data_[:, :, center_z, :] + mask_[:, :, center_z, :])
 
     if len(segmentation_overlay_x.shape) != 3:
         segmentation_overlay_x, segmentation_overlay_y, segmentation_overlay_z = (
@@ -367,7 +342,7 @@ def plot_summary(summary, output_fpath):
         # plt.ylim([0., 1.])
         ax = plt.axes()
         ax.yaxis.set_major_locator(ticker.MultipleLocator(0.05))
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(30)) 
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(30))
         ax.yaxis.set_major_formatter(ScalarFormatter())
         plt.xlabel("Number of iterations per case")
         plt.grid(True)
@@ -425,7 +400,7 @@ def dump_tensorboard(db_file, dump_keys=None, save_image=False, verbose=False):
 
 
 def _generate_color_palette(num_masks):
-    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    palette = torch.tensor([2**25 - 1, 2**15 - 1, 2**21 - 1])
     return [tuple((i * palette) % 255) for i in range(num_masks)]
 
 
@@ -450,7 +425,7 @@ def get_bound_2d(mask, connectivity=1):
     elif connectivity == 2:
         offset = [(0, 0, 1), (0, 0, -1), (0, 1, 0), (0, -1, 0), (0, 1, 1), (0, 1, -1), (0, -1, -1), (0, -1, 1)]
     else:
-        raise ValueError(f'Connectivity should be 1 or 2, but got {connectivity}')
+        raise ValueError(f"Connectivity should be 1 or 2, but got {connectivity}")
 
     def is_bound(data, coord, offsets):
         zeros = []
@@ -464,7 +439,7 @@ def get_bound_2d(mask, connectivity=1):
 
     boundaries = []
     if mask.ndim == 3 and mask.shape[0] > 1:
-        for channel in mask[1:,...]:
+        for channel in mask[1:, ...]:
             coords = torch.nonzero(channel[None])
             if len(coords) == 0:
                 continue
@@ -492,9 +467,7 @@ def __check_image_mask(image, masks):
         if image.size()[0] == 1:
             image = image.repeat_interleave(3, dim=0)
         else:
-            raise ValueError(
-                f"Pass an RGB image. Other Image formats are not supported, got {image.size()}"
-            )
+            raise ValueError(f"Pass an RGB image. Other Image formats are not supported, got {image.size()}")
 
     mask_value_range = masks.unique()
     if masks.ndim == 2:
@@ -517,9 +490,7 @@ def __check_image_mask(image, masks):
 
 def __generate_colors(colors, num_colors):
     if colors is not None and num_colors > len(colors):
-        raise ValueError(
-            f"There are more masks ({num_colors}) than colors ({len(colors)})"
-        )
+        raise ValueError(f"There are more masks ({num_colors}) than colors ({len(colors)})")
 
     if colors is None:
         colors = _generate_color_palette(num_colors)
@@ -529,9 +500,7 @@ def __generate_colors(colors, num_colors):
     if not isinstance(colors[0], (tuple, str)):
         raise ValueError("colors must be a tuple or a string, or a list thereof")
     if isinstance(colors[0], tuple) and len(colors[0]) != 3:
-        raise ValueError(
-            "It seems that you passed a tuple of colors instead of a list of colors"
-        )
+        raise ValueError("It seems that you passed a tuple of colors instead of a list of colors")
 
     out_dtype = torch.uint8
 
@@ -576,7 +545,7 @@ def draw_segmentation_masks(
     img_to_draw = image.detach().clone()
     # TODO: There might be a way to vectorize this
     if masks.ndim == 3 and masks.shape[0] > 1:
-        masks = masks[1:,...]  # skip 0-th channel for onehotted mask
+        masks = masks[1:, ...]  # skip 0-th channel for onehotted mask
     for mask, color in zip(masks, colors_):
         img_to_draw[:, mask] = color[:, None]
 
@@ -630,14 +599,14 @@ def draw_segmentation_contour(
 class LogColorFormatter(logging.Formatter):
     """Logging colored formatter, adapted from https://stackoverflow.com/a/56944256/3638629"""
 
-    grey = '\x1b[38;21m'
-    blue = '\x1b[38;5;39m'
-    yellow = '\x1b[38;5;226m'
-    red = '\x1b[38;5;196m'
-    bold_red = '\x1b[31;1m'
-    reset = '\x1b[0m'
+    grey = "\x1b[38;21m"
+    blue = "\x1b[38;5;39m"
+    yellow = "\x1b[38;5;226m"
+    red = "\x1b[38;5;196m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
 
-    def __init__(self, fmt = None):
+    def __init__(self, fmt=None):
         super().__init__()
         self.fmt = fmt if fmt else "%(asctime)s %(name)s %(levelname)s: %(message)s (%(filename)s:%(lineno)d)"
         self.FORMATS = {
@@ -645,7 +614,7 @@ class LogColorFormatter(logging.Formatter):
             logging.INFO: self.blue + self.fmt + self.reset,
             logging.WARNING: self.yellow + self.fmt + self.reset,
             logging.ERROR: self.red + self.fmt + self.reset,
-            logging.CRITICAL: self.bold_red + self.fmt + self.reset
+            logging.CRITICAL: self.bold_red + self.fmt + self.reset,
         }
 
     def format(self, record):
@@ -663,10 +632,10 @@ def setup_logger(
     filepath: Optional[str] = None,
     distributed_rank: Optional[int] = None,
     reset: bool = False,
-    terminator: str = '\n'
+    terminator: str = "\n",
 ) -> logging.Logger:
     """
-    Extented ignite's setup_logger. 
+    Extented ignite's setup_logger.
     Extended: `color`, `terminator`.
 
     Setups logger: name, level, format etc.
@@ -771,7 +740,7 @@ def setup_logger(
         if filepath is not None:
             fh = logging.FileHandler(filepath)
             fh.setLevel(level)
-            fh.setFormatter(logging.Formatter(format)) # file no color
+            fh.setFormatter(logging.Formatter(format))  # file no color
             logger.addHandler(fh)
 
     # don't propagate to ancestors
@@ -781,5 +750,3 @@ def setup_logger(
         logger.propagate = False
 
     return logger
-
-
