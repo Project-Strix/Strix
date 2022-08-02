@@ -23,7 +23,7 @@ from strix.utilities.enum import Frameworks
 @SEGMENTATION_DATASETS.register("3D", "SyntheticData", None)
 @SELFLEARNING_DATASETS.register("2D", "SyntheticData", None)
 @SELFLEARNING_DATASETS.register("3D", "SyntheticData", None)
-def synthetic_dataset_3d(files_list, phase, opts):
+def synthetic_dataset(files_list, phase, opts):
     if opts['output_nc'] in [1, 2]:
         seg_cls = 1
     elif opts['output_nc'] > 2:
