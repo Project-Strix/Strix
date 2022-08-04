@@ -21,7 +21,7 @@ from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
-from strix.utilities.project_loader import ProjectLoader
+from strix.utilities.project_loader import ProjectManager
 from utils_cw import Print, check_dir, PathlibEncoder
 
 
@@ -440,7 +440,7 @@ def parse_project(ctx, param, value):
 
     if (value / "project.yml").is_file():
         try:
-            loader = ProjectLoader()
+            loader = ProjectManager()
             loader.load(value / "project.yml")
         except Exception as e:
             print(f"Project {value.name} loaded failed!\nMeg: {e}")
