@@ -21,6 +21,7 @@ from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
+from strix.utilities.project_loader import ProjectLoader
 from utils_cw import Print, check_dir, PathlibEncoder
 
 
@@ -430,6 +431,13 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
             ]:
                 dump_dict.pop(flag)
             json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+    return value
+
+
+def parse_project(ctx, param, value):
+    if (value / "project.yml").is_file():
+        loader = ProjectLoader(value / "project.yml")
+        loader.load()
     return value
 
 
