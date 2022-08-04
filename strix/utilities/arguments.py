@@ -59,6 +59,7 @@ def common_params(func):
         "--framework", prompt=True, type=Choice(FRAMEWORKS), default=1,
         callback=framework_select, help="Choose your framework type"
     )
+    @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
     @option("--data-list", type=str, callback=data_select, default=None, help="Data file list (json/yaml)")
     @option("--preload", type=float, default=1.0, help="Ratio of preload data")
     @option("--n-epoch", prompt=True, show_default=True, type=int, default=1000, help="Epoch number")
@@ -97,7 +98,6 @@ def common_params(func):
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
     @option("--debug", is_flag=True, help="Enter debug mode")
     @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
-    @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

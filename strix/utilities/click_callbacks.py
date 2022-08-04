@@ -435,9 +435,16 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
 
 
 def parse_project(ctx, param, value):
+    if isinstance(value, str):
+        value = Path(value)
+
     if (value / "project.yml").is_file():
-        loader = ProjectLoader(value / "project.yml")
-        loader.load()
+        try:
+            loader = ProjectLoader()
+            loader.load(value / "project.yml")
+        except Exception as e:
+            print(f"Project {value.name} loaded failed!\nMeg: {e}")
+
     return value
 
 
