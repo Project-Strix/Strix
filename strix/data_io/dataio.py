@@ -1,5 +1,5 @@
-from multiprocessing.sharedctypes import Value
-from typing import Mapping
+from typing import List, Optional
+from types import SimpleNamespace
 import sys
 import traceback
 
@@ -62,16 +62,35 @@ def get_default_setting(phase, **kwargs):
 
 
 @trycatch()
-def get_dataloader(args, files_list, phase):
+def get_dataloader(
+    args: SimpleNamespace, filelist: List, phase: Phases, unlabel_filelist: Optional[List] = None
+):
+    """Generate pytorch datalist from given args and filelist.
+
+    Args:
+        args (SimpleNamespace): Necessary arguments.
+        filelist (List): List containing data file items.
+        phase (Phases): Phase of the dataloader
+        unlabel_filelist (Optional[List], optional): List containing unlabled data. Defaults to None.
+
+    Raises:
+        DatasetException: Exception occured in custom dataset function.
+        NotImplementedError: Imbalanced dataset sampling.
+
+    Returns:
+        DataLoader: Pytorch's dataloader
+    """
+
     params = get_default_setting(
         phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch_valid, train_n_workers=args.n_worker
     )  #! How to customize?
-    arguments = {"files_list": files_list, "phase": phase, "opts": vars(args)}
+    if unlabel_filelist:
+        arguments = {"filelist": filelist, "unlabel_filelist": unlabel_filelist, "phase": phase, "opts": vars(args)}
+    else:
+        arguments = {"filelist": filelist, "phase": phase, "opts": vars(args)}
 
     try:
-        dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]["FN"](
-            **arguments
-        )
+        dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]["FN"](**arguments)
     except Exception as e:
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e
@@ -82,16 +101,16 @@ def get_dataloader(args, files_list, phase):
     elif (
         phase == "train"
         and args.imbalance_sample
-        and files_list[0].get(label_key) is not None
+        and filelist[0].get(label_key) is not None
     ):
-        if isinstance(files_list[0][label_key], (list, tuple)):
+        if isinstance(filelist[0][label_key], (list, tuple)):
             raise NotImplementedError(
                 "Imbalanced dataset sampling cannot handle list&tuple label"
             )
 
         print("Using imbalanced dataset sampling!")
         params.update({"shuffle": False})
-        labels = [l[label_key] for l in files_list]
+        labels = [l[label_key] for l in filelist]
 
         df = pd.DataFrame()
         df["label"] = labels

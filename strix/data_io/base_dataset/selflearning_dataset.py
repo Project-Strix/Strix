@@ -11,7 +11,7 @@ from strix.data_io.base_dataset.utils import get_input_data
 class BasicSelflearningDataset(object):
     def __new__(
         self,
-        files_list: Sequence,
+        filelist: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
         channeler: Union[Sequence[MapTransform], MapTransform],
         orienter: Union[Sequence[MapTransform], MapTransform],
@@ -27,16 +27,16 @@ class BasicSelflearningDataset(object):
         check_data: bool = True,
         verbose: bool = False,
     ):
-        self.files_list = files_list
+        self.filelist = filelist
         self.verbose = verbose
         self.dataset = dataset_type
         self.dataset_kwargs = dataset_kwargs
         if check_data:
             self.input_data = get_input_data(
-                files_list, False, verbose, self.__class__.__name__
+                filelist, False, verbose, self.__class__.__name__
             )
         else:
-            self.input_data = files_list
+            self.input_data = filelist
 
         self.transforms = ensure_list(loader)
         if channeler is not None:

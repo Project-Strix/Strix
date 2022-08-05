@@ -17,7 +17,7 @@ root_tree = {
         "FRAMEWORK": "",
         "KEYS": ("image", "label"),
         "PHASE": ("train", "valid", "test"),
-        "FILES_LIST": "",
+        "FILELIST": "",
     },
     "PREPROCESS": {
         "LOADER": {},
@@ -69,10 +69,10 @@ def parse_dataset_config(configs):
     check_config(
         configs, key=["ATTRIBUTE", "PHASE"], candidates=["train", "valid", "test"]
     )
-    check_config(configs, key=["ATTRIBUTE", "FILES_LIST"])
+    check_config(configs, key=["ATTRIBUTE", "FILELIST"])
     check_config(configs, key=["PREPROCESS", "LOADER"])
 
-    file_list = configs["ATTRIBUTE"]["FILES_LIST"]
+    file_list = configs["ATTRIBUTE"]["FILELIST"]
     assert os.path.isfile(file_list), f"File list not exist! {file_list}"
 
     default_keys = configs["ATTRIBUTE"]["KEYS"]
@@ -233,7 +233,7 @@ def register_dataset_from_cfg(config_path):
     DATASET_MAPPING[configs["ATTRIBUTE"]["FRAMEWORK"]].register(
         configs["ATTRIBUTE"]["DIM"],
         configs["ATTRIBUTE"]["NAME"],
-        configs["ATTRIBUTE"]["FILES_LIST"],
+        configs["ATTRIBUTE"]["FILELIST"],
         partial(
             create_dataset_from_cfg,
             datasets=datasets_,
@@ -256,7 +256,7 @@ def test_dataset_from_config(config_path, phase, opts):
         )
     )
     dataset = create_dataset_from_cfg(
-        get_items_from_file(configs["ATTRIBUTE"]["FILES_LIST"], format='auto'),
+        get_items_from_file(configs["ATTRIBUTE"]["FILELIST"], format='auto'),
         phase,
         opts,
         datasets_,
