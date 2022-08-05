@@ -337,6 +337,9 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
+    if not _get_prompt_flag(ctx, param, value):  # loaded config from specified file
+        return value
+
     archilist = list(
         ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys()
     )
@@ -347,10 +350,7 @@ def model_select(ctx, param, value):
         )
         ctx.exit()
 
-    if value is not None and value in archilist:
-        return value
-    else:
-        return prompt("Model list", type=NumericChoice(archilist))
+    return prompt("Model", type=NumericChoice(archilist))
 
 
 def data_select(ctx, param, value):
