@@ -35,8 +35,6 @@ def _get_prompt_flag(ctx, param, value, sub_option_keyword=None):
     else:
         default_value = ctx.default_map.get(keyword, ctx.params.get(keyword))
 
-    if keyword == "model_name":
-        print(remeber_mode, default_value)
     prompt_flag = remeber_mode or (not remeber_mode and default_value is None)
     return prompt_flag
 
