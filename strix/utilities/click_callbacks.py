@@ -5,6 +5,7 @@ import math
 import json
 import inspect
 import subprocess
+import warnings
 from functools import partial
 from pathlib import Path
 from time import strftime
@@ -446,6 +447,8 @@ def parse_project(ctx, param, value):
             pm.load(value / "project.yml")
         except Exception as e:
             print(f"Project {value.name} loaded failed!\nMeg: {e}")
+    elif value != Path.cwd():
+        warnings.warn("No 'project.yml' is found! Skip loading project.")
 
     return value
 
@@ -491,7 +494,7 @@ def check_batchsize(ctx_params):
 
     ret = True
     if len_train < n_batch_train:
-        print(f"Validation batch size ({n_batch_train}) larger than valid data size ({len_train})!")
+        print(f"Training batch size ({n_batch_train}) larger than valid data size ({len_train})!")
         ret = False
     if len_valid < n_batch_valid:
         print(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!")
