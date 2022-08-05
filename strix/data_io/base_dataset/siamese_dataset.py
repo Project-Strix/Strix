@@ -64,7 +64,7 @@ class SiameseDatasetWrapper(Dataset):
 class BasicSiameseDataset(BasicClassificationDataset):
     def __new__(
         self,
-        files_list: Sequence,
+        filelist: Sequence,
         loader: Union[Sequence[MapTransform], MapTransform],
         channeler: Union[Sequence[MapTransform], MapTransform],
         orienter: Union[Sequence[MapTransform], MapTransform],
@@ -81,7 +81,7 @@ class BasicSiameseDataset(BasicClassificationDataset):
         verbose: Optional[bool] = False,
     ) -> None:
         super().__init__(
-            files_list=files_list,
+            filelist=filelist,
             loader=loader,
             channeler=channeler,
             orienter=orienter,

@@ -18,7 +18,7 @@ filelist = [
 
 def test_basic_clf_dataset():
     data = BasicClassificationDataset(
-        files_list=filelist,
+        filelist=filelist,
         loader=lambda x: x,
         channeler=None,
         orienter=None,

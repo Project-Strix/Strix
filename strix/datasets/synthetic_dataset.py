@@ -23,7 +23,7 @@ from strix.utilities.enum import Frameworks
 @SEGMENTATION_DATASETS.register("3D", "SyntheticData", None)
 @SELFLEARNING_DATASETS.register("2D", "SyntheticData", None)
 @SELFLEARNING_DATASETS.register("3D", "SyntheticData", None)
-def synthetic_dataset(files_list, phase, opts):
+def synthetic_dataset(filelist, phase, opts):
     if opts['output_nc'] in [1, 2]:
         seg_cls = 1
     elif opts['output_nc'] > 2:
@@ -50,7 +50,7 @@ def synthetic_dataset(files_list, phase, opts):
         )
 
     return BasicSegmentationDataset(
-        files_list,
+        filelist,
         loader=loader,
         channeler=EnsureChannelFirstD(keys=["image", "label"]),
         orienter=None,
@@ -71,7 +71,7 @@ def synthetic_dataset(files_list, phase, opts):
 
 @CLASSIFICATION_DATASETS.register("2D", "RandomData", None)
 @CLASSIFICATION_DATASETS.register("3D", "RandomData", None)
-def random_dataset_cls_nc1(files_list, phase, opts):
+def random_dataset_cls_nc1(filelist, phase, opts):
     if opts['output_nc'] in [1, 2]:
         out_cls = 1
     elif opts['output_nc'] > 2:
@@ -91,7 +91,7 @@ def random_dataset_cls_nc1(files_list, phase, opts):
         )
 
     return BasicClassificationDataset(
-        files_list,
+        filelist,
         loader=loader,
         channeler=EnsureChannelFirstD(keys="image"),
         orienter=None,

@@ -5,7 +5,7 @@ from utils_cw import get_items_from_file
 
 
 dataset = SIAMESE_DATASETS['2D']['jsph_mvi'](
-    files_list=get_items_from_file("/homes/clwang/Data/jsph_lung/MVI/data_crops/datalist-train.json"),
+    filelist=get_items_from_file("/homes/clwang/Data/jsph_lung/MVI/data_crops/datalist-train.json"),
     phase='valid', opts={})
 loader = DataLoader(dataset=dataset, batch_size=5)
 
