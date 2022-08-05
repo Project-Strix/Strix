@@ -9,8 +9,6 @@ from strix.utilities.utils import get_items
 class ProjectManager:
     def __init__(self) -> None:
         super(ProjectManager, self).__init__()
-        self.project_file = None
-        self.project_dict = {}
 
     def __new__(cls):
         if not hasattr(cls, 'instance'):
