@@ -14,8 +14,7 @@ from strix.data_io import (
     SEGMENTATION_DATASETS,
     CLASSIFICATION_DATASETS,
     SELFLEARNING_DATASETS,
-    BasicSegmentationDataset,
-    BasicClassificationDataset,
+    StrixDataset,
 )
 from strix.utilities.enum import Frameworks
 
@@ -49,8 +48,7 @@ def synthetic_dataset(filelist, phase, opts):
             num_seg_classes=seg_cls,
         )
 
-    return BasicSegmentationDataset(
-        filelist,
+    return StrixDataset(
         loader=loader,
         channeler=EnsureChannelFirstD(keys=["image", "label"]),
         orienter=None,
@@ -90,7 +88,7 @@ def random_dataset_cls_nc1(filelist, phase, opts):
             keys=["image", "label"], width=64, height=64, depth=32, num_classes=out_cls
         )
 
-    return BasicClassificationDataset(
+    return StrixDataset(
         filelist,
         loader=loader,
         channeler=EnsureChannelFirstD(keys="image"),
