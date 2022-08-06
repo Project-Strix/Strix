@@ -1,2 +1,2 @@
-from strix.data_io.base_dataset.basic_dataset import StrixDataset, StrixClassificationDataset, StrixSegmentationDataset, StrixSelflearningDataset
+from strix.data_io.base_dataset.basic_dataset import StrixDataset
 from strix.data_io.base_dataset.siamese_dataset import BasicSiameseDataset
