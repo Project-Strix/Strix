@@ -5,6 +5,7 @@ import math
 import json
 import inspect
 import subprocess
+import warnings
 from functools import partial
 from pathlib import Path
 from time import strftime
@@ -126,16 +127,32 @@ def _convert_type(var, types=[float, str]):
 def get_unknown_options(ctx, verbose=False):
     auxilary_params = {}
 
-    if isinstance(ctx, sn):  #! temp solution
+    if isinstance(ctx, sn):  # ! temp solution to skip check custom input (SimpleNamespace)
         return auxilary_params
 
-    for i in range(0, len(ctx.args), 2):  # Todo: how to handle flag auxilary params?
-        if str(ctx.args[i]).startswith("--"):
-            auxilary_params[ctx.args[i][2:].replace("-", "_")] = _convert_type(ctx.args[i + 1])
-        elif str(ctx.args[i]).startswith("-"):
-            auxilary_params[ctx.args[i][1:].replace("-", "_")] = _convert_type(ctx.args[i + 1])
-        else:
-            Print("Got invalid argument:", ctx.args[i], color="y", verbose=verbose)
+    def _check_if_argument(item):
+        if str(item).startswith("--"):
+            return True
+        if str(item).startswith("-") and not isinstance(_convert_type(item, types=[float]), float):
+            return True
+        return False
+
+    def _get_argument_name(item):
+        symbols = ["--", '-']
+        for sym in symbols:
+            if str(item).startswith(sym):
+                return item[len(sym):].replace("-", "_")
+        return None
+
+    for i, item in enumerate(ctx.args):
+        if _check_if_argument(item):            
+            if len(ctx.args) == i + 1:
+                break
+            elif _check_if_argument(ctx.args[i + 1]):
+                auxilary_params[_get_argument_name(item)] = True
+                warnings.warn(f'The flag argument {item} is set to True')
+            else:
+                auxilary_params[_get_argument_name(item)] = _convert_type(ctx.args[i + 1])
 
     Print("Got auxilary params:", auxilary_params, color="y", verbose=verbose)
     return auxilary_params
