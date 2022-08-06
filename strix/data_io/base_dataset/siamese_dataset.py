@@ -10,7 +10,7 @@ from monai_ex.transforms import *
 from monai_ex.utils import ensure_list
 from monai_ex.config import KeysCollection
 from numpy.lib.npyio import load
-from strix.data_io.base_dataset.classification_dataset import BasicClassificationDataset
+from strix.data_io.base_dataset.basic_dataset import StrixDataset
 
 
 class SiameseDatasetWrapper(Dataset):
@@ -61,7 +61,7 @@ class SiameseDatasetWrapper(Dataset):
         return data1, data2, int(data1[self.label_key] == data2[self.label_key])
 
 
-class BasicSiameseDataset(BasicClassificationDataset):
+class BasicSiameseDataset(StrixDataset):
     def __new__(
         self,
         filelist: Sequence,

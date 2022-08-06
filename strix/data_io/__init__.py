@@ -1,10 +1,8 @@
 from pathlib import Path
 from strix.utilities.imports import import_file
 from strix.configures import config as cfg
-from strix.data_io.base_dataset.classification_dataset import *
-from strix.data_io.base_dataset.selflearning_dataset import *
-from strix.data_io.base_dataset.segmentation_dataset import *
-from strix.data_io.base_dataset.siamese_dataset import *
+from strix.data_io.base_dataset.basic_dataset import StrixDataset
+from strix.data_io.base_dataset.siamese_dataset import BasicSiameseDataset
 
 from strix.data_io.dataio import (
     CLASSIFICATION_DATASETS,
