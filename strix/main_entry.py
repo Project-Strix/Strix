@@ -1,10 +1,8 @@
 import os
 import gc
 import shutil
-# import yaml
 import logging
 import time
-import json
 import torch
 import numpy as np
 from pathlib import Path
@@ -123,7 +121,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_c
     "train",
     context_settings={
         "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
-        "default_map": get_items(train_cmd_history, format='json', allow_filenotfound=True)
+        "default_map": get_items(train_cmd_history, format='yaml', allow_filenotfound=True)
     }
 )
 @arguments.hidden_auxilary_params
@@ -161,8 +159,6 @@ def train(ctx, **args):
     if len(auxilary_params) > 0:  # dump auxilary params
         with cargs.experiment_path.joinpath("param.list").open("w") as f:
             yaml.dump(args, f, sort_keys=True)
-            # json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
-
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         logger.warn(f"CUDA_VISIBLE_DEVICES specified to {os.environ['CUDA_VISIBLE_DEVICES']}, ignoring --gpus flag")
@@ -241,7 +237,6 @@ def train(ctx, **args):
                 fold_args = args.copy()
                 fold_args["n_fold"] = fold_args["n_repeat"] = 0
                 fold_args["experiment_path"] = str(cargs.experiment_path)
-                # json.dump(fold_args, f, indent=2)
                 yaml.dump(fold_args, f, sort_keys=True)
 
             train_core(cargs, train_data, valid_data)
@@ -291,7 +286,7 @@ def train_cfg(**args):
     configures = get_items(args["config"], format="yaml")
 
     configures["smi"] = False
-    gpu_id = click.prompt(f"Current GPU id", default=configures["gpus"])
+    gpu_id = click.prompt("Current GPU id", default=configures["gpus"])
     configures["gpus"] = gpu_id
     configures["config"] = args["config"]
 

@@ -437,7 +437,7 @@ def input_cropsize(ctx, param, value):
     return value
 
 
-def dump_params(ctx, param, value, output_path=None, skip_flag=True):
+def dump_params(ctx, param, value, output_path=None):
     if output_path:
         dump_dict = ctx.params.copy()
         with open(output_path, "w") as f:
@@ -447,7 +447,7 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
                 if (not p.prompt or p.is_flag or p.prompt_cond) and p.name in dump_dict
             ]:
                 dump_dict.pop(flag)
-            json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+            yaml.dump(dump_dict, f, sort_keys=True)
     return value
 
 
@@ -511,7 +511,6 @@ def confirmation(
         if out_dir.is_dir():
             with open(out_dir / "param.list", "w") as f:
                 yaml.dump(ctx.params, f, sort_keys=True)
-                # json.dump(ctx.params, f, indent=2, sort_keys=True, cls=PathlibEncoder)
 
             if save_code_dir is not None and Path(save_code_dir).is_dir():
                 save_sourcecode(save_code_dir, out_dir)
