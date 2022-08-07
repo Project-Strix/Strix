@@ -1,7 +1,7 @@
 import os
 import gc
 import shutil
-import yaml
+# import yaml
 import logging
 import time
 import json
@@ -18,6 +18,7 @@ from strix.data_io.dataio import get_dataloader
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
 from strix.utilities.click import OptionEx, CommandEx
+import strix.utilities.oyaml as yaml
 import strix.utilities.arguments as arguments
 from strix.utilities.utils import setup_logger, get_items, generate_synthetic_datalist
 from strix.utilities.click_callbacks import (
@@ -164,7 +165,9 @@ def train(ctx, **args):
 
     if len(auxilary_params) > 0:  # dump auxilary params
         with cargs.experiment_path.joinpath("param.list").open("w") as f:
-            json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+            yaml.dump(args, f, sort_keys=True)
+            # json.dump(args, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+
 
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         logger.warn(f"CUDA_VISIBLE_DEVICES specified to {os.environ['CUDA_VISIBLE_DEVICES']}, ignoring --gpus flag")
@@ -243,7 +246,8 @@ def train(ctx, **args):
                 fold_args = args.copy()
                 fold_args["n_fold"] = fold_args["n_repeat"] = 0
                 fold_args["experiment_path"] = str(cargs.experiment_path)
-                json.dump(fold_args, f, indent=2)
+                # json.dump(fold_args, f, indent=2)
+                yaml.dump(fold_args, f, sort_keys=True)
 
             train_core(cargs, train_data, valid_data)
             logger.info("Cleaning CUDA cache...")
@@ -289,7 +293,7 @@ def train_cfg(**args):
     if len(args.get("additional_args")) != 0:  # parse additional args
         Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
-    configures = get_items(args["config"], format="json")
+    configures = get_items(args["config"], format="yaml")
 
     configures["smi"] = False
     gpu_id = click.prompt(f"Current GPU id", default=configures["gpus"])
@@ -332,7 +336,7 @@ def test_cfg(**args):
         ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
         ValueError: Test file not exist error.
     """
-    configures = get_items(args["config"], format="json")
+    configures = get_items(args["config"], format="yaml")
 
     logger_name = f"{configures['tensor_dim']}-Tester"
     logging_level = logging.DEBUG if configures["debug"] else logging.INFO
