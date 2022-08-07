@@ -31,18 +31,13 @@ from strix.utilities.click_callbacks import (
     check_lr_policy,
     check_freeze_api,
     dump_params,
+    confirmation,
+    print_smi,
+    prompt_when,
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
-from utils_cw import (
-    Print,
-    prompt_when,
-    print_smi,
-    PathlibEncoder,
-    confirmation,
-    check_dir,
-    split_train_test,
-)
+from utils_cw import Print, check_dir, split_train_test
 
 import click
 from ignite.engine import Events

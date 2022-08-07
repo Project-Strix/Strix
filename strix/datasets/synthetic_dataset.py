@@ -49,6 +49,7 @@ def synthetic_dataset(filelist, phase, opts):
         )
 
     return StrixDataset(
+        filelist=filelist,
         loader=loader,
         channeler=EnsureChannelFirstD(keys=["image", "label"]),
         orienter=None,
