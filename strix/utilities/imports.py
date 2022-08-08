@@ -21,7 +21,12 @@ class ModuleManager:
     @staticmethod
     def import_all(folder: str):
         if Path(folder).is_dir():
-            for f in Path(folder).glob("*.py"):
+            python_files = list(Path(folder).glob("*.py"))
+
+            if len(python_files) > 0:
+                sys.path.append(str(folder))
+
+            for f in python_files:
                 try:
                     import_file(f.stem, str(f))
                 except Exception as e:
