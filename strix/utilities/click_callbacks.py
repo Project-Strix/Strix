@@ -6,6 +6,7 @@ import json
 import inspect
 import subprocess
 import warnings
+import warnings
 from functools import partial
 from pathlib import Path
 from time import strftime
@@ -23,6 +24,7 @@ import strix.utilities.oyaml as yaml
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
+from strix.utilities.project_loader import ProjectManager
 from utils_cw import Print, check_dir, PathlibEncoder, save_sourcecode
 
 
@@ -198,6 +200,10 @@ def get_exp_name(ctx, param, value):
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
     project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
+    pm = ProjectManager()
+    project_name = project_name or pm.project_name
+    pm = ProjectManager()
+    project_name = project_name or pm.project_name
 
     if project_name and not project_name.startswith("Project"):
         proj_dirname = f"Project-{project_name}"
@@ -547,6 +553,22 @@ def prompt_when(ctx, param, value, keyword, trigger=True):
         return value
 
 
+def parse_project(ctx, param, value):
+    if isinstance(value, str):
+        value = Path(value)
+
+    if (value / "project.yml").is_file():
+        try:
+            pm = ProjectManager()
+            pm.load(value / "project.yml")
+        except Exception as e:
+            print(f"Project {value.name} loaded failed!\nMeg: {e}")
+    elif value != Path.cwd():
+        warnings.warn("No 'project.yml' is found! Skip loading project.")
+
+    return value
+
+
 #######################################################################
 ##                    checklist callbacks
 #######################################################################
@@ -588,7 +610,7 @@ def check_batchsize(ctx_params):
 
     ret = True
     if len_train < n_batch_train:
-        print(f"Validation batch size ({n_batch_train}) larger than valid data size ({len_train})!")
+        print(f"Training batch size ({n_batch_train}) larger than valid data size ({len_train})!")
         ret = False
     if len_valid < n_batch_valid:
         print(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!")

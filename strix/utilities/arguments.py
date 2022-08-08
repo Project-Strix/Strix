@@ -8,7 +8,7 @@ from strix.configures import config as cfg
 from strix.utilities.click import OptionEx
 from strix.utilities.click_callbacks import NumericChoice as Choice, framework_select
 from strix.utilities.click_callbacks import (
-    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc, freeze_option
+    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc, freeze_option, parse_project
 )
 from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS, FREEZERS
 from utils_cw import prompt_when
@@ -59,6 +59,7 @@ def common_params(func):
         "--framework", prompt=True, type=Choice(FRAMEWORKS), default=1,
         callback=framework_select, help="Choose your framework type"
     )
+    @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
     @option("--data-list", type=str, callback=data_select, default=None, help="Data file list (json/yaml)")
     @option("--preload", type=float, default=1.0, help="Ratio of preload data")
     @option("--n-epoch", prompt=True, show_default=True, type=int, default=1000, help="Epoch number")
