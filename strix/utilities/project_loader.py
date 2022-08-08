@@ -3,17 +3,14 @@ from pathlib import Path
 from typing import Any, Union, Optional
 
 from strix.utilities.imports import ModuleManager
-from strix.utilities.utils import get_items
+from strix.utilities.utils import get_items, singleton
 
 
+@singleton
 class ProjectManager:
     def __init__(self) -> None:
-        super(ProjectManager, self).__init__()
-
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(ProjectManager, cls).__new__(cls)
-        return cls.instance
+        self.project_file = None
+        self.project_dict = {}
 
     @property
     def project_name(self):

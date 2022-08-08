@@ -21,13 +21,13 @@ from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 import strix.utilities.oyaml as yaml
-from strix.utilities.utils import is_avaible_size, get_items, warning_on_one_line
+from strix.utilities.utils import is_avaible_size, get_items, warning_on_one_line, save_sourcecode
 
 warnings.formatwarning = warning_on_one_line
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
 from strix.utilities.project_loader import ProjectManager
-from utils_cw import Print, check_dir, PathlibEncoder, save_sourcecode
+from utils_cw import Print, check_dir
 
 
 #######################################################################
@@ -483,10 +483,8 @@ def confirmation(
         if not all(checking):
             raise Abort()
 
-    Print("\nEverything seems all right! Good luck!", color='g')
-
-    #         if save_code_dir is not None and Path(save_code_dir).is_dir():
-    #             save_sourcecode(save_code_dir, out_dir)
+    Print("\nEverything seems all right! Good luck!", color="g")
+    return value
 
 
 def print_smi(ctx, param, value):
@@ -529,9 +527,9 @@ def parse_project(ctx, param, value):
             pm = ProjectManager()
             pm.load(value / "project.yml")
         except Exception as e:
-            print(f"Project {value.name} loaded failed!\nMeg: {e}")
+            warnings.warn(colored(f"Project {value.name} loaded failed!\nMeg: {e}", "red"))
     elif value != Path.cwd():
-        warnings.warn("No 'project.yml' is found! Skip loading project.")
+        warnings.warn(colored("No 'project.yml' is found! Skip loading project.", "yellow"))
 
     return value
 
@@ -673,7 +671,7 @@ def dump_hyperparameters(ctx_params):
         with open(out_dir / "param.list", "w") as f:
             yaml.dump(ctx_params, f, sort_keys=True)
         return True
-    
+
     warnings.warn(colored("No output dir is specified! Recheck your program!", "red"))
     return False
 
@@ -684,4 +682,12 @@ def backup_project(ctx_params):
     Args:
         ctx_params (dict): params from click context
     """
-    pass
+    out_dir = ctx_params.get("experiment_path") or ctx_params.get("out_dir")
+    if not out_dir.is_dir():
+        warnings.warn(colored("Output dir not exists! Skip backup project!", "yellow"))
+        return True
+
+    pm = ProjectManager()
+    if pm.project_file.is_file():
+        save_sourcecode(pm.project_file.parent, out_dir, verbose=False)
+    return True

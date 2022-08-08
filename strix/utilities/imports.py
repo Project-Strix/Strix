@@ -3,6 +3,7 @@ import importlib
 import importlib.util
 import sys
 import warnings
+from termcolor import colored
 
 # from https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 def import_file(module_name, file_path, make_importable=False):
@@ -30,4 +31,4 @@ class ModuleManager:
                 try:
                     import_file(f.stem, str(f))
                 except Exception as e:
-                    warnings.warn(f"Failed to import file {f}!\nError msg: {e}")
+                    warnings.warn(colored(f"Failed to import file {f}!\nError msg: {e}", "yellow"))
