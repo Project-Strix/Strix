@@ -24,27 +24,20 @@ from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_
 from strix.data_io import DATASET_MAPPING
 from strix.utilities.utils import get_attr_
 from strix.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
-from strix.utilities.imports import import_file
+from strix.utilities.imports import import_file, ModuleManager
 from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
 from strix.models.cnn.cnn_nets import *
 from strix.models.transformer.transformer_nets import *
 from monai_ex.utils import WorkflowException
 
-external_network_dir = Path(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"))
-if external_network_dir.is_dir():
-    for f in external_network_dir.glob("*.py"):
-        import_file(f.stem, str(f))
 
-
-external_loss_dir = Path(cfg.get_strix_cfg("EXTERNAL_LOSS_DIR"))
-if external_loss_dir.is_dir():
-    for f in external_loss_dir.glob("*.py"):
-        import_file(f.stem, str(f))
+ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"))
+ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_LOSS_DIR"))
 
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
-    return [init_channel_number * 2 ** k for k in range(number_of_fmaps)]
+    return [init_channel_number * 2**k for k in range(number_of_fmaps)]
 
 
 def get_loss_fn(framework: str, loss_name: str, loss_params: dict, output_nc: int, deep_supervision: bool = False):
@@ -162,8 +155,12 @@ def get_engine(opts, train_loader, test_loader, writer=None):
 
     loss = lr_scheduler = None
     if opts.framework == Frameworks.MULTITASK.value:
-        subloss1 = get_loss_fn(opts.subtask1, opts.criterion[1], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision)
-        subloss2 = get_loss_fn(opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision)
+        subloss1 = get_loss_fn(
+            opts.subtask1, opts.criterion[1], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision
+        )
+        subloss2 = get_loss_fn(
+            opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision
+        )
         loss = LOSS_MAPPING[opts.framework][opts.criterion[0]](subloss1, subloss2, aggregate="sum", **opts.loss_params)
     else:
         loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, opts.deep_supervision)
