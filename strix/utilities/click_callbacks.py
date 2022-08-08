@@ -1,34 +1,31 @@
-from typing import Callable, Optional, Union, Sequence
-
-import re
-import math
-import json
 import inspect
+import math
+import re
 import subprocess
-import warnings
 import warnings
 from functools import partial
 from pathlib import Path
 from time import strftime
 from types import SimpleNamespace as sn
-from termcolor import colored
+from typing import Callable, Optional, Sequence, Union
 
 import torch.nn as nn
+from click import Abort, Choice, prompt
+from termcolor import colored
 
-from click import Choice, Abort, confirm, prompt
+import strix.utilities.oyaml as yaml
 from strix.data_io import DATASET_MAPPING
 from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
-import strix.utilities.oyaml as yaml
-from strix.utilities.utils import is_avaible_size, get_items, warning_on_one_line, save_sourcecode
+from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
 
 warnings.formatwarning = warning_on_one_line
-from strix.utilities.enum import BUILTIN_TYPES, Freezers
-from strix.utilities.click import NumericChoice
-from strix.utilities.project_loader import ProjectManager
 from utils_cw import Print, check_dir
 
+from strix.utilities.click import NumericChoice
+from strix.utilities.enum import BUILTIN_TYPES, Freezers
+from strix.utilities.project_loader import ProjectManager
 
 #######################################################################
 
@@ -459,12 +456,7 @@ def dump_params(ctx, param, value, output_path=None):
     return value
 
 
-def confirmation(
-    ctx,
-    param,
-    value,
-    checklist: Optional[Union[Callable, Sequence[Callable]]] = None,
-):
+def confirmation(ctx, param, value, checklist: Optional[Union[Callable, Sequence[Callable]]] = None):
     """Callback for confirmation
 
     You can use functools.partial() to modify the params
