@@ -199,6 +199,8 @@ def get_exp_name(ctx, param, value):
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
     project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
+    pm = ProjectManager()
+    project_name = project_name or pm.project_name
 
     if project_name and not project_name.startswith("Project"):
         proj_dirname = f"Project-{project_name}"
@@ -554,8 +556,8 @@ def parse_project(ctx, param, value):
 
     if (value / "project.yml").is_file():
         try:
-            loader = ProjectManager()
-            loader.load(value / "project.yml")
+            pm = ProjectManager()
+            pm.load(value / "project.yml")
         except Exception as e:
             print(f"Project {value.name} loaded failed!\nMeg: {e}")
 

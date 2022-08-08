@@ -19,7 +19,9 @@ class ProjectManager:
 
     @property
     def project_name(self):
-        return self.project_file.resolve().parent.name
+        if self.project_file:
+            return self.project_file.resolve().parent.name
+        return None
 
     def load(self, project_file: Union[str, Path]) -> Any:
         if isinstance(project_file, str):
