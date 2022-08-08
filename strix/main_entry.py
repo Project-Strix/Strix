@@ -32,6 +32,9 @@ from strix.utilities.click_callbacks import (
     confirmation,
     print_smi,
     prompt_when,
+    check_amp,
+    dump_hyperparameters,
+    backup_project,
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -44,6 +47,7 @@ from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)
+
 
 def train_core(cargs, files_train, files_valid):
     """Main train function.
@@ -115,14 +119,18 @@ def train_core(cargs, files_train, files_valid):
     except RuntimeError as e:
         print("Run time error occured!", e)
 
-train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_cmd_history')
+
+train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), ".strix_train_cmd_history")
+
 
 @command(
     "train",
     context_settings={
-        "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
-        "default_map": get_items(train_cmd_history, format='yaml', allow_filenotfound=True)
-    }
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "prompt_in_default_map": True,
+        "default_map": get_items(train_cmd_history, format="yaml", allow_filenotfound=True),
+    },
 )
 @arguments.hidden_auxilary_params
 @arguments.common_params
@@ -131,15 +139,26 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_train_c
 @option("--smi", default=True, callback=print_smi, help="Print GPU usage")
 @option("--gpus", type=str, callback=select_gpu, help="The ID of active GPU")
 @option("--experiment-path", type=str, callback=get_exp_name, default="")
-@option("--dump-params", hidden=True, is_flag=True, default=False, callback=partial(dump_params, output_path=train_cmd_history))
+@option(
+    "--dump-params",
+    hidden=True,
+    is_flag=True,
+    default=False,
+    callback=partial(dump_params, output_path=train_cmd_history),
+)
 @option(
     "--confirm",
     callback=partial(
         confirmation,
-        output_dir_ctx="experiment_path",
-        save_code_dir=cfg.get_strix_cfg("external_network_dir")
-        if cfg.get_strix_cfg("mode") == "dev" else None,
-        checklist=[check_batchsize, check_loss, check_lr_policy, check_freeze_api]
+        checklist=[
+            check_batchsize,
+            check_loss,
+            check_lr_policy,
+            check_freeze_api,
+            check_amp,
+            dump_hyperparameters,
+            backup_project,
+        ],
     ),
 )
 @click.pass_context
@@ -153,7 +172,7 @@ def train(ctx, **args):
     cargs.logger_name = logger_name
     logging_level = logging.DEBUG if cargs.debug else logging.INFO
     log_path = None if cargs.disable_logfile else cargs.experiment_path.joinpath("logs")
-    log_terminator = '\r' if cargs.compact_log and not cargs.debug else '\n'
+    log_terminator = "\r" if cargs.compact_log and not cargs.debug else "\n"
     logger = setup_logger(logger_name, logging_level, filepath=log_path, reset=True, terminator=log_terminator)
 
     if len(auxilary_params) > 0:  # dump auxilary params
@@ -290,9 +309,7 @@ def train_cfg(**args):
     configures["gpus"] = gpu_id
     configures["config"] = args["config"]
 
-    train(
-        default_map=configures, prompt_in_default_map=False,
-    )
+    train(default_map=configures, prompt_in_default_map=False)
 
 
 @click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -355,7 +372,7 @@ def test_cfg(**args):
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
-    if args["use_best_model"]: #! refactor this!
+    if args["use_best_model"]:  #! refactor this!
         model_list = arguments.get_best_trained_models(exp_dir)
         if is_crossvalid:
             configures["n_fold"] = configures["n_repeat"] = 0

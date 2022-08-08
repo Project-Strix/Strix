@@ -1,5 +1,5 @@
 import os
-import sys
+import time
 import json
 import yaml
 import socket
@@ -750,3 +750,28 @@ def setup_logger(
         logger.propagate = False
 
     return logger
+
+
+def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
+    return '%s:%s:\n %s: %s\n' % (filename, lineno, category.__name__, message)
+
+
+def singleton(cls):
+    _instance = {}
+
+    def _singleton(*args, **kwargs):
+        if cls not in _instance:
+            _instance[cls] = cls(*args, **kwargs)
+        return _instance[cls]
+
+    return _singleton
+
+
+def save_sourcecode(code_rootdir, out_dir, verbose=True):
+    if not os.path.isdir(code_rootdir):
+        raise FileNotFoundError(f"Code root dir not exists! {code_rootdir}")
+
+    Print("Backup source code under root_dir:", code_rootdir, color="y", verbose=verbose)
+    outpath = out_dir / f"{os.path.basename(code_rootdir)}_{time.strftime('%m%d_%H%M')}.tar"
+    tar_opt = "cvf" if verbose else "cf"
+    os.system(f"cd {str(code_rootdir)}; tar -{tar_opt} {outpath} .")
