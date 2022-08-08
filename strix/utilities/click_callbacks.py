@@ -21,7 +21,9 @@ from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
 import strix.utilities.oyaml as yaml
-from strix.utilities.utils import is_avaible_size, get_items
+from strix.utilities.utils import is_avaible_size, get_items, warning_on_one_line
+
+warnings.formatwarning = warning_on_one_line
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
 from strix.utilities.project_loader import ProjectManager
@@ -84,7 +86,9 @@ def select_gpu(ctx, param, value):
         # mig query is not support
         gpu_list = subprocess.check_output(LIST_CMD).decode("utf-8").split("\n")
         gpu_num = len(list(filter(lambda x: x, gpu_list)))
-        statuses = [False, ] * gpu_num
+        statuses = [
+            False,
+        ] * gpu_num
     else:
         modes = result.decode("utf-8").split("\n")
         statuses = ["enabled" == status.lower() for status in modes if status]
@@ -167,7 +171,7 @@ def get_exp_name(ctx, param, value):
     partial_data = "-partial" if "partial" in ctx.params and ctx.params["partial"] < 1 else ""
 
     if "debug" in ctx.params and ctx.params["debug"]:
-        Print("You are in Debug mode with preload=0, out_dir=debug, n_worker=0", color="y")
+        warnings.warn(colored("You are in Debug mode with preload=0, out_dir=debug, n_worker=0", "green"))
         ctx.params["preload"] = 0.0  # emmm...
         ctx.params["n_worker"] = 0
         return check_dir(ctx.params["out_dir"], "debug")
@@ -461,10 +465,6 @@ def confirmation(
     ctx,
     param,
     value,
-    output_dir: Optional[str] = None,
-    output_dir_ctx: Optional[str] = None,
-    save_code_dir: Optional[str] = None,
-    exist_ok: Optional[bool] = False,
     checklist: Optional[Union[Callable, Sequence[Callable]]] = None,
 ):
     """Callback for confirmation
@@ -473,15 +473,6 @@ def confirmation(
     e.g. functools.partial(confirmation, output_dir='./')
 
     # Arguments
-        output_dir: output dir for save params and source code.
-                    Skip saving if output dir does not exist.
-        output_dir_ctx: use this only if you wan use the param specified in previous cmd line.
-                        The priority of `output_dir_ctx` is higher than `output_dir`.
-                        `output_dir_ctx`='out_dir' will use the ctx.params['out_dir']
-        save_code: Set to True/False to enable/disable saving code.
-                   Default is None, will request for confirmation every time.
-        save_dir: save a given dir path.
-        exist_ok: allow out_dir exists.
         checklist: items need to be checked. Put your checking callbacks here for an external checking.
     """
     if checklist:
@@ -494,32 +485,10 @@ def confirmation(
         if not all(checking):
             raise Abort()
 
-    if confirm(
-        colored(
-            "Continue processing with these params?\n{}".format(
-                json.dumps(ctx.params, indent=2, sort_keys=True, cls=PathlibEncoder)
-            ),
-            color="cyan",
-        ),
-        default=True,
-        abort=True,
-    ):
+    Print("\nEverything seems all right! Good luck!", color='g')
 
-        if output_dir_ctx is not None:
-            out_dir = Path(ctx.params[output_dir_ctx])
-        elif output_dir is not None:
-            out_dir = Path(output_dir)
-        else:
-            Print("No output dir specified! Do nothing!", color="y")
-            return
-
-        out_dir = check_dir(out_dir, exist_ok=exist_ok)
-        if out_dir.is_dir():
-            with open(out_dir / "param.list", "w") as f:
-                yaml.dump(ctx.params, f, sort_keys=True)
-
-            if save_code_dir is not None and Path(save_code_dir).is_dir():
-                save_sourcecode(save_code_dir, out_dir)
+    #         if save_code_dir is not None and Path(save_code_dir).is_dir():
+    #             save_sourcecode(save_code_dir, out_dir)
 
 
 def print_smi(ctx, param, value):
@@ -610,10 +579,14 @@ def check_batchsize(ctx_params):
 
     ret = True
     if len_train < n_batch_train:
-        print(f"Training batch size ({n_batch_train}) larger than valid data size ({len_train})!")
+        warnings.warn(
+            colored(f"Validation batch size ({n_batch_train}) larger than valid data size ({len_train})!", "red")
+        )
         ret = False
     if len_valid < n_batch_valid:
-        print(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!")
+        warnings.warn(
+            colored(f"Validation batch size ({n_batch_valid}) larger than valid data size ({len_valid})!", "red")
+        )
         ret = False
 
     return ret
@@ -630,7 +603,7 @@ def check_loss(ctx_params):
     """
     output_nc, loss_fn = ctx_params.get("output_nc"), ctx_params.get("criterion")
     if loss_fn == "CE" and output_nc == 1:
-        print("Single output channel should use BCE instead of CE loss.")
+        warnings.warn(colored("Single output channel should use BCE instead of CE loss.", "red"))
         return False
     return True
 
@@ -645,7 +618,7 @@ def check_lr_policy(ctx_params):
         bool: return True is check is passed, and vice versa
     """
     if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
-        Print("Warning: recommand set valid-interval = 1" "when using ReduceLROnPlateau", color="y")
+        warnings.warn(colored("Recommend set valid-interval = 1" "when using ReduceLROnPlateau", "yellow"))
     return True
 
 
@@ -662,17 +635,17 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("model_name")
     ):
         model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
-        warning_msg = (
-            f"freeze() member function is not detected in '{model.__name__}', freeze wont work in your training!"
+        warning_msg = colored(
+            f"freeze() member function is not detected in '{model.__name__}', freeze wont work!", "red"
         )
         if (
             not isinstance(model, nn.Module) and isinstance(model, Callable) and model.__annotations__.get("return")
         ):  # a strix wrapper func with return annotation
             if "freeze" not in dir(model.__annotations__["return"]):
-                Print(warning_msg)
+                warnings.warn(warning_msg)
                 return False
         elif isinstance(model, nn.Module) and "freeze" not in dir(model):
-            Print(warning_msg)
+            warnings.warn(warning_msg)
             return False
         else:
             print(f"check_freeze_api failed to check func {model.__name__}")
@@ -683,8 +656,34 @@ def check_amp(ctx_params):
     """Check wheter amp is turned on. If not, give a warning!
 
     Args:
-        ctx_params (dict): params for click context
+        ctx_params (dict): params from click context
     """
     if not ctx_params.get("amp"):
-        warnings.warn(colored("AMP is not turned on! Recommand to turn on the AMP to accelarate training!", 'yellow'))
+        warnings.warn(colored("AMP is not turned on! Recommend to turn on the AMP to accelarate training!", "yellow"))
     return True
+
+
+def dump_hyperparameters(ctx_params):
+    """Dumping hyper-parameters to output dir.
+
+    Args:
+        ctx_params (dict): params for click context
+    """
+    out_dir = ctx_params.get("experiment_path") or ctx_params.get("out_dir")
+    if out_dir:
+        out_dir = check_dir(out_dir, exist_ok=True)
+        with open(out_dir / "param.list", "w") as f:
+            yaml.dump(ctx_params, f, sort_keys=True)
+        return True
+    
+    warnings.warn(colored("No output dir is specified! Recheck your program!", "red"))
+    return False
+
+
+def backup_project(ctx_params):
+    """Backup project folder for reproduction
+
+    Args:
+        ctx_params (dict): params from click context
+    """
+    pass

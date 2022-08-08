@@ -750,3 +750,7 @@ def setup_logger(
         logger.propagate = False
 
     return logger
+
+
+def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
+    return '%s:%s:\n %s: %s\n' % (filename, lineno, category.__name__, message)
