@@ -1,6 +1,7 @@
 import platform
 import sys
 from collections import OrderedDict
+from pathlib import PosixPath
 
 import yaml as pyyaml
 
@@ -25,6 +26,10 @@ def map_constructor(loader, node):
         raise
 
 
+def path_representer(dumper, data):
+    return dumper.represent_scalar(u'tag:yaml.org,2002:str', str(data))
+
+
 _loaders = [getattr(pyyaml.loader, x) for x in pyyaml.loader.__all__]
 _dumpers = [getattr(pyyaml.dumper, x) for x in pyyaml.dumper.__all__]
 try:
@@ -39,6 +44,7 @@ Dumper = None
 for Dumper in _dumpers:
     pyyaml.add_representer(dict, map_representer, Dumper=Dumper)
     pyyaml.add_representer(OrderedDict, map_representer, Dumper=Dumper)
+    pyyaml.add_representer(PosixPath, path_representer, Dumper=Dumper)
 
 Loader = None
 if not _std_dict_is_order_preserving:

@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional, Union, Sequence
 
 import re
 import math
@@ -14,15 +14,16 @@ from termcolor import colored
 
 import torch.nn as nn
 
-from click import Choice, prompt
+from click import Choice, Abort, confirm, prompt
 from strix.data_io import DATASET_MAPPING
 from strix.models import ARCHI_MAPPING
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
+import strix.utilities.oyaml as yaml
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
-from utils_cw import Print, check_dir, PathlibEncoder
+from utils_cw import Print, check_dir, PathlibEncoder, save_sourcecode
 
 
 #######################################################################
@@ -81,7 +82,7 @@ def select_gpu(ctx, param, value):
         # mig query is not support
         gpu_list = subprocess.check_output(LIST_CMD).decode("utf-8").split("\n")
         gpu_num = len(list(filter(lambda x: x, gpu_list)))
-        statuses = [False,] * gpu_num
+        statuses = [False, ] * gpu_num
     else:
         modes = result.decode("utf-8").split("\n")
         statuses = ["enabled" == status.lower() for status in modes if status]
@@ -138,19 +139,19 @@ def get_unknown_options(ctx, verbose=False):
         return False
 
     def _get_argument_name(item):
-        symbols = ["--", '-']
+        symbols = ["--", "-"]
         for sym in symbols:
             if str(item).startswith(sym):
-                return item[len(sym):].replace("-", "_")
+                return item[len(sym) :].replace("-", "_")
         return None
 
     for i, item in enumerate(ctx.args):
-        if _check_if_argument(item):            
+        if _check_if_argument(item):
             if len(ctx.args) == i + 1:
                 break
             elif _check_if_argument(ctx.args[i + 1]):
                 auxilary_params[_get_argument_name(item)] = True
-                warnings.warn(f'The flag argument {item} is set to True')
+                warnings.warn(f"The flag argument {item} is set to True")
             else:
                 auxilary_params[_get_argument_name(item)] = _convert_type(ctx.args[i + 1])
 
@@ -436,7 +437,7 @@ def input_cropsize(ctx, param, value):
     return value
 
 
-def dump_params(ctx, param, value, output_path=None, skip_flag=True):
+def dump_params(ctx, param, value, output_path=None):
     if output_path:
         dump_dict = ctx.params.copy()
         with open(output_path, "w") as f:
@@ -446,8 +447,104 @@ def dump_params(ctx, param, value, output_path=None, skip_flag=True):
                 if (not p.prompt or p.is_flag or p.prompt_cond) and p.name in dump_dict
             ]:
                 dump_dict.pop(flag)
-            json.dump(dump_dict, f, indent=2, sort_keys=True, cls=PathlibEncoder)
+            yaml.dump(dump_dict, f, sort_keys=True)
     return value
+
+
+def confirmation(
+    ctx,
+    param,
+    value,
+    output_dir: Optional[str] = None,
+    output_dir_ctx: Optional[str] = None,
+    save_code_dir: Optional[str] = None,
+    exist_ok: Optional[bool] = False,
+    checklist: Optional[Union[Callable, Sequence[Callable]]] = None,
+):
+    """Callback for confirmation
+
+    You can use functools.partial() to modify the params
+    e.g. functools.partial(confirmation, output_dir='./')
+
+    # Arguments
+        output_dir: output dir for save params and source code.
+                    Skip saving if output dir does not exist.
+        output_dir_ctx: use this only if you wan use the param specified in previous cmd line.
+                        The priority of `output_dir_ctx` is higher than `output_dir`.
+                        `output_dir_ctx`='out_dir' will use the ctx.params['out_dir']
+        save_code: Set to True/False to enable/disable saving code.
+                   Default is None, will request for confirmation every time.
+        save_dir: save a given dir path.
+        exist_ok: allow out_dir exists.
+        checklist: items need to be checked. Put your checking callbacks here for an external checking.
+    """
+    if checklist:
+        if not isinstance(checklist, Sequence):
+            checklist = [
+                checklist,
+            ]
+
+        checking = [checking_fn(ctx.params) for checking_fn in checklist]
+        if not all(checking):
+            raise Abort()
+
+    if confirm(
+        colored(
+            "Continue processing with these params?\n{}".format(
+                json.dumps(ctx.params, indent=2, sort_keys=True, cls=PathlibEncoder)
+            ),
+            color="cyan",
+        ),
+        default=True,
+        abort=True,
+    ):
+
+        if output_dir_ctx is not None:
+            out_dir = Path(ctx.params[output_dir_ctx])
+        elif output_dir is not None:
+            out_dir = Path(output_dir)
+        else:
+            Print("No output dir specified! Do nothing!", color="y")
+            return
+
+        out_dir = check_dir(out_dir, exist_ok=exist_ok)
+        if out_dir.is_dir():
+            with open(out_dir / "param.list", "w") as f:
+                yaml.dump(ctx.params, f, sort_keys=True)
+
+            if save_code_dir is not None and Path(save_code_dir).is_dir():
+                save_sourcecode(save_code_dir, out_dir)
+
+
+def print_smi(ctx, param, value):
+    """Callback for printing nvidia-smi
+
+    If value is set to True, then print the info, vice versa.
+
+    """
+    if value:
+        subprocess.call(["nvidia-smi"])
+
+
+def prompt_when(ctx, param, value, keyword, trigger=True):
+    """Only prompt when trigger specified keyword
+
+    # Arguments
+        keyword: keyword appeared in ctx.params
+        trigger: trigger prompt when keyword == trigger
+    """
+    if keyword in ctx.params and ctx.params[keyword] is trigger:
+        prompt_string = "\t--> " + param.name.replace("_", " ").capitalize()
+        Print(f"This option appears because you triggered: {keyword} = {trigger}", color="y")
+        return prompt(
+            prompt_string,
+            default=value,
+            type=param.type,
+            hide_input=param.hide_input,
+            confirmation_prompt=param.confirmation_prompt,
+        )
+    else:
+        return value
 
 
 #######################################################################
@@ -543,7 +640,9 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("model_name")
     ):
         model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
-        warning_msg = f"freeze() member function is not detected in '{model.__name__}', freeze wont work in your training!"
+        warning_msg = (
+            f"freeze() member function is not detected in '{model.__name__}', freeze wont work in your training!"
+        )
         if (
             not isinstance(model, nn.Module) and isinstance(model, Callable) and model.__annotations__.get("return")
         ):  # a strix wrapper func with return annotation
