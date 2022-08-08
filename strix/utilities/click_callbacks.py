@@ -655,3 +655,14 @@ def check_freeze_api(ctx_params):
         else:
             print(f"check_freeze_api failed to check func {model.__name__}")
     return True
+
+
+def check_amp(ctx_params):
+    """Check wheter amp is turned on. If not, give a warning!
+
+    Args:
+        ctx_params (dict): params for click context
+    """
+    if not ctx_params.get("amp"):
+        warnings.warn(colored("AMP is not turned on! Recommand to turn on the AMP to accelarate training!", 'yellow'))
+    return True
