@@ -767,12 +767,11 @@ def singleton(cls):
     return _singleton
 
 
-# todo: support multiple file types, like \( -name "*.png" -o -name "*.jpg" -o -name "*.deb" \)
-def save_sourcecode(code_rootdir, out_dir, file_type="*.py", verbose=True):
+def save_sourcecode(code_rootdir, out_dir, verbose=True):
     if not os.path.isdir(code_rootdir):
         raise FileNotFoundError(f"Code root dir not exists! {code_rootdir}")
 
     Print("Backup source code under root_dir:", code_rootdir, color="y", verbose=verbose)
     outpath = out_dir / f"{os.path.basename(code_rootdir)}_{time.strftime('%m%d_%H%M')}.tar"
     tar_opt = "cvf" if verbose else "cf"
-    os.system(f"find {code_rootdir} -name '{file_type}' | tar -{tar_opt} {outpath} -T -")
+    os.system(f"cd {str(code_rootdir)}; tar -{tar_opt} {outpath} .")
