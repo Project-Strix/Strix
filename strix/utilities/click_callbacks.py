@@ -23,6 +23,7 @@ import strix.utilities.oyaml as yaml
 from strix.utilities.utils import is_avaible_size, get_items
 from strix.utilities.enum import BUILTIN_TYPES, Freezers
 from strix.utilities.click import NumericChoice
+from strix.utilities.project_loader import ProjectLoader
 from utils_cw import Print, check_dir, PathlibEncoder, save_sourcecode
 
 
@@ -545,6 +546,13 @@ def prompt_when(ctx, param, value, keyword, trigger=True):
         )
     else:
         return value
+
+
+def parse_project(ctx, param, value):
+    if (value / "project.yml").is_file():
+        loader = ProjectLoader(value / "project.yml")
+        loader.load()
+    return value
 
 
 #######################################################################

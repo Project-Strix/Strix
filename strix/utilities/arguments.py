@@ -8,7 +8,7 @@ from strix.configures import config as cfg
 from strix.utilities.click import OptionEx
 from strix.utilities.click_callbacks import NumericChoice as Choice, framework_select
 from strix.utilities.click_callbacks import (
-    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc, freeze_option
+    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc, freeze_option, parse_project
 )
 from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS, FREEZERS
 from utils_cw import prompt_when
@@ -97,6 +97,7 @@ def common_params(func):
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
     @option("--debug", is_flag=True, help="Enter debug mode")
     @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
+    @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
