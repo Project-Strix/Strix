@@ -6,6 +6,7 @@ import json
 import inspect
 import subprocess
 import warnings
+import warnings
 from functools import partial
 from pathlib import Path
 from time import strftime
@@ -199,6 +200,8 @@ def get_exp_name(ctx, param, value):
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
     project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
+    pm = ProjectManager()
+    project_name = project_name or pm.project_name
     pm = ProjectManager()
     project_name = project_name or pm.project_name
 
