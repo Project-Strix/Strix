@@ -359,8 +359,6 @@ class HESAM(nn.Module):
         return logits
 
 
-# @CLASSIFICATION_ARCHI.register('2D', 'nnHESAM')
-# @CLASSIFICATION_ARCHI.register('3D', 'nnHESAM')
 class HESAM2(nn.Module):
     def __init__(
         self,

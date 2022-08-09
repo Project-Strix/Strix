@@ -6,8 +6,6 @@ from strix.models.cnn.nets.dynunet import DynUNet
 from strix.models.cnn.blocks.dynunet_block_ex import *
 
 
-# @SEGMENTATION_ARCHI.register('2D', 'mg_unet')
-# @SEGMENTATION_ARCHI.register('3D', 'mg_unet')
 class MG_Unet(DynUNet):
     def __init__(
         self,

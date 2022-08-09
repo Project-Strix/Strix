@@ -4,7 +4,7 @@ import torch
 
 from strix.models.cnn.engines.classification_engines import ClassificationTestEngine
 from strix.models.cnn.nets.dynunet import DynUNet as UNet
-from strix.models import CLASSIFICATION_ARCHI
+from strix.utilities.registry import NetworkRegistry
 from strix.utilities.enum import Phases
 from torch.optim import SGD, lr_scheduler
 from strix.models.cnn.losses import DiceLoss
@@ -28,7 +28,8 @@ class TestClassification:
     @pytest.mark.parametrize("save_prob", [True, False])
     def test_segmentatation_test_engine(self, device, phase, dim, save_img, save_prob, tmp_path):
         dataset_fn = CLASSIFICATION_DATASETS[f"{dim}D"]["RandomData"]["FN"]
-        net = CLASSIFICATION_ARCHI[f"{dim}D"]["vgg9"](
+        Networks = NetworkRegistry()
+        net = Networks[f"{dim}D"]["classificaton"]["vgg9"](
             spatial_dims=dim,
             in_channels=1,
             out_channels=1,
