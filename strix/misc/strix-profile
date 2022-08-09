@@ -12,4 +12,4 @@ IFS=" "
 read -ra splits <<< "$outdir"
 echo "${splits[1]}"
 
-nsys profile --output "${splits[1]}" --force-overwrite true --trace-fork-before-exec true strix-train-from-cfg --config "$2"
+nsys profile --output "${splits[1]}/gpu-profiling" --force-overwrite true --trace-fork-before-exec true strix-train-from-cfg --config "$2"
