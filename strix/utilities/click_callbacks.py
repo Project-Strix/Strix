@@ -15,17 +15,16 @@ from termcolor import colored
 
 import strix.utilities.oyaml as yaml
 from strix.data_io import DATASET_MAPPING
-from strix.models import ARCHI_MAPPING
+from strix.utilities.registry import NetworkRegistry
 from strix.models.cnn.losses import LOSS_MAPPING
-from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
+from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
+from strix.utilities.click import NumericChoice
+from strix.utilities.project_loader import ProjectManager
 
 warnings.formatwarning = warning_on_one_line
 from utils_cw import Print, check_dir
 
-from strix.utilities.click import NumericChoice
-from strix.utilities.enum import BUILTIN_TYPES, Freezers
-from strix.utilities.project_loader import ProjectManager
 
 #######################################################################
 
@@ -390,15 +389,16 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    archilist = list(ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
-    if len(archilist) == 0:
+    networks = NetworkRegistry()
+    net_list = networks.list(ctx.params["tensor_dim"], ctx.params["framework"])
+    if len(net_list) == 0:
         print(f"No architecture available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
 
-    if value is not None and value in archilist:
+    if value is not None and value in net_list:
         return value
     else:
-        return prompt("Model list", type=NumericChoice(archilist))
+        return prompt("Model list", type=NumericChoice(net_list))
 
 
 def data_select(ctx, param, value):
@@ -621,8 +621,9 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("framework")
         and ctx_params.get("tensor_dim")
         and ctx_params.get("model_name")
-    ):
-        model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
+    ):  
+        Networks = NetworkRegistry()
+        model = Networks[ctx_params["tensor_dim"]][ctx_params["framework"]][ctx_params["model_name"]]
         warning_msg = colored(
             f"freeze() member function is not detected in '{model.__name__}', freeze wont work!", "red"
         )
@@ -680,6 +681,6 @@ def backup_project(ctx_params):
         return True
 
     pm = ProjectManager()
-    if pm.project_file.is_file():
+    if pm.project_file and pm.project_file.is_file():
         save_sourcecode(pm.project_file.parent, out_dir, verbose=False)
     return True

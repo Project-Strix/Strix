@@ -3,12 +3,14 @@ import pytest
 import torch
 import torch.nn as nn
 
-from strix.models import ARCHI_MAPPING
+from strix.utilities.registry import NetworkRegistry
 from strix.models.cnn.utils import set_trainable, count_trainable_params
+
 
 @pytest.mark.parametrize("freeze", [True, False])
 def test_segmentation_train_engine(freeze):
-    model_type = ARCHI_MAPPING["multitask"]["3D"]["UnifiedNet-M3"]
+    Networks = NetworkRegistry()
+    model_type = Networks["3D"]["multitask"]["UnifiedNet-M3"]
     net = model_type(
         3,
         1,

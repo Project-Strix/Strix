@@ -1,14 +1,12 @@
 from typing import Any
 
-import os
-import torch
-
-from strix.models import SEGMENTATION_ARCHI
+from strix.utilities.registry import NetworkRegistry
 from monai_ex.networks.nets import UNETR
 
+NETWORK = NetworkRegistry()
 
-@SEGMENTATION_ARCHI.register("2D", "UNETR")
-@SEGMENTATION_ARCHI.register("3D", "UNETR")
+@NETWORK.register("2D", "segmentation", "UNETR")
+@NETWORK.register("3D", "segmentation", "UNETR")
 def strix_unetr(
     spatial_dims: int,
     in_channels: int,

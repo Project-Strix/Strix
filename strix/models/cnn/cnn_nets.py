@@ -3,7 +3,7 @@ from typing import Any
 import os
 import torch
 
-from strix.models import CLASSIFICATION_ARCHI, SEGMENTATION_ARCHI, SELFLEARNING_ARCHI
+from strix.utilities.registry import NetworkRegistry
 from strix.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from strix.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from strix.models.cnn.nets.dynunet import DynUNet
@@ -11,9 +11,10 @@ from strix.models.cnn.nets.drn import drn_a_50
 from strix.models.cnn.nets.hesam import HESAM
 from strix.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
 
+NETWORK = NetworkRegistry()
 
-@CLASSIFICATION_ARCHI.register("2D", "resnet18")
-@CLASSIFICATION_ARCHI.register("3D", "resnet18")
+@NETWORK.register("2D", "classification", "resnet18")
+@NETWORK.register("3D", "classification", "resnet18")
 def strix_resnet18(
     spatial_dims: int,
     in_channels: int,
@@ -37,8 +38,8 @@ def strix_resnet18(
     return resnet18(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "resnet34")
-@CLASSIFICATION_ARCHI.register("3D", "resnet34")
+@NETWORK.register("2D", "classification", "resnet34")
+@NETWORK.register("3D", "classification", "resnet34")
 def strix_resnet50(
     spatial_dims: int,
     in_channels: int,
@@ -62,8 +63,8 @@ def strix_resnet50(
     return resnet34(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "resnet50")
-@CLASSIFICATION_ARCHI.register("3D", "resnet50")
+@NETWORK.register("2D", "classification", "resnet50")
+@NETWORK.register("3D", "classification", "resnet50")
 def strix_resnet50(
     spatial_dims: int,
     in_channels: int,
@@ -87,8 +88,8 @@ def strix_resnet50(
     return resnet50(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "vgg9")
-@CLASSIFICATION_ARCHI.register("3D", "vgg9")
+@NETWORK.register("2D", "classification", "vgg9")
+@NETWORK.register("3D", "classification", "vgg9")
 def strix_vgg9_bn(
     spatial_dims: int,
     in_channels: int,
@@ -114,8 +115,8 @@ def strix_vgg9_bn(
     return vgg9_bn(pretrained=False, progress=True, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "vgg11")
-@CLASSIFICATION_ARCHI.register("3D", "vgg11")
+@NETWORK.register("2D", "classification", "vgg11")
+@NETWORK.register("3D", "classification", "vgg11")
 def strix_vgg11_bn(
     spatial_dims: int,
     in_channels: int,
@@ -141,8 +142,8 @@ def strix_vgg11_bn(
     return vgg11_bn(pretrained=False, progress=True, **inkwargs)
 
 
-@SELFLEARNING_ARCHI.register('2D', 'unet')
-@SELFLEARNING_ARCHI.register('3D', 'unet')
+@NETWORK.register('2D', "selflearning", "unet")
+@NETWORK.register('3D', "selflearning", "unet")
 def strix_dyn_unet(
     spatial_dims: int,
     in_channels: int,
@@ -186,8 +187,8 @@ def strix_dyn_unet(
     )
 
 
-@SEGMENTATION_ARCHI.register("2D", "unet")
-@SEGMENTATION_ARCHI.register("3D", "unet")
+@NETWORK.register("2D", "segmentation", "unet")
+@NETWORK.register("3D", "segmentation", "unet")
 def strix_dyn_unet(
     spatial_dims: int,
     in_channels: int,
@@ -231,8 +232,8 @@ def strix_dyn_unet(
     )
 
 
-@SEGMENTATION_ARCHI.register("2D", "res-unet")
-@SEGMENTATION_ARCHI.register("3D", "res-unet")
+@NETWORK.register("2D", "segmentation", "res-unet")
+@NETWORK.register("3D", "segmentation", "res-unet")
 def strix_dyn_resunet(
     spatial_dims: int,
     in_channels: int,
@@ -276,8 +277,8 @@ def strix_dyn_resunet(
     )
 
 
-@CLASSIFICATION_ARCHI.register("2D", "DRN_a50")
-@CLASSIFICATION_ARCHI.register("3D", "DRN_a50")
+@NETWORK.register("2D", "classification", "DRN_a50")
+@NETWORK.register("3D", "classification", "DRN_a50")
 def strix_drn_a_50(
     spatial_dims: int,
     in_channels: int,
@@ -299,8 +300,8 @@ def strix_drn_a_50(
     return drn_a_50(pretrained=False, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "HESAM")
-@CLASSIFICATION_ARCHI.register("3D", "HESAM")
+@NETWORK.register("2D", "classification", "HESAM")
+@NETWORK.register("3D", "classification", "HESAM")
 def strix_hesam(
     spatial_dims: int,
     in_channels: int,
@@ -344,8 +345,8 @@ def strix_hesam(
     return net
 
 
-@CLASSIFICATION_ARCHI.register("2D", "resnet_aag_34")
-@CLASSIFICATION_ARCHI.register("3D", "resnet_aag_34")
+@NETWORK.register("2D", "classification", "resnet_aag_34")
+@NETWORK.register("3D", "classification", "resnet_aag_34")
 def strix_resnetaag_34(
     spatial_dims: int,
     in_channels: int,
@@ -381,8 +382,8 @@ def strix_resnetaag_34(
     return resnet34_aag(pretrained_model_path, **inkwargs)
 
 
-@CLASSIFICATION_ARCHI.register("2D", "resnet_aag_50")
-@CLASSIFICATION_ARCHI.register("3D", "resnet_aag_50")
+@NETWORK.register("2D", "classification", "resnet_aag_50")
+@NETWORK.register("3D", "classification", "resnet_aag_50")
 def strix_resnetaag_50(
     spatial_dims: int,
     in_channels: int,
