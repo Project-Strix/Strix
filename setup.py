@@ -71,6 +71,9 @@ setup(
             "strix-gradcam-from-cfg = strix.interpreter:gradcam",
         ],
     },
+    scripts=[
+        'strix/misc/strix-profile'
+    ],
     # ext_modules=get_extensions(),
     cmdclass=get_cmds(),
     keywords=[
