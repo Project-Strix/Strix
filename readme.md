@@ -140,6 +140,7 @@ _For more examples, please refer to the [Documentation](https://strix.readthedoc
 - `strix-nni-search`: Use [NNI](https://nni.readthedocs.io) for automatic hyper-parameter tuning. 
 - `strix-check-data`: Visualize preprocessed input dataset.
 - `strix-gradcam-from-cfg`: Gradcam visualization.
+- `strix-profile`: Profiling the GPU usage of the training.
 
 **Here is a usage example!**\
 <img src="images/usage-example.png" alt="Usage-example" width="650">
