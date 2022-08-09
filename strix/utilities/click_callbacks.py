@@ -15,17 +15,16 @@ from termcolor import colored
 
 import strix.utilities.oyaml as yaml
 from strix.data_io import DATASET_MAPPING
-from strix.models import ARCHI_MAPPING
+from strix.utilities.registry import NetworkRegistry
 from strix.models.cnn.losses import LOSS_MAPPING
-from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks
+from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
+from strix.utilities.click import NumericChoice
+from strix.utilities.project_loader import ProjectManager
 
 warnings.formatwarning = warning_on_one_line
 from utils_cw import Print, check_dir
 
-from strix.utilities.click import NumericChoice
-from strix.utilities.enum import BUILTIN_TYPES, Freezers
-from strix.utilities.project_loader import ProjectManager
 
 #######################################################################
 
@@ -390,7 +389,8 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    archilist = list(ARCHI_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
+    Networks = NetworkRegistry()
+    archilist = list(Networks[ctx.params["tensor_dim"]][ctx.params["framework"]].keys())
     if len(archilist) == 0:
         print(f"No architecture available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
@@ -621,8 +621,9 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("framework")
         and ctx_params.get("tensor_dim")
         and ctx_params.get("model_name")
-    ):
-        model = ARCHI_MAPPING[ctx_params["framework"]][ctx_params["tensor_dim"]][ctx_params["model_name"]]
+    ):  
+        Networks = NetworkRegistry()
+        model = Networks[ctx_params["tensor_dim"]][ctx_params["framework"]][ctx_params["model_name"]]
         warning_msg = colored(
             f"freeze() member function is not detected in '{model.__name__}', freeze wont work!", "red"
         )

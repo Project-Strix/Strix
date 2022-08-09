@@ -2,7 +2,10 @@ from typing import Optional
 
 import os
 import inspect
-from strix.utilities.enum import DIMS, NETWORK_ARGS
+import warnings
+from termcolor import colored
+from strix.utilities.enum import DIMS, NETWORK_ARGS, FRAMEWORKS
+from strix.utilities.utils import singleton
 
 
 def _register_generic(module_dict, module_name, module):
@@ -16,6 +19,15 @@ def _register_generic_dim(module_dict, dim, module_name, module):
     ), f"{module_name} already registed in {module_dict.get(dim)}"
 
     module_dict[dim].update({module_name: module})
+
+
+def _register_network(module_dict, dim, framework, module_name, module):
+    if module_name in module_dict[dim][framework]:
+        warnings.warn(colored(f"{module_name} already registed! Skip!", "yellow"))
+        return False
+
+    module_dict[dim][framework].update({module_name: module})
+    return True
 
 
 def _register_generic_data(
@@ -84,8 +96,8 @@ class DimRegistry(dict):
         self["3D"] = {}
 
     def register(self, dim, module_name, module=None):
+        dim = self.dim_mapping.get(dim)
         assert dim in DIMS, "Only support '2D'&'3D' dataset now"
-        dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
             _register_generic_dim(self, dim, module_name, module)
@@ -99,9 +111,13 @@ class DimRegistry(dict):
         return register_fn
 
 
+@singleton
 class NetworkRegistry(DimRegistry):
     def __init__(self, *args, **kwargs):
-        super(NetworkRegistry, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+        for dim in DIMS:
+            for framework in FRAMEWORKS:
+                self[dim].update({framework: {}})
 
     def check_args(self, func, module_name):
         sig = inspect.signature(func)
@@ -112,19 +128,21 @@ class NetworkRegistry(DimRegistry):
                     f"Missing argument {arg} in your {module_name} network API funcion"
                 )
 
-    def register(self, dim, module_name, module=None):
+    def register(self, dim, framework, module_name, module=None):
+        dim = self.dim_mapping.get(dim)
         assert dim in DIMS, "Only support '2D'&'3D' dataset now"
-        dim = self.dim_mapping[dim]
+        assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
+        
         # used as function call
         if module is not None:
             self.check_args(module, module_name)
-            _register_generic_dim(self, dim, module_name, module)
+            _register_network(self, dim, framework, module_name, module)
             return
 
         # used as decorator
         def register_fn(fn):
             self.check_args(fn, module_name)
-            _register_generic_dim(self, dim, module_name, fn)
+            _register_network(self, dim, framework, module_name, fn)
             return fn
 
         return register_fn

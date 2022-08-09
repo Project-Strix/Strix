@@ -1,21 +1,6 @@
-from pathlib import Path
 from utils_cw import check_dir
 import torch
 from strix.utilities.registry import NetworkRegistry
-
-CLASSIFICATION_ARCHI = NetworkRegistry()
-SEGMENTATION_ARCHI = NetworkRegistry()
-SELFLEARNING_ARCHI = NetworkRegistry()
-MULTITASK_ARCHI = NetworkRegistry()
-SIAMESE_ARCHI = NetworkRegistry()
-
-ARCHI_MAPPING = {
-    "segmentation": SEGMENTATION_ARCHI,
-    "classification": CLASSIFICATION_ARCHI,
-    "selflearning": SELFLEARNING_ARCHI,
-    "multitask": MULTITASK_ARCHI,
-    "siamese": SIAMESE_ARCHI,
-}
 
 from strix.models.cnn.utils import print_network, PolynomialLRDecay
 from strix.models.cnn.layers.radam import RAdam
@@ -24,7 +9,7 @@ from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_
 from strix.data_io import DATASET_MAPPING
 from strix.utilities.utils import get_attr_
 from strix.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
-from strix.utilities.imports import import_file, ModuleManager
+from strix.utilities.imports import ModuleManager
 from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
 from strix.models.cnn.cnn_nets import *
@@ -95,15 +80,9 @@ def get_network(opts):
     n_group = options.pop("n_group", 1)  # used for multi-group archi
     pretrained_model_path = options.pop("pretrained_model_path", None)
 
-    siamese = None
-    siamese_latent_dim = options.pop("latent_dim", 512)
-    if ARCHI_MAPPING[opts.framework] == SIAMESE_ARCHI:
-        loss_type = LOSS_MAPPING[opts.framework][opts.criterion]
-        siamese = "single" if loss_type == ContrastiveLoss else "multi"
-        raise NotImplementedError
-
     try:
-        model = ARCHI_MAPPING[opts.framework][opts.tensor_dim][opts.model_name]
+        Networks = NetworkRegistry()
+        model = Networks[opts.tensor_dim][opts.framework][opts.model_name]
     except:
         raise ValueError(f"Cannot find registered model: {opts.model_name}")
     else:
