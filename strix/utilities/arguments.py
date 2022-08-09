@@ -98,6 +98,7 @@ def common_params(func):
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
     @option("--debug", is_flag=True, help="Enter debug mode")
     @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
+    @option("--profile", is_flag=True, help="Turn on GPU profiling")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

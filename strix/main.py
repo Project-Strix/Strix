@@ -20,7 +20,7 @@ def main():
 
 
 if __name__ == "__main__":
-    assert sys.version_info >= (3, 6), "Python ver. >=3.6 is required!"
+    assert sys.version_info >= (3, 8), "Python ver. >=3.8 is required!"
 
     from strix.main_entry import train
     from strix.main_entry import train_cfg
