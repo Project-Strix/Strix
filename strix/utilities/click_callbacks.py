@@ -680,6 +680,6 @@ def backup_project(ctx_params):
         return True
 
     pm = ProjectManager()
-    if pm.project_file.is_file():
+    if pm.project_file and pm.project_file.is_file():
         save_sourcecode(pm.project_file.parent, out_dir, verbose=False)
     return True
