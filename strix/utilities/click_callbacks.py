@@ -389,16 +389,16 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    Networks = NetworkRegistry()
-    archilist = list(Networks[ctx.params["tensor_dim"]][ctx.params["framework"]].keys())
-    if len(archilist) == 0:
+    networks = NetworkRegistry()
+    net_list = networks.list(ctx.params["tensor_dim"], ctx.params["framework"])
+    if len(net_list) == 0:
         print(f"No architecture available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
 
-    if value is not None and value in archilist:
+    if value is not None and value in net_list:
         return value
     else:
-        return prompt("Model list", type=NumericChoice(archilist))
+        return prompt("Model list", type=NumericChoice(net_list))
 
 
 def data_select(ctx, param, value):

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import os
 import inspect
@@ -146,6 +146,46 @@ class NetworkRegistry(DimRegistry):
             return fn
 
         return register_fn
+
+    def get(self, dim: Union[int, str], framework: str, name: str):
+        """alias of direct access by `[]`
+
+        Args:
+            dim (int | str): tensor dim
+            framework (str): framework type, eg. segmentation
+            name (str): network name which has been register
+
+        Returns:
+            Net: speificed network.
+            None: if no network is found.
+        """
+        try:
+            dim = self.dim_mapping.get(dim)
+            net = self[dim][framework][name]
+        except KeyError as e:
+            warnings.warn(colored(f"Network is not registered!\nErr msg: {e}", "red"))
+            return None
+        else:
+            return net
+
+    def list(self, dim: Union[int, str], framework: str):
+        """List all registered networks by given dim and framework
+
+        Args:
+            dim (Union[int, str]): tensor dim
+            framework (str): framework type, eg. classification
+
+        Returns:
+            list: if no network is found, return empty list [].
+        """
+        try:
+            dim = self.dim_mapping.get(dim)
+            nets = list(self[dim][framework].keys())
+        except KeyError as e:
+            warnings.warn(colored(f"Key error!\nErr msg: {e}", "red"))
+            return []
+        else:
+            return nets
 
 
 class DatasetRegistry(DimRegistry):

@@ -80,26 +80,25 @@ def get_network(opts):
     n_group = options.pop("n_group", 1)  # used for multi-group archi
     pretrained_model_path = options.pop("pretrained_model_path", None)
 
-    try:
-        Networks = NetworkRegistry()
-        model = Networks[opts.tensor_dim][opts.framework][opts.model_name]
-    except:
+    networks = NetworkRegistry()
+    model = networks.get(opts.tensor_dim, opts.framework, opts.model_name)
+    if model is None:
         raise ValueError(f"Cannot find registered model: {opts.model_name}")
-    else:
-        return model(
-            dim,
-            in_channels,
-            out_channels,
-            act,
-            norm,
-            n_depth,
-            n_group,
-            drop_out,
-            is_prunable,
-            pretrained,
-            pretrained_model_path,
-            **options,  # Todo: Only pass network-related kwargs instead of all
-        )
+    
+    return model(
+        dim,
+        in_channels,
+        out_channels,
+        act,
+        norm,
+        n_depth,
+        n_group,
+        drop_out,
+        is_prunable,
+        pretrained,
+        pretrained_model_path,
+        **options,  # Todo: Only pass network-related kwargs instead of all
+    )
 
 
 def get_engine(opts, train_loader, test_loader, writer=None):
