@@ -1,6 +1,8 @@
 import csv
 import os
+import warnings
 from pathlib import Path
+from termcolor import colored
 
 import click
 import matplotlib as mpl
@@ -10,10 +12,11 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from strix.data_io import DATASET_MAPPING
+from strix.utilities.registry import DatasetRegistry
 from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.arguments import data_select
 from strix.utilities.enum import FRAMEWORKS, Phases
+from strix.utilities.utils import get_torch_datast
 from strix.configures import config as cfg
 from monai_ex.data import DatasetSummaryEx
 
@@ -94,18 +97,19 @@ options = ["Spacing", "Statistics", "Percentiles"]
 @click.option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
 @click.option("--skip", "-s", prompt=True, prompt_required=False, type=Choice(options), default=None)
 def summarize_data(tensor_dim, framework, data_list, skip):
-    data_attr = DATASET_MAPPING[framework][tensor_dim][data_list]
-    dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
-    files_list = get_items_from_file(dataset_list, format="auto")
+    datasets = DatasetRegistry()
+    strix_dataset = datasets.get(tensor_dim, framework, data_list)
+    if strix_dataset is None:
+        warnings.warn(colored(f"Dataset {data_list} is not found!", "red"))
+        return
 
-    try:
-        train_dataset = dataset_fn(files_list, Phases.TRAIN, {"preload": 0})
-    except Exception as e:
-        Print(f"Creating dataset '{data_list}' failed! \nMsg: {repr(e)}", color="r")
+    torch_dataset = get_torch_datast(strix_dataset, Phases.TRAIN, {"preload": 0})
+    if torch_dataset is None:
+        warnings.warn(colored("Get torch dataset failed! Skip summarize!", "red"))
         return
 
     analyzer = DatasetSummaryEx(
-        dataset=train_dataset,
+        dataset=torch_dataset,
         image_key=cfg.get_key("image"),
         label_key=cfg.get_key("label"),
         num_workers=2,  #! os.cpu_count()

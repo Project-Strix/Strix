@@ -14,8 +14,7 @@ from click import Abort, Choice, prompt
 from termcolor import colored
 
 import strix.utilities.oyaml as yaml
-from strix.data_io import DATASET_MAPPING
-from strix.utilities.registry import NetworkRegistry
+from strix.utilities.registry import NetworkRegistry, DatasetRegistry
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
@@ -199,7 +198,9 @@ def get_exp_name(ctx, param, value):
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
-    project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
+    ds_registry = DatasetRegistry()
+
+    project_name = ds_registry.get(ctx.params["tensor_dim"], ctx.params["framework"], datalist_name).get("PROJECT")
     pm = ProjectManager()
     project_name = project_name or pm.project_name
 
@@ -402,10 +403,11 @@ def model_select(ctx, param, value):
 
 
 def data_select(ctx, param, value):
-    datalist = list(DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
+    ds = DatasetRegistry()
+    datalist = ds.list(ctx.params["tensor_dim"], ctx.params["framework"])
 
     if len(datalist) == 0:
-        print(f"No datalist available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
+        print(f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!")
         ctx.exit()
 
     if _get_prompt_flag(ctx, param, value):
@@ -467,9 +469,7 @@ def confirmation(ctx, param, value, checklist: Optional[Union[Callable, Sequence
     """
     if checklist:
         if not isinstance(checklist, Sequence):
-            checklist = [
-                checklist,
-            ]
+            checklist = [checklist, ]
 
         checking = [checking_fn(ctx.params) for checking_fn in checklist]
         if not all(checking):
@@ -560,7 +560,8 @@ def check_batchsize(ctx_params):
         len_valid = int(all_cases * split)
         len_train = all_cases - len_valid
     else:
-        datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
+        ds = DatasetRegistry()
+        datalist_fname = ds.get(tensor_dim, framework, data_name).get("PATH", "")
         all_data_list = get_items(datalist_fname, format="auto")
         len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid

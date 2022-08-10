@@ -7,7 +7,7 @@ from monai_ex.data import *
 from monai_ex.utils import ensure_tuple, first
 import strix.utilities.oyaml as yaml
 from strix.utilities.enum import DIMS, FRAMEWORKS, PHASES
-from strix.data_io.dataio import DATASET_MAPPING
+from strix.utilities.registry import DatasetRegistry
 from utils_cw import get_items_from_file
 
 root_tree = {
@@ -230,8 +230,10 @@ def register_dataset_from_cfg(config_path):
 
     datasets_, dataloader_, transforms_ = parse_dataset_config(configs)
 
-    DATASET_MAPPING[configs["ATTRIBUTE"]["FRAMEWORK"]].register(
+    ds_registry = DatasetRegistry()
+    ds_registry.register(
         configs["ATTRIBUTE"]["DIM"],
+        configs["ATTRIBUTE"]["FRAMEWORK"],
         configs["ATTRIBUTE"]["NAME"],
         configs["ATTRIBUTE"]["FILELIST"],
         partial(

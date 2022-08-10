@@ -10,18 +10,16 @@ from monai_ex.transforms import (
     ToTensorD,
 )
 
-from strix.data_io import (
-    SEGMENTATION_DATASETS,
-    CLASSIFICATION_DATASETS,
-    SELFLEARNING_DATASETS,
-    StrixDataset,
-)
+from strix.data_io import StrixDataset
 from strix.utilities.enum import Frameworks
+from strix.utilities.registry import DatasetRegistry
 
-@SEGMENTATION_DATASETS.register("2D", "SyntheticData", None)
-@SEGMENTATION_DATASETS.register("3D", "SyntheticData", None)
-@SELFLEARNING_DATASETS.register("2D", "SyntheticData", None)
-@SELFLEARNING_DATASETS.register("3D", "SyntheticData", None)
+DATASETS = DatasetRegistry()
+
+@DATASETS.register("2D", "segmentation", "SyntheticData", None)
+@DATASETS.register("3D", "segmentation", "SyntheticData", None)
+@DATASETS.register("2D", "selflearning", "SyntheticData", None)
+@DATASETS.register("3D", "selflearning", "SyntheticData", None)
 def synthetic_dataset(filelist, phase, opts):
     if opts['output_nc'] in [1, 2]:
         seg_cls = 1
@@ -68,8 +66,8 @@ def synthetic_dataset(filelist, phase, opts):
     )
 
 
-@CLASSIFICATION_DATASETS.register("2D", "RandomData", None)
-@CLASSIFICATION_DATASETS.register("3D", "RandomData", None)
+@DATASETS.register("2D", "classification", "RandomData", None)
+@DATASETS.register("3D", "classification", "RandomData", None)
 def random_dataset_cls_nc1(filelist, phase, opts):
     if opts['output_nc'] in [1, 2]:
         out_cls = 1

@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from types import SimpleNamespace as sn
 
 from strix.models import get_engine, get_test_engine
-from strix.data_io import DATASET_MAPPING
+from strix.utilities.registry import DatasetRegistry
 from strix.data_io.dataio import get_dataloader
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
@@ -191,7 +191,12 @@ def train(ctx, **args):
         cargs.gpu_ids = [0]
 
     # ! dump dataset file
-    source_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("SOURCE")
+    datasets = DatasetRegistry()
+    strix_dataset = datasets.get(cargs.tensor_dim, cargs.framework, cargs.data_list)
+    if strix_dataset is None:
+        raise ValueError(f"Dataset {cargs.data_list} not found!")
+
+    source_file = strix_dataset.get("SOURCE")
     if source_file and os.path.isfile(source_file):
         shutil.copyfile(source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot"))
 
@@ -202,17 +207,17 @@ def train(ctx, **args):
         train_core(cargs, files_train, files_valid)
         return cargs
 
-    data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("PATH", "")
-    test_file = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list].get("TEST_PATH")
+    datalist_fpath = strix_dataset.get("PATH", "")
+    testlist_fpath = strix_dataset.get("TEST_PATH")
 
     # ! Synthetic test phase
-    if data_list is None:
+    if datalist_fpath is None:
         train_datalist = generate_synthetic_datalist(100, logger)
     else:
-        assert os.path.isfile(data_list), f"Data list '{data_list}' not exists!"
-        train_datalist = get_items(data_list, format="auto")
+        assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
+        train_datalist = get_items(datalist_fpath, format="auto")
 
-    if cargs.do_test and (test_file is None or not os.path.isfile(test_file)):
+    if cargs.do_test and (testlist_fpath is None or not os.path.isfile(testlist_fpath)):
         logger.warn(
             f"Test datalist is not found, split test cohort from training data with split ratio of {cargs.split}"
         )
@@ -268,11 +273,11 @@ def train(ctx, **args):
 
     # ! Do testing
     if cargs.do_test > 0:
-        if test_file and os.path.isfile(test_file):
-            test_datalist = get_items(test_file, format="auto")
+        if testlist_fpath and os.path.isfile(testlist_fpath):
+            test_datalist = get_items(testlist_fpath, format="auto")
         elif len(test_datalist) > 0:
-            test_file = cargs.experiment_path.joinpath("test_files.yml")
-            with test_file.open("w") as f:
+            testlist_fpath = cargs.experiment_path.joinpath("test_files.yml")
+            with testlist_fpath.open("w") as f:
                 yaml.dump(test_datalist, f)
         else:
             return cargs
@@ -282,7 +287,7 @@ def train(ctx, **args):
         if len(test_datalist) > 0:
             configures = {
                 "config": os.path.join(args["experiment_path"], "param.list"),
-                "test_files": test_file,
+                "test_files": testlist_fpath,
                 "with_label": has_labels,
                 "use_best_model": True,
                 "smi": False,
