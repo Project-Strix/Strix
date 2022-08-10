@@ -4,15 +4,13 @@ import warnings
 import torch
 import torch.nn as nn
 
-from strix.utilities.registry import NetworkRegistry
-from strix.models.cnn.utils import set_trainable, count_trainable_params
+from strix import strix_networks
+from strix.models.cnn.utils import count_trainable_params
 
 
 @pytest.mark.parametrize("freeze", [True, False])
 def test_freeze_network(freeze):
-    networks = NetworkRegistry()
-
-    network = networks.get("3D", "multitask", "UnifiedNet-M3")
+    network = strix_networks.get("3D", "multitask", "UnifiedNet-M3")
     if network is None:
         warnings.warn("UnifiedNet-M3 not registered! Please use other multitask network to test! Skip")
         return
@@ -20,7 +18,7 @@ def test_freeze_network(freeze):
     net = network(
         3,
         1,
-        (1,1),
+        (1, 1),
         act='relu',
         norm='batch',
         n_depth=5,

@@ -1,12 +1,11 @@
 from typing import Any
 
-from strix.utilities.registry import NetworkRegistry
+from strix import strix_networks
 from monai_ex.networks.nets import UNETR
 
-NETWORK = NetworkRegistry()
 
-@NETWORK.register("2D", "segmentation", "UNETR")
-@NETWORK.register("3D", "segmentation", "UNETR")
+@strix_networks.register("2D", "segmentation", "UNETR")
+@strix_networks.register("3D", "segmentation", "UNETR")
 def strix_unetr(
     spatial_dims: int,
     in_channels: int,

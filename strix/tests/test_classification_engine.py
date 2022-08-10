@@ -2,8 +2,8 @@ import pytest
 from types import SimpleNamespace as sn
 import torch
 
+from strix import strix_networks, strix_datasets
 from strix.models.cnn.engines.classification_engines import ClassificationTestEngine
-from strix.utilities.registry import NetworkRegistry, DatasetRegistry
 from strix.utilities.enum import Phases
 from strix.utilities.utils import get_torch_datast
 from monai_ex.data import DataLoader
@@ -21,12 +21,10 @@ class TestClassification:
     @pytest.mark.parametrize("save_img", [True, False])
     @pytest.mark.parametrize("save_prob", [True, False])
     def test_classification_test_engine(self, device, phase, dim, save_img, save_prob, tmp_path):
-        ds = DatasetRegistry()
-        strix_ds = ds.get(f"{dim}D", 'classification', 'RandomData')
+        strix_ds = strix_datasets.get(f"{dim}D", 'classification', 'RandomData')
         torch_ds = get_torch_datast(strix_ds, Phases.VALID, {"output_nc": 1, "tensor_dim": f"{dim}D"}, synthetic_data_num=4)
 
-        Networks = NetworkRegistry()
-        net = Networks[f"{dim}D"]["classification"]["vgg9"](
+        net = strix_networks[f"{dim}D"]["classification"]["vgg9"](
             spatial_dims=dim,
             in_channels=1,
             out_channels=1,
@@ -46,10 +44,10 @@ class TestClassification:
         self.opts.out_dir = tmp_path
         self.opts.save_image = save_img
         self.opts.save_prob = save_prob
-        
+
         if 'cuda' in device:
             self.opts.amp = True
-        
+
         evaluater = ClassificationTestEngine(
             self.opts,
             DataLoader(torch_ds, 0, batch_size=self.opts.n_batch),
