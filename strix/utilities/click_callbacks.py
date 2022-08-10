@@ -13,9 +13,8 @@ import torch.nn as nn
 from click import Abort, Choice, prompt
 from termcolor import colored
 
+from strix import strix_networks, strix_datasets
 import strix.utilities.oyaml as yaml
-from strix.data_io import DATASET_MAPPING
-from strix.utilities.registry import NetworkRegistry
 from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
@@ -199,7 +198,7 @@ def get_exp_name(ctx, param, value):
     input_str = prompt("Experiment name", default=exp_name, type=str)
     exp_name = exp_name + "-" + input_str.strip("+") if "+" in input_str else input_str
 
-    project_name = DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]][datalist_name].get("PROJECT")
+    project_name = strix_datasets.get(ctx.params["tensor_dim"], ctx.params["framework"], datalist_name).get("PROJECT")
     pm = ProjectManager()
     project_name = project_name or pm.project_name
 
@@ -389,8 +388,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
 
 
 def model_select(ctx, param, value):
-    networks = NetworkRegistry()
-    net_list = networks.list(ctx.params["tensor_dim"], ctx.params["framework"])
+    net_list = strix_networks.list(ctx.params["tensor_dim"], ctx.params["framework"])
     if len(net_list) == 0:
         print(f"No architecture available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
         ctx.exit()
@@ -402,10 +400,10 @@ def model_select(ctx, param, value):
 
 
 def data_select(ctx, param, value):
-    datalist = list(DATASET_MAPPING[ctx.params["framework"]][ctx.params["tensor_dim"]].keys())
+    datalist = strix_datasets.list(ctx.params["tensor_dim"], ctx.params["framework"])
 
     if len(datalist) == 0:
-        print(f"No datalist available for {ctx.params['tensor_dim']} " f"{ctx.params['framework']} task! Abort!")
+        print(f"No datalist available for {ctx.params['tensor_dim']} {ctx.params['framework']} task! Abort!")
         ctx.exit()
 
     if _get_prompt_flag(ctx, param, value):
@@ -467,9 +465,7 @@ def confirmation(ctx, param, value, checklist: Optional[Union[Callable, Sequence
     """
     if checklist:
         if not isinstance(checklist, Sequence):
-            checklist = [
-                checklist,
-            ]
+            checklist = [checklist, ]
 
         checking = [checking_fn(ctx.params) for checking_fn in checklist]
         if not all(checking):
@@ -560,7 +556,7 @@ def check_batchsize(ctx_params):
         len_valid = int(all_cases * split)
         len_train = all_cases - len_valid
     else:
-        datalist_fname = DATASET_MAPPING[framework][tensor_dim][data_name].get("PATH", "")
+        datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
         all_data_list = get_items(datalist_fname, format="auto")
         len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
@@ -622,8 +618,7 @@ def check_freeze_api(ctx_params):
         and ctx_params.get("tensor_dim")
         and ctx_params.get("model_name")
     ):  
-        Networks = NetworkRegistry()
-        model = Networks[ctx_params["tensor_dim"]][ctx_params["framework"]][ctx_params["model_name"]]
+        model = strix_networks[ctx_params["tensor_dim"]][ctx_params["framework"]][ctx_params["model_name"]]
         warning_msg = colored(
             f"freeze() member function is not detected in '{model.__name__}', freeze wont work!", "red"
         )

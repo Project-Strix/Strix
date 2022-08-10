@@ -15,20 +15,6 @@ from strix.configures import config as cfg
 from strix.utilities.utils import trycatch
 import pandas as pd
 
-CLASSIFICATION_DATASETS = DatasetRegistry()
-SEGMENTATION_DATASETS = DatasetRegistry()
-SELFLEARNING_DATASETS = DatasetRegistry()
-MULTITASK_DATASETS = DatasetRegistry()
-SIAMESE_DATASETS = DatasetRegistry()
-
-DATASET_MAPPING = {
-    "segmentation": SEGMENTATION_DATASETS,
-    "classification": CLASSIFICATION_DATASETS,
-    "selflearning": SELFLEARNING_DATASETS,
-    "multitask": MULTITASK_DATASETS,
-    "siamese": SIAMESE_DATASETS,
-}
-
 
 def get_default_setting(phase, **kwargs):
     if phase == Phases.TRAIN:  # Todo: move this part to each dataset?
@@ -90,14 +76,17 @@ def get_dataloader(
         arguments = {"filelist": filelist, "phase": phase, "opts": vars(args)}
 
     try:
-        dataset_ = DATASET_MAPPING[args.framework][args.tensor_dim][args.data_list]["FN"](**arguments)
+        datasets = DatasetRegistry()
+        strix_dataset = datasets.get(args.tensor_dim, args.framework, args.data_list)
+        if strix_dataset is not None:
+            torch_dataset = strix_dataset["FN"](**arguments)
     except Exception as e:
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e
 
     label_key = cfg.get_key("LABEL")
-    if isinstance(dataset_, _TorchDataLoader):
-        return dataset_
+    if isinstance(torch_dataset, _TorchDataLoader):
+        return torch_dataset
     elif (
         phase == "train"
         and args.imbalance_sample
@@ -121,9 +110,9 @@ def get_dataloader(
         weights = torch.DoubleTensor(weights.to_list())
 
         return DataLoader(
-            dataset_,
-            sampler=WeightedRandomSampler(weights=weights, num_samples=len(dataset_)),
+            torch_dataset,
+            sampler=WeightedRandomSampler(weights=weights, num_samples=len(torch_dataset)),
             **params,
         )
     else:
-        return DataLoader(dataset_, **params)
+        return DataLoader(torch_dataset, **params)

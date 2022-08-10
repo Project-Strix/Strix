@@ -4,7 +4,7 @@ import os
 import inspect
 import warnings
 from termcolor import colored
-from strix.utilities.enum import DIMS, NETWORK_ARGS, FRAMEWORKS
+from strix.utilities.enum import DIMS, NETWORK_ARGS, FRAMEWORKS, Phases
 from strix.utilities.utils import singleton
 
 
@@ -30,15 +30,13 @@ def _register_network(module_dict, dim, framework, module_name, module):
     return True
 
 
-def _register_generic_data(
-    module_dict, dim, module_name, train_fpath, test_fpath, module
-):
-    assert module_name not in module_dict.get(
-        dim
-    ), f"{module_name} already registed in {module_dict.get(dim)}"
+def _register_dataset(module_dict, dim, framework, module_name, train_fpath, test_fpath, module):
+    if module_name in module_dict[dim][framework]:
+        warnings.warn(colored(f"{module_name} already registed! Skip!", "yellow"))
+        return False
 
     attr = {module_name: {"FN": module, "PATH": train_fpath, "TEST_PATH": test_fpath}}
-    module_dict[dim].update(attr)
+    module_dict[dim][framework].update(attr)
 
 
 class Registry(dict):
@@ -132,7 +130,7 @@ class NetworkRegistry(DimRegistry):
         dim = self.dim_mapping.get(dim)
         assert dim in DIMS, "Only support '2D'&'3D' dataset now"
         assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
-        
+
         # used as function call
         if module is not None:
             self.check_args(module, module_name)
@@ -188,13 +186,18 @@ class NetworkRegistry(DimRegistry):
             return nets
 
 
+@singleton
 class DatasetRegistry(DimRegistry):
     def __init__(self, *args, **kwargs):
-        super(DatasetRegistry, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+        for dim in DIMS:
+            for framework in FRAMEWORKS:
+                self[dim].update({framework: {}})
 
     def register(
         self,
-        dim: int,
+        dim: Union[int, str],
+        framework: str,
         module_name: str,
         train_filepath: str,
         test_filepath: Optional[str] = None,
@@ -204,16 +207,12 @@ class DatasetRegistry(DimRegistry):
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
-            _register_generic_data(
-                self, dim, module_name, train_filepath, test_filepath, module
-            )
+            _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, module)
             return
 
         # used as decorator
         def register_fn(fn):
-            _register_generic_data(
-                self, dim, module_name, train_filepath, test_filepath, fn
-            )
+            _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, fn)
             return fn
 
         return register_fn
@@ -229,7 +228,7 @@ class DatasetRegistry(DimRegistry):
 
     def multi_in(self, *keys):
         def register_input(fn):
-            dim_module_list = self._get_keys(fn)
+            dim_module_list = self._get_keys(fn)  # todo: refactor!
             for dim, module_name in dim_module_list:
                 self[dim][module_name].update({"M_IN": keys})
             return fn
@@ -238,7 +237,7 @@ class DatasetRegistry(DimRegistry):
 
     def multi_out(self, *keys):
         def register_output(fn):
-            dim_module_list = self._get_keys(fn)
+            dim_module_list = self._get_keys(fn)  # todo: refactor!
             for dim, module_name in dim_module_list:
                 self[dim][module_name].update({"M_OUT": keys})
             return fn
@@ -263,3 +262,42 @@ class DatasetRegistry(DimRegistry):
             return fn
 
         return register_proj
+
+    def get(self, dim: Union[int, str], framework: str, name: str):
+        """Get registered Strix dataset.
+
+        Args:
+            dim (Union[int, str]): tensor dim
+            framework (str): framwork type
+            name (str): registered dastset name
+
+        Returns:
+            dict: registered dataset
+        """
+        try:
+            dim = self.dim_mapping.get(dim)
+            dataset = self[dim][framework][name]
+        except KeyError as e:
+            warnings.warn(colored(f"Dataset is not registered!\nErr msg: {e}", "red"))
+            return None
+        else:
+            return dataset
+
+    def list(self, dim: Union[int, str], framework: str):
+        """List all registered datasets by given dim and framework
+
+        Args:
+            dim (Union[int, str]): tensor dim
+            framework (str): framework type, eg. classification
+
+        Returns:
+            list: if no dataset is found, return empty list [].
+        """
+        try:
+            dim = self.dim_mapping.get(dim)
+            datasets = list(self[dim][framework].keys())
+        except KeyError as e:
+            warnings.warn(colored(f"Key error!\nErr msg: {e}", "red"))
+            return []
+        else:
+            return datasets

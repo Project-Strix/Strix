@@ -26,8 +26,9 @@ from strix.utilities.utils import (
     get_items,
     trycatch,
     generate_synthetic_datalist,
+    get_torch_datast,
 )
-from strix.data_io import DATASET_MAPPING
+from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg
 from monai.networks import one_hot
 from monai_ex.utils import first
@@ -160,7 +161,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_c
 @option(
     "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
-@option("--data-list", type=str, callback=data_select, default=None, help="Data file list")
+@option("--data-list", type=str, callback=data_select, default=None, help="Data file list")  # todo: Rename
 @option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
 @option("--split", type=float, default=0.2, help="Training/testing split ratio")
 @option("--save-raw", is_flag=True, help="Save processed raw image to local")
@@ -183,9 +184,13 @@ def check_data(ctx, **args):
 
     @trycatch(show_details=False)
     def get_train_valid_datasets():
-        data_attr = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]
-        dataset_fn, dataset_list = data_attr["FN"], data_attr["PATH"]
-        if dataset_list is None:  #synthetic data
+        datasets = DatasetRegistry()
+        strix_dataset = datasets.get(cargs.tensor_dim, cargs.framework, cargs.data_list)
+        if strix_dataset is None:
+            raise ValueError(f"{cargs.data_list} not found!")
+        dataset_fn, dataset_list = strix_dataset.get("FN"), strix_dataset.get("PATH")
+
+        if dataset_list is None:  # synthetic data
             file_list = generate_synthetic_datalist(100, logger)
         else:
             file_list = get_items(dataset_list, format="auto")
@@ -194,7 +199,7 @@ def check_data(ctx, **args):
         train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)
         valid_ds = dataset_fn(files_valid, Phases.VALID, auxilary_params)
         return train_ds, valid_ds
-    
+
     train_dataset, valid_dataset = get_train_valid_datasets()
     logger.info(f"Creating dataset '{cargs.data_list}' successfully!")
 

@@ -11,7 +11,7 @@ command = partial(click.command, cls=CommandEx)
 def test_prompt_cond(value, runner):
     @command()
     @option("-d", is_flag=True, default=value)
-    @option("-p", prompt=True,  type=str, default='week', prompt_cond=lambda ctx: ctx.params['d'])
+    @option("-p", prompt=True, type=str, default='week', prompt_cond=lambda ctx: ctx.params['d'])
     def cli_prmopt_case2(d, p):
         pass
 

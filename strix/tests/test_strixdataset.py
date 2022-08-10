@@ -4,7 +4,7 @@ import json
 import torch
 import numpy as np
 
-from strix.data_io import CLASSIFICATION_DATASETS as CLF_DATASETS, DATASET_MAPPING
+from strix.utilities.registry import DatasetRegistry
 from strix.data_io import StrixDataset
 from strix.utilities.utils import get_items
 
@@ -22,7 +22,9 @@ def test_strix_dataset(no_transform, tmp_path):
     to_tensor_tf = None if no_transform else ToTensorD(keys=["image", "label"])
     ds_name = f"test-ds-{no_transform}"
 
-    @CLF_DATASETS.register("2D", ds_name, str(tmp_path / "datalist.json"))
+    DATASETS = DatasetRegistry()
+
+    @DATASETS.register("2D", "classification", ds_name, str(tmp_path / "datalist.json"))
     def get_dataset(filelist, phase, opts):
 
         return StrixDataset(
@@ -43,8 +45,8 @@ def test_strix_dataset(no_transform, tmp_path):
             additional_transforms=[],
         )
 
-    ds_func = DATASET_MAPPING["classification"]["2D"][ds_name].get("FN")
-    fpath = DATASET_MAPPING["classification"]["2D"][ds_name].get("PATH")
+    ds_func = DATASETS.get("2D", "classification", ds_name).get("FN")
+    fpath = DATASETS.get("2D", "classification", ds_name).get("PATH")
     ds = ds_func(get_items(fpath), "train", {})
 
     assert ds is not None

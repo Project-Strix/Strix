@@ -1,12 +1,11 @@
 from utils_cw import check_dir
 import torch
-from strix.utilities.registry import NetworkRegistry
+from strix import strix_datasets, strix_networks
 
 from strix.models.cnn.utils import print_network, PolynomialLRDecay
 from strix.models.cnn.layers.radam import RAdam
 from strix.models.cnn.layers.ranger21 import Ranger21
 from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
-from strix.data_io import DATASET_MAPPING
 from strix.utilities.utils import get_attr_
 from strix.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
 from strix.utilities.imports import ModuleManager
@@ -80,11 +79,10 @@ def get_network(opts):
     n_group = options.pop("n_group", 1)  # used for multi-group archi
     pretrained_model_path = options.pop("pretrained_model_path", None)
 
-    networks = NetworkRegistry()
-    model = networks.get(opts.tensor_dim, opts.framework, opts.model_name)
+    model = strix_networks.get(opts.tensor_dim, opts.framework, opts.model_name)
     if model is None:
         raise ValueError(f"Cannot find registered model: {opts.model_name}")
-    
+
     return model(
         dim,
         in_channels,
@@ -124,9 +122,9 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     momentum = get_attr_(opts, "momentum", 0.0)
     valid_interval = get_attr_(opts, "valid_interval", 5)
 
-    frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
-    multi_input_keys = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
-    multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
+    frame, dim, name = opts.framework, opts.tensor_dim, opts.data_list
+    multi_input_keys = strix_datasets.get(dim, frame, name).get("M_IN", None)
+    multi_output_keys = strix_datasets.get(dim, frame, name).get("M_OUT", None)
 
     device = torch.device("cuda") if opts.gpus != "-1" else torch.device("cpu")
     model_dir = check_dir(opts.experiment_path, "Models")
@@ -247,9 +245,9 @@ def get_test_engine(opts, test_loader):
 
     device = torch.device("cuda:0") if opts.gpus != "-1" else torch.device("cpu")
 
-    frame, dim, data = opts.framework, opts.tensor_dim, opts.data_list
-    multi_input_keys = DATASET_MAPPING[frame][dim][data].get("M_IN", None)
-    multi_output_keys = DATASET_MAPPING[frame][dim][data].get("M_OUT", None)
+    frame, dim, name = opts.framework, opts.tensor_dim, opts.data_list
+    multi_input_keys = strix_datasets.get(dim, frame, name).get("M_IN", None)
+    multi_output_keys = strix_datasets.get(dim, frame, name).get("M_OUT", None)
 
     net = get_network(opts).to(device)
 

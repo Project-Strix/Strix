@@ -52,6 +52,3 @@ def test_remeber_options(prompt, runner, tmp_path):
         assert "(1: none, 2: day, 3: week, 4: month) [day]: none" in result.output
     else:
         assert len(result.output) == 0
-
-
-

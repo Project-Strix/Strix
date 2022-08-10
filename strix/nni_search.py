@@ -9,7 +9,8 @@ from types import SimpleNamespace as sn
 from utils_cw import Print, get_items_from_file, check_dir
 
 from strix.models import get_engine
-from strix.data_io.dataio import get_dataloader, DATASET_MAPPING
+from strix.data_io.dataio import get_dataloader
+from strix.utilities.registry import DatasetRegistry
 from strix.utilities.utils import detect_port, parse_nested_data
 from strix.utilities.enum import Phases
 from strix.utilities.click_callbacks import get_nni_exp_name
@@ -56,9 +57,10 @@ def train_nni(**kwargs):
             # temp solution for MIG env
             cargs.gpu_ids = list(range(len(list(map(str, cargs.gpus.split(","))))))
 
-        data_list = DATASET_MAPPING[cargs.framework][cargs.tensor_dim][cargs.data_list]["PATH"]
-        assert os.path.isfile(data_list), "Data list not exists!"
-        files_list = get_items_from_file(data_list, format="auto")
+        datasets = DatasetRegistry()
+        datalist_fpath = datasets.get(cargs.tensor_dim, cargs.framework, cargs.data_list).get("PATH")
+        assert os.path.isfile(datalist_fpath), "Data list not exists!"
+        files_list = get_items_from_file(datalist_fpath, format="auto")
         if cargs.partial < 1:
             logger.info(f"Use {int(len(files_list)*cargs.partial)} data")
             files_list = files_list[: int(len(files_list) * cargs.partial)]
@@ -66,10 +68,7 @@ def train_nni(**kwargs):
         files_train, files_valid = train_test_split(
             files_list, test_size=cargs.split, random_state=cargs.seed
         )
-        logger.info(
-            f"Get {len(files_train)} training data,"
-            f"{len(files_valid)} validation data"
-        )
+        logger.info(f"Get {len(files_train)} training data, {len(files_valid)} validation data")
 
         # Save param and datalist
         with open(os.path.join(cargs.experiment_path, "train_files.yml"), "w") as f:
