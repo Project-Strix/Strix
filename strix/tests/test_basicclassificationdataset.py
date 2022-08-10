@@ -1,6 +1,6 @@
 import pytest
 from monai.data import Dataset
-from strix.data_io import BasicClassificationDataset
+from strix.data_io import StrixDataset
 
 filelist = [
     {
@@ -17,7 +17,7 @@ filelist = [
 
 
 def test_basic_clf_dataset():
-    data = BasicClassificationDataset(
+    data = StrixDataset(
         filelist=filelist,
         loader=lambda x: x,
         channeler=None,

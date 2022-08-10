@@ -1,8 +1,9 @@
 import pytest
-from strix.data_io import CLASSIFICATION_DATASETS
+from strix.utilities.registry import DatasetRegistry
 
 def test_classification_dataset():
-    dummy_cls_dataset = lambda file_list, phase, opts: [1,2,3]
-    CLASSIFICATION_DATASETS.register('2D', 'dummy', '', '', dummy_cls_dataset)
-    
-    assert 'dummy' in CLASSIFICATION_DATASETS['2D'].keys()
+    ds = DatasetRegistry()
+    dummy_cls_dataset = lambda file_list, phase, opts: [1, 2, 3]
+    ds.register('2D', 'classification', 'dummy', '', '', dummy_cls_dataset)
+
+    assert 'dummy' in ds.list('2D', 'classification')

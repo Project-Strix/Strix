@@ -1,4 +1,5 @@
 import pytest
+import warnings 
 
 import torch
 import torch.nn as nn
@@ -8,10 +9,15 @@ from strix.models.cnn.utils import set_trainable, count_trainable_params
 
 
 @pytest.mark.parametrize("freeze", [True, False])
-def test_segmentation_train_engine(freeze):
-    Networks = NetworkRegistry()
-    model_type = Networks["3D"]["multitask"]["UnifiedNet-M3"]
-    net = model_type(
+def test_freeze_network(freeze):
+    networks = NetworkRegistry()
+
+    network = networks.get("3D", "multitask", "UnifiedNet-M3")
+    if network is None:
+        warnings.warn("UnifiedNet-M3 not registered! Please use other multitask network to test! Skip")
+        return
+
+    net = network(
         3,
         1,
         (1,1),
