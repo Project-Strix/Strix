@@ -69,7 +69,7 @@ class SelflearningTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
             tensorboard_image_kwargs=SelflearningTrainEngine.get_tensorboard_image_transform(
-                opts.output_nc, decollate=decollate, interval=1
+                opts.output_nc, decollate=decollate, interval=opts.tb_dump_img_interval // valid_interval
             ),
             dump_tensorboard=True,
             record_nni=opts.nni,
