@@ -84,7 +84,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
-                output_nc=opts.output_nc, decollate=decollate
+                output_nc=opts.output_nc, decollate=decollate, interval=1
             ),
             dump_tensorboard=True,
             record_nni=opts.nni,
@@ -150,7 +150,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             checkpoint_save_interval=opts.save_epoch_freq,
             ckeckpoint_n_saved=1,
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
-                output_nc=opts.output_nc, decollate=decollate
+                output_nc=opts.output_nc, decollate=decollate, interval=opts.tb_dump_img_interval
             ),
             graph_batch_transform=prepare_batch_fn if opts.visualize else None,
         )
@@ -227,7 +227,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
 
     @staticmethod
     def get_tensorboard_image_transform(
-        output_nc: int, decollate: bool, item_index: Optional[int] = None, label_key: Optional[str] = None
+        output_nc: int, decollate: bool, interval: int, item_index: Optional[int] = None, label_key: Optional[str] = None
     ):
         _image = cfg.get_key("image")
         _label = label_key if label_key else cfg.get_key("label")
@@ -258,7 +258,8 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         return {
             "batch_transform": from_engine([_image, _label]),
             "output_transform": post_transform,
-            "max_channels": 3,
+            "max_channels": 6,
+            "interval": interval,
         }
 
 
