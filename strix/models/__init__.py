@@ -1,13 +1,12 @@
 from utils_cw import check_dir
 import torch
-from strix import strix_datasets, strix_networks
+from strix import strix_datasets, strix_networks, strix_losses
 
 from strix.models.cnn.utils import print_network, PolynomialLRDecay
 from strix.models.cnn.layers.radam import RAdam
 from strix.models.cnn.layers.ranger21 import Ranger21
 from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
 from strix.utilities.utils import get_attr_
-from strix.models.cnn.losses import LOSS_MAPPING, ContrastiveLoss
 from strix.utilities.imports import ModuleManager
 from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
@@ -25,7 +24,7 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
 
 
 def get_loss_fn(framework: str, loss_name: str, loss_params: dict, output_nc: int, deep_supervision: bool = False):
-    loss_type = LOSS_MAPPING[framework][loss_name]
+    loss_type = strix_losses.get(framework, loss_name)
 
     if output_nc == 1:
         kwargs = {
@@ -137,7 +136,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         subloss2 = get_loss_fn(
             opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision
         )
-        loss = LOSS_MAPPING[opts.framework][opts.criterion[0]](subloss1, subloss2, aggregate="sum", **opts.loss_params)
+        loss = strix_losses.get(opts.framework, opts.criterion[0])(subloss1, subloss2, aggregate="sum", **opts.loss_params)
     else:
         loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, opts.deep_supervision)
 
