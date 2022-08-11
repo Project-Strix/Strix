@@ -95,6 +95,7 @@ def common_params(func):
     @option("--disable-logfile", is_flag=True, help="Stop dump log file to local disk")
     @option("--compact-log", is_flag=True, help="Output compact log info")
     @option("--symbolic-tb", is_flag=True, help="Create symbolic for tensorboard logs")
+    @option("--tb-dump-img-interval", type=int, default=50, help="Tensorboard dump image data every N epochs")
     @option("--timestamp", type=str, default=time.strftime("%m%d_%H%M"), help="Timestamp")
     @option("--debug", is_flag=True, help="Enter debug mode")
     @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
