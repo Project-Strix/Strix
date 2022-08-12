@@ -416,7 +416,7 @@ def input_cropsize(ctx, param, value):
     if value is False:
         return value
 
-    configures = get_items(ctx.params["config"], format="json")
+    configures = get_items(ctx.params["config"], format="yaml")
     if is_avaible_size(configures.get("crop_size", None)) or value is False:
         return value
 
