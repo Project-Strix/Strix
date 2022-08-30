@@ -19,11 +19,11 @@ def test_datalist_dict_json(tmp_path):
     with open(data_file, 'w') as f:
         json.dump(content, f, indent=2)
 
-    labeled, unlabeled = parse_datalist(data_file, include_unlabel=True)
+    labeled, unlabeled = parse_datalist(data_file, has_unlabel=True)
     assert len(labeled) == 3
     assert len(unlabeled) == 2
 
-    labeled = parse_datalist(data_file, include_unlabel=False)
+    labeled = parse_datalist(data_file, has_unlabel=False)
     assert len(labeled) == 3
 
     content = {"labeled": labeled_content}
@@ -32,7 +32,7 @@ def test_datalist_dict_json(tmp_path):
         json.dump(content, f, indent=2)
     
     with pytest.raises(Exception):
-        parse_datalist.__wrapped__(data_file2, include_unlabel=True)
+        parse_datalist.__wrapped__(data_file2, has_unlabel=True)
 
 
 def test_datalist_list_json(tmp_path):
@@ -40,5 +40,5 @@ def test_datalist_list_json(tmp_path):
     with open(data_file, 'w') as f:
         json.dump(labeled_content, f, indent=2)
 
-    labeled_list = parse_datalist(data_file, include_unlabel=True)
+    labeled_list = parse_datalist(data_file, has_unlabel=True)
     assert len(labeled_list) == 3
