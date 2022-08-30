@@ -13,12 +13,13 @@ def _register_generic(module_dict, module_name, module):
     module_dict[module_name] = module
 
 
-def _register_generic_dim(module_dict, dim, module_name, module):
-    assert module_name not in module_dict.get(
-        dim
-    ), f"{module_name} already registed in {module_dict.get(dim)}"
+def _register_with_argument(module_dict, key, module_name, module):
+    if module_name in module_dict[key]:
+        warnings.warn(colored(f"{module_name} was already registed in {key}", "yellow"))
+        return False
 
-    module_dict[dim].update({module_name: module})
+    module_dict[key].update({module_name: module})
+    return True
 
 
 def _register_network(module_dict, dim, framework, module_name, module):
@@ -98,12 +99,12 @@ class DimRegistry(dict):
         assert dim in DIMS, "Only support '2D'&'3D' dataset now"
         # used as function call
         if module is not None:
-            _register_generic_dim(self, dim, module_name, module)
+            _register_with_argument(self, dim, module_name, module)
             return
 
         # used as decorator
         def register_fn(fn):
-            _register_generic_dim(self, dim, module_name, fn)
+            _register_with_argument(self, dim, module_name, fn)
             return fn
 
         return register_fn
@@ -127,10 +128,10 @@ class NetworkRegistry(DimRegistry):
                 )
 
     def register(self, dim, framework, module_name, module=None):
-        dim = self.dim_mapping.get(dim)
-        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
+        assert dim in self.dim_mapping, f"Only support {self.dim_mapping} dataset now"
         assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
 
+        dim = self.dim_mapping.get(dim)
         # used as function call
         if module is not None:
             self.check_args(module, module_name)
@@ -203,7 +204,8 @@ class DatasetRegistry(DimRegistry):
         test_filepath: Optional[str] = None,
         module=None,
     ):
-        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
+        assert dim in self.dim_mapping, f"Only support {self.dim_mapping} dataset now"
+        assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
         dim = self.dim_mapping[dim]
         # used as function call
         if module is not None:
@@ -301,3 +303,46 @@ class DatasetRegistry(DimRegistry):
             return []
         else:
             return datasets
+
+
+@singleton
+class LossRegistry(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for framework in FRAMEWORKS:
+            self[framework] = {}
+
+
+    def register(self, framework: str, loss_name: str, module=None):
+        assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
+        # used as function call
+        if module is not None:
+            _register_with_argument(self, framework, loss_name, module)
+            return
+
+        # used as decorator
+        def register_fn(fn):
+            _register_with_argument(self, framework, loss_name, fn)
+            return fn
+
+        return register_fn
+
+    def get(self, framework: str, name: str):
+        """alias of direct access by `[]`
+
+        Args:
+            dim (int | str): tensor dim
+            framework (str): framework type, eg. segmentation
+            name (str): network name which has been register
+
+        Returns:
+            callable: speificed loss func.
+            None: if no network is found.
+        """
+        try:
+            loss = self[framework][name]
+        except KeyError as e:
+            warnings.warn(colored(f"Loss is not registered!\nErr msg: {e}", "red"))
+            return None
+        else:
+            return loss
