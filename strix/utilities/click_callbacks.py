@@ -1,3 +1,9 @@
+from typing import Callable
+
+import sys
+import re
+import math
+import json
 import inspect
 import math
 import re
@@ -16,7 +22,7 @@ from termcolor import colored
 from strix import strix_networks, strix_datasets, strix_losses
 import strix.utilities.oyaml as yaml
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
-from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
+from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line, parse_datalist
 from strix.utilities.click import NumericChoice
 from strix.utilities.project_loader import ProjectManager
 
@@ -535,7 +541,7 @@ def check_batchsize(ctx_params):
     Returns:
         bool: return True is check is passed, and vice versa
     """
-    train_list, valid_list, framework, tensor_dim, data_name, split, n_batch_train, n_batch_valid = (
+    train_list, valid_list, framework, tensor_dim, data_name, split, n_batch_train, n_batch_valid, semi = (
         ctx_params.get("train_list"),
         ctx_params.get("valid_list"),
         ctx_params.get("framework"),
@@ -544,21 +550,34 @@ def check_batchsize(ctx_params):
         ctx_params.get("split"),
         ctx_params.get("n_batch"),
         ctx_params.get("n_batch_valid"),
+        ctx_params.get("semi_supervised")
     )
+    is_semi = semi or framework == Frameworks.SEMISUPERVISED.value
+    
+    unlabel_files_len = sys.maxsize
     if train_list and valid_list:
         print(valid_list, train_list)
-        files_train = get_items(train_list, format="auto")
-        files_valid = get_items(valid_list, format="auto")
-        len_train, len_valid = len(files_train), len(files_valid)
+        if is_semi:
+            train_files, unlabel_files = parse_datalist(train_list, format="auto", has_unlabel=True)
+            unlabel_files_len = len(unlabel_files)
+        else:
+            train_files = parse_datalist(train_list, format="auto")        
+        valid_files = parse_datalist(valid_list, format="auto")
+        len_train, len_valid = min(len(train_files), unlabel_files_len), len(valid_files)
     elif data_name in ["RandomData", "SyntheticData"]:
         all_cases = 100
         len_valid = int(all_cases * split)
         len_train = all_cases - len_valid
     else:
         datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
-        all_data_list = get_items(datalist_fname, format="auto")
-        len_valid = math.ceil(len(all_data_list) * split)
-        len_train = len(all_data_list) - len_valid
+        if is_semi:
+            train_files, unlabel_files = parse_datalist(datalist_fname, format="auto", has_unlabel=True)
+            unlabel_files_len = len(unlabel_files)
+        else:
+            train_files = parse_datalist(datalist_fname, format="auto")
+
+        len_valid = math.ceil(len(train_files) * split)
+        len_train = min(len(train_files) - len_valid, unlabel_files_len)
 
     ret = True
     if len_train < n_batch_train:
