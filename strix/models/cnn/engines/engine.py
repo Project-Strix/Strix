@@ -118,6 +118,7 @@ class StrixTrainEngine(ABC):
                 TensorBoardImageHandlerEx(
                     summary_writer=tb_summary_writer,
                     prefix_name=name + "-" + phase,
+                    logger_name=logger_name,
                     **kwargs,
                 )
                 for kwargs, name in zip(tb_img_kwargs, tb_img_names)

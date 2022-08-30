@@ -14,7 +14,7 @@ from strix import strix_datasets
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
 from strix.utilities.registry import DatasetRegistry
-from strix.utilities.utils import is_numeric, trycatch
+from strix.utilities.utils import is_numeric, trycatch, get_attr_
 
 
 def get_default_setting(phase, **kwargs):
@@ -82,22 +82,22 @@ def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unla
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e
 
-    label_key = cfg.get_key("LABEL")
+    flag_key = get_attr_(args, "sample_flag_key", cfg.get_key("LABEL"))
     if isinstance(torch_dataset, _TorchDataLoader):
         return torch_dataset
     elif (
         phase == Phases.TRAIN
         and args.imbalance_sample
-        and filelist[0].get(label_key) is not None
+        and filelist[0].get(flag_key) is not None
     ):
-        if isinstance(filelist[0][label_key], (list, tuple)):
+        if isinstance(filelist[0][flag_key], (list, tuple)):
             raise NotImplementedError(
                 "Imbalanced dataset sampling cannot handle list&tuple label"
             )
 
         print("Using imbalanced dataset sampling!")
         params.update({"shuffle": False})
-        labels = np.array([l[label_key] for l in filelist])
+        labels = np.array([l[flag_key] for l in filelist]).astype(np.int)
         if len(labels) != len(torch_dataset):
             raise DatasetException("Length of label != Length of dataset. ??? Please recheck!")
         if not is_numeric(labels):

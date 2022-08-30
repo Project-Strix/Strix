@@ -1,45 +1,41 @@
-from types import SimpleNamespace
-from typing import Optional, Union, Sequence, Dict
-import re
 import copy
+import re
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Dict, Optional, Sequence, Union
 
 import torch
-from torch.utils.data import DataLoader 
-from strix.models.cnn.engines import TRAIN_ENGINES, TEST_ENGINES, ENSEMBLE_TEST_ENGINES
+from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluatorEx, SupervisedTrainerEx
+from monai_ex.handlers import (
+    EarlyStopHandler,
+    ImageBatchSaver,
+    LrScheduleTensorboardHandler,
+    MeanDice,
+    SegmentationSaver,
+    ValidationHandler,
+)
+from monai_ex.handlers import from_engine_ex as from_engine
+from monai_ex.handlers import stopping_fn_from_metric
+from monai_ex.inferers import SimpleInfererEx as SimpleInferer
+from monai_ex.inferers import SlidingWindowInferer
+from monai_ex.transforms import ActivationsD
+from monai_ex.transforms import AsDiscreteExD as AsDiscreteD
+from monai_ex.transforms import ComposeEx as Compose
+from monai_ex.transforms import GetItemD, MeanEnsembleD
+from torch.utils.data import DataLoader
+
+from strix.configures import config as cfg
+from strix.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
+from strix.models.cnn.engines.engine import StrixTestEngine, StrixTrainEngine
 from strix.models.cnn.engines.utils import (
+    get_dice_metric_transform_fn,
     get_models,
     get_prepare_batch_fn,
     get_unsupervised_prepare_batch_fn,
-    get_dice_metric_transform_fn,
 )
-from strix.utilities.utils import setup_logger, output_filename_check, get_attr_
 from strix.utilities.enum import Phases
 from strix.utilities.transforms import decollate_transform_adaptor as DTA
-from strix.configures import config as cfg
-from strix.models.cnn.engines.engine import StrixTrainEngine, StrixTestEngine
-
-from monai_ex.inferers import SimpleInfererEx as SimpleInferer, SlidingWindowInferer
-
-from monai_ex.engines import SupervisedTrainerEx, SupervisedEvaluatorEx, EnsembleEvaluator
-
-from monai_ex.transforms import (
-    ComposeEx as Compose,
-    ActivationsD,
-    AsDiscreteExD as AsDiscreteD,
-    MeanEnsembleD,
-    GetItemD,
-)
-from monai_ex.handlers import (
-    ValidationHandler,
-    LrScheduleTensorboardHandler,
-    SegmentationSaver,
-    MeanDice,
-    stopping_fn_from_metric,
-    from_engine_ex as from_engine,
-    EarlyStopHandler,
-    ImageBatchSaver,
-)
+from strix.utilities.utils import get_attr_, output_filename_check, setup_logger
 
 
 @TRAIN_ENGINES.register("segmentation")

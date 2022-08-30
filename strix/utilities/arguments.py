@@ -71,6 +71,7 @@ def common_params(func):
     @option("--n-batch-valid", prompt=True, show_default=True, type=int, default=5, help="Valid batch size")
     @option("--n-worker", type=int, default=10, help="Num of workers for training dataloader")
     @option("-IS", "--imbalance-sample", is_flag=True, help="Use imbalanced dataset sampling")
+    @option("--sample-flag-key", type=str, default=None, help="Key used for imbalance-sampling")
     @option("--downsample", type=int, default=-1, help="Downsample rate. disable:-1")
     @option("--input-nc", type=int, default=1, prompt=True, help="Input data channels")
     @option("--output-nc", type=UNPROCESSED, default=1, prompt=True, callback=multi_ouputnc, help="Output channels")

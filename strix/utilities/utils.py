@@ -38,7 +38,7 @@ def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = Fals
     try:
         return get_items_from_file(filelist, format, sep)
     except json.JSONDecodeError as e:
-        raise GenericException("Content of your json file cannot be parsed. Please recheck it!")
+        raise GenericException(f"Content of your file {filelist} cannot be parsed. Please recheck it!")
     except yaml.YAMLError as e:
         if hasattr(e, "problem_mark"):
             mark = e.problem_mark

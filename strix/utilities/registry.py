@@ -38,6 +38,7 @@ def _register_dataset(module_dict, dim, framework, module_name, train_fpath, tes
 
     attr = {module_name: {"FN": module, "PATH": train_fpath, "TEST_PATH": test_fpath}}
     module_dict[dim][framework].update(attr)
+    return True
 
 
 def _register_unlabel_data(module_dict, dim, framework, dataset_name, module):
@@ -46,6 +47,7 @@ def _register_unlabel_data(module_dict, dim, framework, dataset_name, module):
         return False
 
     module_dict[dim][framework][dataset_name].update({"UNLABEL_FN": module})
+    return True
 
 
 class Registry(dict):
@@ -101,6 +103,7 @@ class DimRegistry(dict):
         }
         self["2D"] = {}
         self["3D"] = {}
+        self.fn_to_module_mapping = {}
 
     def register(self, dim, module_name, module=None):
         dim = self.dim_mapping.get(dim)
@@ -213,14 +216,23 @@ class DatasetRegistry(DimRegistry):
         assert dim in self.dim_mapping, f"Only support {self.dim_mapping} dataset now"
         assert framework in FRAMEWORKS, f"Given '{framework}' is not supported yet!"
         dim = self.dim_mapping[dim]
+
+        def _update_fn_to_module_mapping(module, dim, framework, module_name):
+            if module in self.fn_to_module_mapping:
+                self.fn_to_module_mapping[module].append((dim, framework, module_name))
+            else:
+                self.fn_to_module_mapping[module] = [(dim, framework, module_name)]
+
         # used as function call
         if module is not None:
-            _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, module)
+            if _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, module):
+                _update_fn_to_module_mapping(module, dim, framework, module_name)
             return
 
         # used as decorator
         def register_fn(fn):
-            _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, fn)
+            if _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, fn):
+                _update_fn_to_module_mapping(module, dim, framework, module_name)
             return fn
 
         return register_fn
@@ -244,16 +256,17 @@ class DatasetRegistry(DimRegistry):
         dims = ["2D", "3D"]
         results = []
         for d in dims:
-            for key, value in self[d].items():
-                if val == value["FN"]:
-                    results.append((d, key))
+            for framework in FRAMEWORKS:
+                for key, value in self[d][framework].items():
+                    if val == value["FN"]:
+                        results.append((d, framework, key))
         return results
 
     def multi_in(self, *keys):
         def register_input(fn):
             dim_module_list = self._get_keys(fn)  # todo: refactor!
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_IN": keys})
+            for dim, fw, module_name in dim_module_list:
+                self[dim][fw][module_name].update({"M_IN": keys})
             return fn
 
         return register_input
@@ -261,8 +274,8 @@ class DatasetRegistry(DimRegistry):
     def multi_out(self, *keys):
         def register_output(fn):
             dim_module_list = self._get_keys(fn)  # todo: refactor!
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_OUT": keys})
+            for dim, fw, module_name in dim_module_list:
+                self[dim][fw][module_name].update({"M_OUT": keys})
             return fn
 
         return register_output
