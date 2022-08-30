@@ -18,7 +18,7 @@ from strix.utilities.enum import Phases
 from strix.utilities.click import OptionEx, CommandEx
 import strix.utilities.oyaml as yaml
 import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger, get_items, generate_synthetic_datalist
+from strix.utilities.utils import setup_logger, get_items, parse_datalist, generate_synthetic_datalist
 from strix.utilities.click_callbacks import (
     get_unknown_options,
     get_exp_name,
@@ -202,8 +202,8 @@ def train(ctx, **args):
 
     # ! Manually specified train&valid datalist
     if cargs.train_list and cargs.valid_list:
-        files_train = get_items(cargs.train_list, format="auto")
-        files_valid = get_items(cargs.valid_list, format="auto")
+        files_train = parse_datalist(cargs.train_list, format="auto")
+        files_valid = parse_datalist(cargs.valid_list, format="auto")
         train_core(cargs, files_train, files_valid)
         return cargs
 
@@ -215,7 +215,7 @@ def train(ctx, **args):
         train_datalist = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-        train_datalist = get_items(datalist_fpath, format="auto")
+        train_datalist = parse_datalist(datalist_fpath, format="auto")
 
     if cargs.do_test and (testlist_fpath is None or not os.path.isfile(testlist_fpath)):
         logger.warn(
@@ -274,7 +274,7 @@ def train(ctx, **args):
     # ! Do testing
     if cargs.do_test > 0:
         if testlist_fpath and os.path.isfile(testlist_fpath):
-            test_datalist = get_items(testlist_fpath, format="auto")
+            test_datalist = parse_datalist(testlist_fpath, format="auto")
         elif len(test_datalist) > 0:
             testlist_fpath = cargs.experiment_path.joinpath("test_files.yml")
             with testlist_fpath.open("w") as f:
@@ -364,7 +364,7 @@ def test_cfg(**args):
 
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
-        test_files = get_items(args["test_files"], format="auto")
+        test_files = parse_datalist(args["test_files"], format="auto")
     elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
@@ -373,7 +373,7 @@ def test_cfg(**args):
         test_fpaths = list(exp_dir.glob("valid_files*"))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
-            test_files = get_items(test_fpath, format="auto")
+            test_files = parse_datalist(test_fpath, format="auto")
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
