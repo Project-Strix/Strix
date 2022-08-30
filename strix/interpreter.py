@@ -100,6 +100,8 @@ def gradcam(**args):
     configures["phase"] = phase
     configures["experiment_path"] = exp_dir
     configures["model_path"] = get_trained_models(exp_dir)[0]  # Get the first model
+    configures["save_image"] = False
+    configures["save_prob"] = False
     configures["save_results"] = False
     configures["save_latent"] = False
     configures["target_layer"] = None

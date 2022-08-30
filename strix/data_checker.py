@@ -28,6 +28,8 @@ from strix.utilities.utils import (
     trycatch,
     generate_synthetic_datalist,
     get_torch_datast,
+    parse_datalist,
+    trycatch
 )
 from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg
@@ -56,6 +58,9 @@ def save_raw_image(data, meta_dict, out_dir, phase, dataset_name, batch_index, l
 
 
 def save_fnames(data, img_meta_key, image_fpath):
+    if data.get(img_meta_key) is None:
+        return
+
     fnames = {idx + 1: fname for idx, fname in enumerate(data[img_meta_key]["filename_or_obj"])}
     image_fpath = str(image_fpath).split("-chn")[0]
     output_path = os.path.splitext(image_fpath)[0] + "-fnames.yml"
@@ -241,6 +246,7 @@ def check_data(ctx, **args):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
                     mask_class_num = len(data[msk_key].unique())
+                    msk = data[msk_key]
                     if mask_class_num > 2:
                         msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
                 else:
@@ -280,6 +286,7 @@ def check_data(ctx, **args):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
                     mask_class_num = len(data[msk_key].unique())
+                    msk = data[msk_key]
                     if mask_class_num > 2:
                         msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
                 else:
@@ -322,6 +329,7 @@ def check_data(ctx, **args):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
                     mask_class_num = len(data[msk_key].unique())
+                    msk = data[msk_key]
                     if mask_class_num > 2:
                         msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
                 else:
