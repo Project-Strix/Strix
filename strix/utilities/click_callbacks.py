@@ -550,10 +550,10 @@ def check_batchsize(ctx_params):
         ctx_params.get("split"),
         ctx_params.get("n_batch"),
         ctx_params.get("n_batch_valid"),
-        ctx_params.get("semi_supervised")
+        ctx_params.get("semi_supervised"),
     )
     is_semi = semi or framework == Frameworks.SEMISUPERVISED.value
-    
+
     unlabel_files_len = sys.maxsize
     if train_list and valid_list:
         print(valid_list, train_list)
@@ -561,7 +561,7 @@ def check_batchsize(ctx_params):
             train_files, unlabel_files = parse_datalist(train_list, format="auto", has_unlabel=True)
             unlabel_files_len = len(unlabel_files)
         else:
-            train_files = parse_datalist(train_list, format="auto")        
+            train_files = parse_datalist(train_list, format="auto")
         valid_files = parse_datalist(valid_list, format="auto")
         len_train, len_valid = min(len(train_files), unlabel_files_len), len(valid_files)
     elif data_name in ["RandomData", "SyntheticData"]:
