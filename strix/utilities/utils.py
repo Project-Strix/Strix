@@ -65,13 +65,13 @@ def generate_synthetic_datalist(data_num: int = 100, logger=None):
 
 
 @trycatch()
-def parse_datalist(filelist, format="auto", include_unlabel: bool = False):
+def parse_datalist(filelist, format="auto", has_unlabel: bool = False):
     """Wrapper of `get_items` function for parsing datalist
 
     Args:
         filelist (list): input filelist containing data path.
         format (str, optional): datalist file format. Defaults to "auto".
-        include_unlabel (bool, optional): whether return unlabeled data if exists. Defaults to False.
+        has_unlabel (bool, optional): whether return unlabeled data if exists. Defaults to False.
     """
     datalist = get_items(filelist, format=format)
     if isinstance(datalist, Sequence):
@@ -81,11 +81,11 @@ def parse_datalist(filelist, format="auto", include_unlabel: bool = False):
         unlabel: str = DatalistKeywords.UNLABEL.value
         if label not in datalist:
             raise GenericException(f"Your datalist does not contain '{label}' key.")
-        if include_unlabel and unlabel not in datalist:
+        if has_unlabel and unlabel not in datalist:
             raise GenericException(
                 f"Your datalist does not contain '{unlabel}' key, but you need it for your task!"
             )
-        if include_unlabel:
+        if has_unlabel:
             return datalist[label], datalist[unlabel]
         return datalist[label]
     else:
