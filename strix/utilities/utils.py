@@ -9,7 +9,7 @@ import warnings
 from pathlib import Path
 from functools import partial
 from termcolor import colored
-from typing import List, Optional, Tuple, Union, TextIO
+from typing import List, Optional, Tuple, Union, TextIO, Sequence, Dict
 
 import matplotlib
 import pylab
@@ -24,10 +24,10 @@ import matplotlib.ticker as ticker
 import numpy as np
 import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
-from strix.utilities.enum import LR_SCHEDULES, Phases
+from strix.utilities.enum import LR_SCHEDULES, Phases, DatalistKeywords
 from monai.networks import one_hot
 from monai_ex.utils import ensure_list, GenericException
-from utils_cw import catch_exception, get_items_from_file, Print
+from utils_cw import catch_exception, get_items_from_file
 
 trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords="strix")
 
@@ -64,7 +64,37 @@ def generate_synthetic_datalist(data_num: int = 100, logger=None):
     return train_datalist
 
 
-def get_attr_(obj, name, default=None):
+@trycatch()
+def parse_datalist(filelist, format="auto", include_unlabel: bool = False):
+    """Wrapper of `get_items` function for parsing datalist
+
+    Args:
+        filelist (list): input filelist containing data path.
+        format (str, optional): datalist file format. Defaults to "auto".
+        include_unlabel (bool, optional): whether return unlabeled data if exists. Defaults to False.
+    """
+    datalist = get_items(filelist, format=format)
+    if isinstance(datalist, Sequence):
+        return datalist  # normal datalist
+    elif isinstance(datalist, Dict):
+        label: str = DatalistKeywords.LABEL.value
+        unlabel: str = DatalistKeywords.UNLABEL.value
+        if label not in datalist:
+            raise GenericException(f"Your datalist does not contain '{label}' key.")
+        if include_unlabel and unlabel not in datalist:
+            raise GenericException(
+                f"Your datalist does not contain '{unlabel}' key, but you need it for your task!"
+            )
+        if include_unlabel:
+            return datalist[label], datalist[unlabel]
+        return datalist[label]
+    else:
+        return GenericException(
+            f"Current datalist should be list or dict (labeled&unlabeled), but got {type(datalist)}"
+        )
+
+
+def get_attr_(obj, name, default = None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 

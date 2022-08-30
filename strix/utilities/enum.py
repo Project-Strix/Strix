@@ -1,6 +1,8 @@
 # All enum variables
 from enum import Enum
 
+from sklearn import semi_supervised
+
 BUILTIN_TYPES = [dict, list, tuple, str, int, float, bool]
 
 
@@ -90,6 +92,7 @@ class Frameworks(Enum):
     SELFLEARNING = "selflearning"
     DETECTION = "detection"
     MULTITASK = "multitask"
+    SEMISUPERVISED = 'semisupervised'
 
 
 FRAMEWORKS = get_enums(Frameworks)
@@ -141,3 +144,10 @@ class Freezers(Enum):
     SUBTASK = "subtask"
 
 FREEZERS = get_enums(Freezers)
+
+
+class DatalistKeywords(Enum):
+    UNLABEL = "unlabeled"
+    LABEL = "labeled"
+
+DATALISTKEYWORDS = get_enums(DatalistKeywords)
