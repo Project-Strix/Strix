@@ -13,9 +13,8 @@ import torch.nn as nn
 from click import Abort, Choice, prompt
 from termcolor import colored
 
-from strix import strix_networks, strix_datasets
+from strix import strix_networks, strix_datasets, strix_losses
 import strix.utilities.oyaml as yaml
-from strix.models.cnn.losses import LOSS_MAPPING
 from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
 from strix.utilities.click import NumericChoice
@@ -314,7 +313,7 @@ def framework_select(ctx, param, value):
 
 def loss_select(ctx, param, value, prompt_all_args=False):
     def _single_loss_select(ctx, framework, value, prompt_all_args, meta_key_postfix=""):
-        losslist = list(LOSS_MAPPING[framework].keys())
+        losslist = strix_losses.list(framework)
 
         assert len(losslist) > 0, f"No loss available for {framework}! Abort!"
 
@@ -348,7 +347,7 @@ def loss_select(ctx, param, value, prompt_all_args=False):
         elif value == "Uniform":
             ctx.params[meta_key] = {"weight": 1}
         else:  #! custom loss
-            func = LOSS_MAPPING[framework][value]
+            func = strix_losses.get(framework, value)
             sig = inspect.signature(func)
             anno = inspect.getfullargspec(func).annotations
             if not prompt_all_args:

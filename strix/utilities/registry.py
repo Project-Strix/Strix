@@ -327,7 +327,7 @@ class LossRegistry(dict):
 
         return register_fn
 
-    def get(self, framework: str, name: str):
+    def get(self, framework: str, name: str) -> Optional[callable]:
         """alias of direct access by `[]`
 
         Args:
@@ -336,8 +336,7 @@ class LossRegistry(dict):
             name (str): network name which has been register
 
         Returns:
-            callable: speificed loss func.
-            None: if no network is found.
+            Optional[callable]: speificed loss func. If no network is found, return None
         """
         try:
             loss = self[framework][name]
@@ -346,3 +345,21 @@ class LossRegistry(dict):
             return None
         else:
             return loss
+
+    def list(self, framework: str) -> list:
+        """List all registered losses by given framework
+
+        Args:
+            framework (str): framework type, eg. classification
+
+        Returns:
+            list: if no loss is found, return empty list [].
+        """
+
+        try:
+            losses = list(self[framework].keys())
+        except KeyError as e:
+            warnings.warn(colored(f"Key error!\nErr msg: {e}", "red"))
+            return []
+        else:
+            return losses
