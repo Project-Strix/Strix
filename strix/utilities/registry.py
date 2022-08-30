@@ -40,6 +40,12 @@ def _register_dataset(module_dict, dim, framework, module_name, train_fpath, tes
     module_dict[dim][framework].update(attr)
 
 
+def _register_unlabel_data(module_dict, dim, dataset_name, module):
+    assert dataset_name in module_dict[dim], f"labeled data of '{dataset_name}' should be registered first!"
+
+    module_dict[dim][dataset_name].update({"UNLABEL_FN": module})
+
+
 class Registry(dict):
     """
     A helper class for managing registering modules, it extends a dictionary
@@ -123,9 +129,7 @@ class NetworkRegistry(DimRegistry):
         func_args = list(sig.parameters.keys())
         for arg in NETWORK_ARGS:
             if arg not in func_args:
-                raise ValueError(
-                    f"Missing argument {arg} in your {module_name} network API funcion"
-                )
+                raise ValueError(f"Missing argument {arg} in your {module_name} network API funcion")
 
     def register(self, dim, framework, module_name, module=None):
         assert dim in self.dim_mapping, f"Only support {self.dim_mapping} dataset now"
@@ -215,6 +219,21 @@ class DatasetRegistry(DimRegistry):
         # used as decorator
         def register_fn(fn):
             _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, fn)
+            return fn
+
+        return register_fn
+
+    def register_unlabel(self, dim: int, framework: str, dataset_name: str, module=None):
+        assert dim in DIMS, "Only support '2D'&'3D' dataset now"
+        dim = self.dim_mapping[dim]
+        # used as function call
+        if module is not None:
+            _register_unlabel_data(self, dim, framework, dataset_name, module)
+            return
+
+        # used as decorator
+        def register_fn(fn):
+            _register_unlabel_data(self, dim, framework, dataset_name, fn)
             return fn
 
         return register_fn

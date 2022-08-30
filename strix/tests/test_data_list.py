@@ -32,7 +32,7 @@ def test_datalist_dict_json(tmp_path):
         json.dump(content, f, indent=2)
     
     with pytest.raises(Exception):
-        parse_datalist._wrapped__(data_file2, include_unlabel=True)
+        parse_datalist.__wrapped__(data_file2, include_unlabel=True)
 
 
 def test_datalist_list_json(tmp_path):
