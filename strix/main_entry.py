@@ -20,7 +20,7 @@ from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluator
 from monai_ex.handlers import SNIP_prune_handler
 from sklearn.model_selection import KFold, ShuffleSplit, train_test_split
 from torch.utils.tensorboard import SummaryWriter
-from utils_cw import PathlibEncoder, Print, check_dir, confirmation, print_smi, prompt_when, split_train_test
+from utils_cw import Print, check_dir, split_train_test
 
 import strix.utilities.arguments as arguments
 from strix.configures import config as cfg
@@ -45,15 +45,12 @@ from strix.utilities.click_callbacks import (
     check_amp,
     dump_hyperparameters,
     backup_project,
+    select_gpu,
+    get_exp_name,
+    input_cropsize,
+    get_unknown_options,
 )
 
-from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
-from utils_cw import Print, check_dir, split_train_test
-
-import click
-from ignite.engine import Events
-from monai_ex.handlers import SNIP_prune_handler
-from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)

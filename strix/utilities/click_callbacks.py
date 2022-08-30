@@ -620,7 +620,7 @@ def check_lr_policy(ctx_params):
         bool: return True is check is passed, and vice versa
     """
     if ctx_params.get("lr_policy") == "plateau" and ctx_params.get("valid_interval") != 1:
-        warnings.warn(colored("Recommend set valid-interval = 1" "when using ReduceLROnPlateau", "yellow"))
+        warnings.warn(colored("Recommend set valid-interval = 1 when using ReduceLROnPlateau", "yellow"))
     return True
 
 

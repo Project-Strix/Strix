@@ -27,7 +27,7 @@ from matplotlib.ticker import ScalarFormatter
 from strix.utilities.enum import LR_SCHEDULES, Phases, DatalistKeywords
 from monai.networks import one_hot
 from monai_ex.utils import ensure_list, GenericException
-from utils_cw import catch_exception, get_items_from_file
+from utils_cw import catch_exception, get_items_from_file, Print
 
 trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords="strix")
 
@@ -802,7 +802,7 @@ def save_sourcecode(code_rootdir, out_dir, verbose=True):
     if not os.path.isdir(code_rootdir):
         raise FileNotFoundError(f"Code root dir not exists! {code_rootdir}")
 
-    Print("Backup source code under root_dir:", code_rootdir, color="y", verbose=verbose)
+    Print("Backup source code under root_dir:", code_rootdir, color="g", verbose=verbose)
     outpath = out_dir / f"{os.path.basename(code_rootdir)}_{time.strftime('%m%d_%H%M')}.tar"
     tar_opt = "cvf" if verbose else "cf"
     os.system(f"cd {str(code_rootdir)}; tar -{tar_opt} {outpath} .")
