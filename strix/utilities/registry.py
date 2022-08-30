@@ -40,10 +40,12 @@ def _register_dataset(module_dict, dim, framework, module_name, train_fpath, tes
     module_dict[dim][framework].update(attr)
 
 
-def _register_unlabel_data(module_dict, dim, dataset_name, module):
-    assert dataset_name in module_dict[dim], f"labeled data of '{dataset_name}' should be registered first!"
+def _register_unlabel_data(module_dict, dim, framework, dataset_name, module):
+    if dataset_name not in module_dict[dim][framework]:
+        warnings.warn(colored(f"labeled data of '{dataset_name}' should be registered first!"))
+        return False
 
-    module_dict[dim][dataset_name].update({"UNLABEL_FN": module})
+    module_dict[dim][framework][dataset_name].update({"UNLABEL_FN": module})
 
 
 class Registry(dict):
