@@ -233,7 +233,7 @@ def train(ctx, **args):
 
     # ! Synthetic test phase
     if datalist_fpath is None:
-        train_datalist = generate_synthetic_datalist(100, logger)
+        train_files = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
 
