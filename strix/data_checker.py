@@ -4,6 +4,7 @@ import click
 import numpy as np
 import nibabel as nib
 from tqdm import tqdm
+from pathlib import Path
 from functools import partial
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
@@ -15,7 +16,7 @@ from torchvision.utils import save_image
 from strix.utilities.arguments import data_select
 from strix.utilities.click import OptionEx, CommandEx
 from strix.utilities.click import NumericChoice as Choice
-from strix.utilities.click_callbacks import get_unknown_options, dump_params
+from strix.utilities.click_callbacks import get_unknown_options, dump_params, parse_project
 from strix.utilities.enum import FRAMEWORKS, Phases
 from strix.utilities.utils import (
     draw_segmentation_masks,
@@ -155,12 +156,13 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_c
     "check-data", 
     context_settings={
         "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
-        "default_map": get_items(check_cmd_history, format='json', allow_filenotfound=True)
+        "default_map": get_items(check_cmd_history, format='yaml', allow_filenotfound=True)
     })
 @option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
 @option(
     "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
+@option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
 @option("--data-list", type=str, callback=data_select, default=None, help="Data file list")  # todo: Rename
 @option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
 @option("--split", type=float, default=0.2, help="Training/testing split ratio")
