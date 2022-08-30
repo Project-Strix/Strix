@@ -285,10 +285,10 @@ class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
         self.logger = setup_logger(logger_name)
 
         if use_slidingwindow:
-            print("---Use slidingwindow infer!---","\nPatch size:", crop_size)
+            print("---Use slidingwindow infer!---", "\nPatch size:", crop_size)
         else:
             print("---Use simple infer!---")
-        
+
         key_val_metric = SegmentationTestEngine.get_metric(opts.phase, opts.output_nc, decollate)
         metric_name = SegmentationTestEngine.get_key_metric_name(opts.phase)
 

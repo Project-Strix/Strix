@@ -21,7 +21,7 @@ def strix_unetr(
     **kwargs: Any
 ):
     image_sz = kwargs.get("image_size")
-    pos_embed = kwargs.get("pos_embed", "perceptron")  # conv
+    pos_embed = kwargs.get("pos_embed", "conv")  # perceptron
     num_heads = kwargs.get("num_heads", 12)
     feature_size = kwargs.get("feature_size", 16)
     if image_sz is None:
