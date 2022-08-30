@@ -8,7 +8,7 @@ from strix.models.cnn.engines import TEST_ENGINES, TRAIN_ENGINES, StrixTestEngin
 from strix.models.cnn.engines.utils import get_prepare_batch_fn, get_unsupervised_prepare_batch_fn, get_models
 from strix.utilities.utils import setup_logger, output_filename_check, get_attr_
 from strix.utilities.enum import Phases
-from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluatorEx
+from monai_ex.engines import MultiTaskTrainer, SupervisedEvaluatorEx, EnsembleEvaluatorEx, SemiMultiTaskTrainer
 from monai_ex.transforms import MeanEnsembleD, MultitaskMeanEnsembleD
 from monai_ex.handlers import EarlyStopHandler, LrScheduleTensorboardHandler, ValidationHandler
 from monai_ex.handlers import from_engine_ex as from_engine
@@ -174,6 +174,173 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             custom_keys=cfg.get_keys_dict(),
         )
         self.logger = setup_logger(logger_name)
+
+
+@TRAIN_ENGINES.register("semi-multitask")
+class SemiMultiTaskTrainEngine(StrixTrainEngine, SemiMultiTaskTrainer):
+    def __init__(
+        self,
+        opts,
+        train_loader,
+        test_loader,
+        unlabel_loader,
+        net,
+        loss,
+        optim,
+        lr_scheduler,
+        writer,
+        device,
+        model_dir,
+        logger_name,
+        **kwargs,
+    ) -> None:
+        valid_interval = kwargs.get("valid_interval", 1)
+        multi_input_keys = kwargs.get("multi_input_keys", None)
+        multi_output_keys = kwargs.get("multi_output_keys", None)
+        _image = cfg.get_key("image")
+        _label = cfg.get_key("label")
+        _ul_label = cfg.get_key('unlabel_label')
+        _pred = cfg.get_key("pred")
+        _loss = cfg.get_key("loss")
+        decollate = False
+        freeze_mode = get_attr_(opts, "freeze_mode", None)
+        freeze_params = get_attr_(opts, "freeze_params", None)
+        logger_name = get_attr_(opts, 'logger_name', logger_name)
+
+        # if multi_output_keys is None:
+        #     raise ValueError("No 'multi_output_keys' was specified for MultiTask!")
+
+        subtask1_train_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+            phase=Phases.TRAIN, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+        )
+        subtask2_train_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+            phase=Phases.TRAIN, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+        )
+
+        subtask1_val_metric = TRAIN_ENGINES[opts.subtask1].get_metric(
+            phase=Phases.VALID, output_nc=opts.output_nc[0], decollate=decollate, item_index=0, suffix="task1"
+        )
+        subtask2_val_metric = TRAIN_ENGINES[opts.subtask2].get_metric(
+            phase=Phases.VALID, output_nc=opts.output_nc[1], decollate=decollate, item_index=1, suffix="task2"
+        )
+        val_metric_name = list(subtask1_val_metric.keys())[0]
+
+        task1_tb_image_kwargs = TRAIN_ENGINES[opts.subtask1].get_tensorboard_image_transform(
+            opts.output_nc[0], decollate, 0, label_key=_label
+        )
+        task2_tb_image_kwargs = TRAIN_ENGINES[opts.subtask2].get_tensorboard_image_transform(
+            opts.output_nc[1], decollate, 1, label_key=_ul_label
+        )
+
+        val_handlers = StrixTrainEngine.get_basic_handlers(
+            phase=Phases.VALID.value,
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
+            tb_summary_writer=writer,
+            logger_name=logger_name,
+            stats_dicts={val_metric_name: lambda x: None},
+            save_bestmodel=True,
+            model_file_prefix=val_metric_name,
+            bestmodel_n_saved=opts.save_n_best,
+            tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
+            tensorboard_image_names=["Subtask1", "Subtask2"],
+            dump_tensorboard=True,
+            record_nni=opts.nni,
+            nni_kwargs={
+                "metric_name": val_metric_name,
+                "max_epochs": opts.n_epoch,
+                "logger_name": logger_name,
+            },
+        )
+
+        if opts.early_stop > 0:
+            val_handlers += [
+                EarlyStopHandler(
+                    patience=opts.early_stop,
+                    score_function=stopping_fn_from_metric(val_metric_name),
+                    trainer=self,
+                    min_delta=0.0001,
+                    epoch_level=True,
+                ),
+            ]
+
+        #todo: what if unlabel batch has no input pseudo label?
+        prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+        prepare_unlabel_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
+
+        evaluator = SupervisedEvaluatorEx(
+            device=device,
+            val_data_loader=test_loader,
+            network=net,
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(test_loader)),
+            prepare_batch=prepare_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=None,
+            key_val_metric=subtask1_val_metric,
+            additional_metrics=subtask2_val_metric,
+            val_handlers=val_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+        )
+        evaluator.logger = setup_logger(logger_name)
+
+        if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_step_transform = lambda x: evaluator.state.metrics[val_metric_name]
+        else:
+            lr_step_transform = lambda x: ()
+
+        train_handlers = [
+            ValidationHandler(validator=evaluator, interval=valid_interval, epoch_level=True),
+            LrScheduleTensorboardHandler(
+                lr_scheduler=lr_scheduler,
+                summary_writer=writer,
+                name=logger_name,
+                step_transform=lr_step_transform,
+            ),
+        ]
+        train_handlers += StrixTrainEngine.get_basic_handlers(
+            phase=Phases.TRAIN.value,
+            model_dir=model_dir,
+            net=net,
+            optimizer=optim,
+            tb_summary_writer=writer,
+            logger_name=logger_name,
+            stats_dicts={"train_loss": from_engine(_loss, first=True)},
+            save_checkpoint=True,
+            checkpoint_save_interval=opts.save_epoch_freq,
+            ckeckpoint_n_saved=1,
+            tensorboard_image_kwargs=[task1_tb_image_kwargs, task2_tb_image_kwargs],
+            tensorboard_image_names=["Subtask1", "Subtask2"],
+            graph_batch_transform=prepare_batch_fn if opts.visualize else None,
+            freeze_mode=freeze_mode,
+            freeze_params=freeze_params,
+        )
+
+        SemiMultiTaskTrainer.__init__(
+            self,
+            device=device,
+            max_epochs=opts.n_epoch,
+            train_data_loader=train_loader,
+            unlabel_data_loader=unlabel_loader,
+            network=net,
+            optimizer=optim,
+            loss_function=loss,
+            epoch_length=int(opts.n_epoch_len) if opts.n_epoch_len > 1.0 else int(opts.n_epoch_len * len(train_loader)),
+            prepare_batch=prepare_batch_fn,
+            prepare_unlabel_batch=prepare_unlabel_batch_fn,
+            inferer=SimpleInferer(),
+            postprocessing=None,
+            key_train_metric=subtask1_train_metric,
+            additional_metrics=subtask2_train_metric,
+            train_handlers=train_handlers,
+            amp=opts.amp,
+            decollate=decollate,
+            custom_keys=cfg.get_keys_dict(),
+        )
+        self.logger = setup_logger(logger_name)
+
 
 
 @TEST_ENGINES.register("multitask")
