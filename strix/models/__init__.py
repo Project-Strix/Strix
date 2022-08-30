@@ -98,13 +98,14 @@ def get_network(opts):
     )
 
 
-def get_engine(opts, train_loader, test_loader, writer=None):
+def get_engine(opts, train_loader, test_loader, unlabel_loader=None, writer=None):
     """Generate engines for specified config.
 
     Args:
         opts (SimpleNamespace): All arguments from cmd line.
         train_loader (DataLoader): Pytorch dataload for training dataset.
         test_loader (DataLoader): Pytorch dataload for validation dataset.
+        unlabel_loader (DataLoader): Pytorch dataload for unlabeled dataset.
         writer (SummaryWriter, optional): Tensorboard SummaryWriter. Defaults to None.
 
     Raises:
@@ -210,6 +211,7 @@ def get_engine(opts, train_loader, test_loader, writer=None):
         "opts": opts,
         "train_loader": train_loader,
         "test_loader": test_loader,
+        "unlabel_loader": unlabel_loader,
         "net": net,
         "optim": optim,
         "loss": loss,
@@ -224,7 +226,10 @@ def get_engine(opts, train_loader, test_loader, writer=None):
     }
 
     try:
-        engine = TRAIN_ENGINES[opts.framework](**params)
+        if unlabel_loader:
+            engine = TRAIN_ENGINES["semi-" + opts.framework](**params)
+        else:
+            engine = TRAIN_ENGINES[opts.framework](**params)
     except Exception as e:
         raise WorkflowException() from e
 
