@@ -18,7 +18,6 @@ sphinxcontrib-qthelp
 sphinxcontrib-serializinghtml
 sphinx-autodoc-typehints==1.11.1
 sphinx-markdown-tables
-pandas
 tensorboardX
 imagecodecs; platform_system == "Linux"
 tifffile; platform_system == "Linux"

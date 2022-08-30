@@ -1,19 +1,20 @@
-from typing import List, Optional
-from types import SimpleNamespace
 import sys
 import traceback
+from types import SimpleNamespace
+from typing import List
 
+import numpy as np
 import torch
-from torch.utils.data import DataLoader as _TorchDataLoader
-from torch.utils.data._utils.collate import default_collate
-from torch.utils.data.sampler import WeightedRandomSampler
-from strix.utilities.registry import DatasetRegistry
-from strix.utilities.enum import Phases, Frameworks
 from monai_ex.data import DataLoader
 from monai_ex.utils.exceptions import DatasetException
+from torch.utils.data import DataLoader as _TorchDataLoader
+from torch.utils.data.sampler import WeightedRandomSampler
+
+from strix import strix_datasets
 from strix.configures import config as cfg
-from strix.utilities.utils import trycatch
-import pandas as pd
+from strix.utilities.enum import Phases
+from strix.utilities.registry import DatasetRegistry
+from strix.utilities.utils import is_numeric, trycatch
 
 
 def get_default_setting(phase, **kwargs):
@@ -71,8 +72,7 @@ def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unla
     arguments = {"filelist": filelist, "phase": phase, "opts": vars(args)}
 
     try:
-        datasets = DatasetRegistry()
-        strix_dataset = datasets.get(args.tensor_dim, args.framework, args.data_list)
+        strix_dataset = strix_datasets.get(args.tensor_dim, args.framework, args.data_list)
         if strix_dataset is not None:
             if is_unlabel:
                 torch_dataset = strix_dataset["UNLABEL_FN"](**arguments)
@@ -97,15 +97,16 @@ def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unla
 
         print("Using imbalanced dataset sampling!")
         params.update({"shuffle": False})
-        labels = [l[label_key] for l in filelist]
+        labels = np.array([l[label_key] for l in filelist])
+        if len(labels) != len(torch_dataset):
+            raise DatasetException("Length of label != Length of dataset. ??? Please recheck!")
+        if not is_numeric(labels):
+            raise DatasetException(f"Label must be numeric data! But got {labels.dtype}")
 
-        df = pd.DataFrame()
-        df["label"] = labels
-        df = df.sort_index()
-
-        label_to_count = df["label"].value_counts()
-        weights = 1.0 / label_to_count[df["label"]]
-        weights = torch.DoubleTensor(weights.to_list())
+        counts = np.bincount(labels)
+        labels_weights = 1. / counts
+        weights = labels_weights[labels]
+        weights = torch.DoubleTensor(weights)
 
         return DataLoader(
             torch_dataset,
