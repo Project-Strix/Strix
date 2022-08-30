@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader as _TorchDataLoader
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.sampler import WeightedRandomSampler
 from strix.utilities.registry import DatasetRegistry
-from strix.utilities.enum import Phases
+from strix.utilities.enum import Phases, Frameworks
 from monai_ex.data import DataLoader
 from monai_ex.utils.exceptions import DatasetException
 from strix.configures import config as cfg
@@ -48,16 +48,14 @@ def get_default_setting(phase, **kwargs):
 
 
 @trycatch()
-def get_dataloader(
-    args: SimpleNamespace, filelist: List, phase: Phases, unlabel_filelist: Optional[List] = None
-):
+def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unlabel: bool = False):
     """Generate pytorch datalist from given args and filelist.
 
     Args:
         args (SimpleNamespace): Necessary arguments.
         filelist (List): List containing data file items.
-        phase (Phases): Phase of the dataloader
-        unlabel_filelist (Optional[List], optional): List containing unlabled data. Defaults to None.
+        phase (Phases): Phase of the dataloader.
+        is_unlabel (bool): Whether it's a unlabeled data.
 
     Raises:
         DatasetException: Exception occured in custom dataset function.
@@ -70,16 +68,16 @@ def get_dataloader(
     params = get_default_setting(
         phase, train_n_batch=args.n_batch, valid_n_batch=args.n_batch_valid, train_n_workers=args.n_worker
     )  #! How to customize?
-    if unlabel_filelist:
-        arguments = {"filelist": filelist, "unlabel_filelist": unlabel_filelist, "phase": phase, "opts": vars(args)}
-    else:
-        arguments = {"filelist": filelist, "phase": phase, "opts": vars(args)}
+    arguments = {"filelist": filelist, "phase": phase, "opts": vars(args)}
 
     try:
         datasets = DatasetRegistry()
         strix_dataset = datasets.get(args.tensor_dim, args.framework, args.data_list)
         if strix_dataset is not None:
-            torch_dataset = strix_dataset["FN"](**arguments)
+            if is_unlabel:
+                torch_dataset = strix_dataset["UNLABEL_FN"](**arguments)
+            else:
+                torch_dataset = strix_dataset["FN"](**arguments)
     except Exception as e:
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e
@@ -88,7 +86,7 @@ def get_dataloader(
     if isinstance(torch_dataset, _TorchDataLoader):
         return torch_dataset
     elif (
-        phase == "train"
+        phase == Phases.TRAIN
         and args.imbalance_sample
         and filelist[0].get(label_key) is not None
     ):
