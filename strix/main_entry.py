@@ -49,6 +49,7 @@ from strix.utilities.click_callbacks import (
     get_exp_name,
     input_cropsize,
     get_unknown_options,
+    parse_project,
 )
 
 
@@ -344,7 +345,8 @@ def train_cfg(**args):
 
 
 @click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-@option("--config", type=click.Path(exists=True), default="YourConfigFle")
+@option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
+@option("--config", type=click.Path(exists=True), default="YourConfigFile")
 @option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @option("--out-dir", type=str, default=None, help="Optional output dir to save results")
 @option(  # TODO: automatically decide when using patchdataset

@@ -48,7 +48,7 @@ def get_default_setting(phase, **kwargs):
     }
 
 
-@trycatch()
+@trycatch(show_args=False)
 def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unlabel: bool = False):
     """Generate pytorch datalist from given args and filelist.
 
@@ -78,6 +78,8 @@ def get_dataloader(args: SimpleNamespace, filelist: List, phase: Phases, is_unla
                 torch_dataset = strix_dataset["UNLABEL_FN"](**arguments)
             else:
                 torch_dataset = strix_dataset["FN"](**arguments)
+        else:
+            raise DatasetException("Dataset not registered. Skip!")
     except Exception as e:
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e

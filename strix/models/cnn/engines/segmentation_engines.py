@@ -394,13 +394,14 @@ class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
                     output_ext=".nii.gz",
                     resample=opts.resample,
                     data_root_dir=data_root_dir,
+                    separate_folder=False,
                     batch_transform=from_engine(_image + "_meta_dict"),
                     output_transform=SegmentationTestEngine.get_seg_saver_post_transform(
                         output_nc, decollate, discrete=False, item_index=item_index
                     ),
                 ),
             ]
-        
+
         if opts.save_label:
             multi_output_keys = kwargs.get("multi_output_keys", None)
             if multi_output_keys and item_index is not None:

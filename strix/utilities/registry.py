@@ -314,7 +314,7 @@ class DatasetRegistry(DimRegistry):
             dim = self.dim_mapping.get(dim)
             dataset = self[dim][framework][name]
         except KeyError as e:
-            warnings.warn(colored(f"Dataset is not registered!\nErr msg: {e}", "red"))
+            warnings.warn(colored(f"Dataset is not registered!\nErr key: {e}", "red"))
             return None
         else:
             return dataset
