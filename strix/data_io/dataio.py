@@ -78,14 +78,15 @@ def get_dataloader(
     try:
         datasets = DatasetRegistry()
         strix_dataset = datasets.get(args.tensor_dim, args.framework, args.data_list)
-        if strix_dataset is not None:
-            torch_dataset = strix_dataset["FN"](**arguments)
+        torch_dataset = strix_dataset["FN"](**arguments) if strix_dataset is not None else None
     except Exception as e:
         msg = "".join(traceback.format_tb(sys.exc_info()[-1], limit=-1))
         raise DatasetException(f"Dataset {args.data_list} cannot be instantiated!\n{msg}") from e
 
     label_key = cfg.get_key("LABEL")
-    if isinstance(torch_dataset, _TorchDataLoader):
+    if torch_dataset is None:
+        raise DatasetException("None torch dataset is returned from strix_dataset")
+    elif isinstance(torch_dataset, _TorchDataLoader):
         return torch_dataset
     elif (
         phase == "train"

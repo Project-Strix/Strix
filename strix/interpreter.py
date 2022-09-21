@@ -15,13 +15,16 @@ from strix.models import get_test_engine
 from strix.data_io.dataio import get_dataloader
 from strix.utilities.utils import get_specify_file
 from strix.utilities.enum import Phases
-from strix.utilities.click_callbacks import parse_input_str
+from strix.utilities.click_callbacks import parse_input_str, parse_project
 from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.arguments import get_trained_models
 from monai_ex.handlers import GradCamHandler
 
 
 @click.command("gradcam-from-cfg")
+@click.option(
+    "--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path"
+)
 @click.option(
     "--config", type=click.Path(exists=True), default="", help="Specify config file"
 )
