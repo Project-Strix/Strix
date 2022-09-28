@@ -8,7 +8,8 @@ __version__ = _version.get_versions()['version']
 
 __basedir__ = os.path.dirname(__file__)
 
-from strix.utilities.registry import NetworkRegistry, DatasetRegistry
+from strix.utilities.registry import NetworkRegistry, DatasetRegistry, LossRegistry
 
 strix_networks = NetworkRegistry()
 strix_datasets = DatasetRegistry()
+strix_losses = LossRegistry()
