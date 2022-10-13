@@ -35,6 +35,7 @@ from strix.utilities.click_callbacks import (
     check_amp,
     dump_hyperparameters,
     backup_project,
+    parse_project
 )
 
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
@@ -318,6 +319,7 @@ def train_cfg(**args):
 
 
 @click.command("test-from-cfg", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
 @option("--config", type=click.Path(exists=True), default="YourConfigFle")
 @option("--test-files", type=str, default="", help="External files (json/yaml) for testing")
 @option("--out-dir", type=str, default=None, help="Optional output dir to save results")
