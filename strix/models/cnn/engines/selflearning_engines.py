@@ -46,7 +46,8 @@ class SelflearningTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         decollate = False
         logger_name = get_attr_(opts, 'logger_name', logger_name)
         freeze_mode = get_attr_(opts, "freeze_mode", None)
-        freeze_params=get_attr_(opts, "freeze_params", None)
+        freeze_params = get_attr_(opts, "freeze_params", None)
+        lr_policy_epoch_level = get_attr_(opts, "lr_policy_level", "epoch") == "epoch"
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
         _loss = cfg.get_key("loss")
@@ -65,7 +66,7 @@ class SelflearningTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             tb_summary_writer=writer,
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
-            save_bestmodel=True,
+            save_bestmodel=opts.save_n_best > 0,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
             tensorboard_image_kwargs=SelflearningTrainEngine.get_tensorboard_image_transform(
@@ -118,6 +119,7 @@ class SelflearningTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
                 name=logger_name,
+                epoch_level=lr_policy_epoch_level,
                 step_transform=lr_step_transform,
             ),
         ]
