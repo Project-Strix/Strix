@@ -18,7 +18,7 @@ from strix.utilities.enum import Phases
 from strix.utilities.click import OptionEx, CommandEx
 import strix.utilities.oyaml as yaml
 import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger, get_items, generate_synthetic_datalist
+from strix.utilities.utils import setup_logger, get_items
 from strix.utilities.generate_cohorts import generate_train_valid_cohorts, generate_test_cohort
 from strix.utilities.click_callbacks import (
     get_unknown_options,

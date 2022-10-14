@@ -69,6 +69,7 @@ setup(
             "strix-nni-search = strix.nni_search:nni_search",
             "strix-check-data = strix.data_checker:check_data",
             "strix-gradcam-from-cfg = strix.interpreter:gradcam",
+            "strix-find-lr = strix.find_lr:find_best_lr",
         ],
     },
     scripts=[
