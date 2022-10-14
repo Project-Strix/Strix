@@ -16,7 +16,7 @@ from strix.utilities.click_callbacks import get_exp_name, lr_schedule_params, se
 from strix.utilities.enum import OPTIMIZERS, Phases
 from strix.utilities.generate_cohorts import generate_train_valid_cohorts
 from strix.utilities.utils import setup_logger
-from monai_ex.handlers.lr_record_handler import LearningRateRecordHandler
+from monai_ex.handlers.lr_record_handler import LearningHistoryRecordHandler
 from monai_ex.utils import optional_import
 
 plt, has_matplotlib = optional_import("matplotlib.pyplot")
@@ -119,7 +119,7 @@ def find_best_lr(**args):
     valid_loader = get_dataloader(cargs, valid_data, phase=Phases.VALID)
 
     trainer, _ = get_engine(cargs, train_loader, valid_loader, writer=None)
-    history_handler = LearningRateRecordHandler(lambda x: x["loss"], None)
+    history_handler = LearningHistoryRecordHandler(lambda x: x["loss"], None)
     history_handler.attach(trainer)
     trainer.run()
 
