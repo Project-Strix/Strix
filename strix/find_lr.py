@@ -126,6 +126,14 @@ def find_best_lr(**args):
     losses = history_handler.history["loss"]
     learningrates = history_handler.history["lr"]
 
+    if not losses:
+        logger.error("Cannot log training losses. Please check!")
+        return
+
+    if len(losses) != len(learningrates):
+        logger.error("Numbers of losses and learningrate do no match. Please check!")
+        return
+
     if cargs.smooth > 0:
         smoothed_losses = np.array(losses[:-1]) * (1 - cargs.smooth) + np.array(losses[1:]) * cargs.smooth
         smoothed_losses = smoothed_losses.squeeze().tolist()
