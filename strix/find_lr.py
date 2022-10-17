@@ -27,8 +27,8 @@ option = partial(click.option, cls=OptionEx)
 def get_steepest_gradient(lrs, losses) -> Union[Tuple[float, float], Tuple[None, None]]:
     """Get learning rate which has steepest gradient and its corresponding loss
     Args:
-        skip_start: number of batches to trim from the start.
-        skip_end: number of batches to trim from the end.
+        lrs: series of learning rates.
+        losses: series of losses.
     Returns:
         Learning rate which has steepest gradient and its corresponding loss
     """
