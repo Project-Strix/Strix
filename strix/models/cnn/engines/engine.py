@@ -124,7 +124,7 @@ class StrixTrainEngine(ABC):
                 if kwargs is not None
             ]
 
-        if dump_tensorboard:
+        if dump_tensorboard and tb_summary_writer:
             handlers += [
                 TensorboardDumper(
                     log_dir=tb_summary_writer.log_dir,

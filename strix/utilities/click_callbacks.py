@@ -170,6 +170,9 @@ def get_exp_name(ctx, param, value):
         ctx.params["n_worker"] = 0
         return check_dir(ctx.params["out_dir"], "debug")
 
+    if ctx.command.name == "find-lr":
+        return check_dir(ctx.params["out_dir"], "lr_finding")
+
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
     layer_norm = mapping[ctx.params["layer_norm"]]
     # update timestamp if train-from-cfg
@@ -270,6 +273,23 @@ def lr_schedule_params(ctx, param, value):
         ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"patience": patience}
     elif value == "CLR":
         raise NotImplementedError
+    elif value in ["linear", "exponential"]:
+        end_lr = _prompt("Linear end LR", float, 1.0)
+        if ctx.params.get("lr_policy_level") == "iter":
+            tensor_dim, framework, data_name, split, n_batch = ctx.params.get("tensor_dim"), ctx.params.get("framework"), ctx.params.get("data_list"), ctx.params.get("split"), ctx.params.get("n_batch")
+            if data_name in ["RandomData", "SyntheticData"]:
+                all_cases = 100
+                train_len = all_cases - int(all_cases * split)
+            else:
+                datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
+                all_data_list = get_items(datalist_fname, format="auto")
+                train_len = math.ceil(len(all_data_list) * (1 - split))
+            epoch_iter_num = train_len // n_batch
+            num_iter = ctx.params["n_epoch"] * epoch_iter_num
+        else:
+            num_iter = ctx.params["n_epoch"]
+
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"end_lr": end_lr, "num_iter": num_iter}
 
     return value
 

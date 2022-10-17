@@ -78,6 +78,8 @@ class LrSchedule(Enum):
     MULTISTEP = "multistep"
     SGDR = "SGDR"
     PLATEAU = "plateau"
+    EXP = "exponential"
+    LINEAR = "linear"
 
 
 LR_SCHEDULES = get_enums(LrSchedule)
