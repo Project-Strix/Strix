@@ -39,8 +39,7 @@ from strix.utilities.click_callbacks import (
     parse_project
 )
 
-from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
-from utils_cw import Print, check_dir, split_train_test
+from utils_cw import Print, check_dir
 
 import click
 from ignite.engine import Events
