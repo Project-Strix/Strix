@@ -8,7 +8,6 @@ from strix.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from strix.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from strix.models.cnn.nets.dynunet import DynUNet
 from strix.models.cnn.nets.drn import drn_a_50
-from strix.models.cnn.nets.hesam import HESAM
 from strix.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
 
 
