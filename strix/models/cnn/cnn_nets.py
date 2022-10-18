@@ -8,7 +8,6 @@ from strix.models.cnn.nets.resnet import resnet18, resnet34, resnet50
 from strix.models.cnn.nets.vgg import vgg9_bn, vgg11_bn
 from strix.models.cnn.nets.dynunet import DynUNet
 from strix.models.cnn.nets.drn import drn_a_50
-from strix.models.cnn.nets.hesam import HESAM
 from strix.models.cnn.nets.resnet_aag import resnet34_aag, resnet50_aag
 
 
@@ -297,51 +296,6 @@ def strix_drn_a_50(
     inkwargs["num_classes"] = out_channels
 
     return drn_a_50(pretrained=False, **inkwargs)
-
-
-@strix_networks.register("2D", "classification", "HESAM")
-@strix_networks.register("3D", "classification", "HESAM")
-def strix_hesam(
-    spatial_dims: int,
-    in_channels: int,
-    out_channels: int,
-    act: str,
-    norm: str,
-    n_depth: int,
-    n_group: int,
-    drop_out: float,
-    is_prunable: bool,
-    pretrained: bool,
-    pretrained_model_path: str,
-    **kwargs: Any
-):
-    features = kwargs.get("features", (64, 128, 256, 256))
-    last_feature = kwargs.get("last_feature", 64)
-    upsample = kwargs.get("upsample", "deconv")
-    sam_size = kwargs.get("sam_size", 6)
-
-    net = HESAM(
-        spatial_dims,
-        in_channels,
-        out_channels,
-        features,
-        last_feature,
-        sam_size,
-        act,
-        norm,
-        drop_out,
-        upsample,
-        n_group,
-    )
-
-    if os.path.isfile(pretrained_model_path):
-        print("Load pretrained model for contiune training:\n")
-        net.load_state_dict(torch.load(pretrained_model_path))
-
-        fc = torch.nn.Linear(features[-1], out_channels)
-        net.final_fc = fc
-
-    return net
 
 
 @strix_networks.register("2D", "classification", "resnet_aag_34")

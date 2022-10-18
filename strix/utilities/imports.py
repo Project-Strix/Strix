@@ -1,6 +1,6 @@
+from typing import Union
 from pathlib import Path
 import importlib
-import importlib.util
 import sys
 import warnings
 from termcolor import colored
@@ -8,6 +8,9 @@ from termcolor import colored
 # from https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
 def import_file(module_name, file_path, make_importable=False):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None:
+        raise ValueError(f"None spec is found in file: {file_path}")
+
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if make_importable:
@@ -20,9 +23,15 @@ class ModuleManager:
         pass
 
     @staticmethod
-    def import_all(folder: str):
+    def import_all(folder: Union[str, Path], recursive: bool = False):
+        """Import all python files in the given folder.
+
+        Args:
+            folder (Union[str, Path]): target folder.
+            recursive (bool): recursively search py files. Default to False.
+        """
         if Path(folder).is_dir():
-            python_files = list(Path(folder).glob("*.py"))
+            python_files = list(Path(folder).rglob("*.py")) if recursive else list(Path(folder).glob("*.py"))
 
             if len(python_files) > 0:
                 sys.path.append(str(folder))
@@ -32,3 +41,5 @@ class ModuleManager:
                     import_file(f.stem, str(f))
                 except Exception as e:
                     warnings.warn(colored(f"Failed to import file {f}!\nError msg: {e}", "yellow"))
+        else:
+            warnings.warn(f"Given folder not exists: {folder}. Skip import.")
