@@ -6,20 +6,19 @@ import shutil
 import logging
 from pathlib import Path
 from types import SimpleNamespace as sn
-from utils_cw import Print, get_items_from_file, check_dir
 
 from strix.models import get_engine
 from strix.data_io.dataio import get_dataloader
 from strix.utilities.registry import DatasetRegistry
-from strix.utilities.utils import detect_port, parse_nested_data
-from strix.utilities.enum import Phases
+from strix.utilities.utils import detect_port, parse_nested_data, get_items
+from strix.utilities.enum import Phases, SerialFileFormat
 from strix.utilities.click_callbacks import get_nni_exp_name
 
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 from sklearn.model_selection import train_test_split
 from ignite.engine import Events
 from monai_ex.handlers import CheckpointLoader
-from monai_ex.utils import optional_import, min_version
+from monai_ex.utils import optional_import, min_version, Print, check_dir
 
 # Need NNI package
 nni, has_nni = optional_import("nni", "1.8", min_version)
@@ -32,7 +31,7 @@ if has_nni:
 def train_nni(**kwargs):
     logger = logging.getLogger("nni_search")
     logger.info("-" * 10 + "start" + "-" * 10)
-    configures = get_items_from_file(kwargs["config"], format="json")
+    configures = get_items(kwargs["config"], format=SerialFileFormat.YAML)
     configures["nni"] = True
     cargs = sn(**configures)
 
@@ -60,7 +59,7 @@ def train_nni(**kwargs):
         datasets = DatasetRegistry()
         datalist_fpath = datasets.get(cargs.tensor_dim, cargs.framework, cargs.data_list).get("PATH")
         assert os.path.isfile(datalist_fpath), "Data list not exists!"
-        files_list = get_items_from_file(datalist_fpath, format="auto")
+        files_list = get_items(datalist_fpath)
         if cargs.partial < 1:
             logger.info(f"Use {int(len(files_list)*cargs.partial)} data")
             files_list = files_list[: int(len(files_list) * cargs.partial)]
@@ -105,7 +104,7 @@ def train_nni(**kwargs):
                     load_path=cargs.pretrained_model_path,
                     load_dict={"net": net},
                     strict=False,
-                    skip_mismatch=True,
+                    strict_shape=False,
                 ),
             )
         trainer.run()
@@ -131,19 +130,18 @@ def nni_search(**args):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(cargs.gpus)
     gpus_ = os.environ["CUDA_VISIBLE_DEVICES"]
 
-    configures = get_items_from_file(args["param_list"], format="json")
+    configures = get_items(args["param_list"], format=SerialFileFormat.YAML)
     configures["out_dir"] = cargs.out_dir
     configures["gpus"] = gpus_
     configures["nni"] = True
     configures["experiment_path"] = cargs.experiment_path
     os.environ['MKL_THREADING_LAYER'] = 'GNU'
-    # os.environ['CUDA_VISIBLE_DEVICES'] = str(cargs.gpus)
 
     if not os.path.isfile(cargs.nni_config):
         nni_config_path = Path(__file__).parent.joinpath("misc/nni_template_config.yml")
-        nni_config = get_items_from_file(nni_config_path, format="auto")
+        nni_config = get_items(nni_config_path)
     else:
-        nni_config = get_items_from_file(cargs.nni_config, format="auto")
+        nni_config = get_items(cargs.nni_config)
 
     main_file = Path(__file__).parent.joinpath("main.py")
     paramlist_file = os.path.join(cargs.experiment_path, "param.list")

@@ -4,11 +4,11 @@ import logging
 from functools import partial
 from monai_ex.transforms import *
 from monai_ex.data import *
-from monai_ex.utils import ensure_tuple, first
+from monai.utils.misc import ensure_tuple, first
 import strix.utilities.oyaml as yaml
 from strix.utilities.enum import DIMS, FRAMEWORKS, PHASES
 from strix.utilities.registry import DatasetRegistry
-from utils_cw import get_items_from_file
+from strix.utilities.utils import get_items
 
 root_tree = {
     "ATTRIBUTE": {
@@ -258,7 +258,7 @@ def test_dataset_from_config(config_path, phase, opts):
         )
     )
     dataset = create_dataset_from_cfg(
-        get_items_from_file(configs["ATTRIBUTE"]["FILELIST"], format='auto'),
+        get_items(configs["ATTRIBUTE"]["FILELIST"]),
         phase,
         opts,
         datasets_,

@@ -1,4 +1,3 @@
-from utils_cw import check_dir
 import torch
 from strix import strix_datasets, strix_networks, strix_losses
 
@@ -12,7 +11,7 @@ from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
 from strix.models.cnn.cnn_nets import *
 from strix.models.transformer.transformer_nets import *
-from monai_ex.utils import WorkflowException
+from monai_ex.utils import WorkflowException, check_dir
 from monai.optimizers.lr_scheduler import ExponentialLR, LinearLR
 
 

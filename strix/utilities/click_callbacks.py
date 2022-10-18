@@ -15,13 +15,13 @@ from termcolor import colored
 
 from strix import strix_networks, strix_datasets, strix_losses
 import strix.utilities.oyaml as yaml
-from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
+from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers, SerialFileFormat
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line
 from strix.utilities.click import NumericChoice
 from strix.utilities.project_loader import ProjectManager
+from monai_ex.utils.misc import Print, check_dir
 
 warnings.formatwarning = warning_on_one_line
-from utils_cw import Print, check_dir
 
 
 #######################################################################
@@ -212,7 +212,7 @@ def get_exp_name(ctx, param, value):
 
 
 def get_nni_exp_name(ctx, param, value):
-    param_list = get_items(ctx.params["param_list"], format="json")
+    param_list = get_items(ctx.params["param_list"], format=SerialFileFormat.JSON)
     param_list["out_dir"] = ctx.params["out_dir"]
     param_list["timestamp"] = strftime("%m%d_%H%M")
     context_ = sn(**{"params": param_list})
@@ -282,7 +282,7 @@ def lr_schedule_params(ctx, param, value):
                 train_len = all_cases - int(all_cases * split)
             else:
                 datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
-                all_data_list = get_items(datalist_fname, format="auto")
+                all_data_list = get_items(datalist_fname)
                 train_len = math.ceil(len(all_data_list) * (1 - split))
             epoch_iter_num = train_len // n_batch
             num_iter = ctx.params["n_epoch"] * epoch_iter_num
@@ -435,7 +435,7 @@ def input_cropsize(ctx, param, value):
     if value is False:
         return value
 
-    configures = get_items(ctx.params["config"], format="yaml")
+    configures = get_items(ctx.params["config"], format=SerialFileFormat.YAML)
     if is_avaible_size(configures.get("crop_size", None)) or value is False:
         return value
 
@@ -567,8 +567,8 @@ def check_batchsize(ctx_params):
     )
     if train_list and valid_list:
         print(valid_list, train_list)
-        files_train = get_items(train_list, format="auto")
-        files_valid = get_items(valid_list, format="auto")
+        files_train = get_items(train_list)
+        files_valid = get_items(valid_list)
         len_train, len_valid = len(files_train), len(files_valid)
     elif data_name in ["RandomData", "SyntheticData"]:
         all_cases = 100
@@ -576,7 +576,7 @@ def check_batchsize(ctx_params):
         len_train = all_cases - len_valid
     else:
         datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
-        all_data_list = get_items(datalist_fname, format="auto")
+        all_data_list = get_items(datalist_fname)
         len_valid = math.ceil(len(all_data_list) * split)
         len_train = len(all_data_list) - len_valid
 

@@ -143,3 +143,8 @@ class Freezers(Enum):
     SUBTASK = "subtask"
 
 FREEZERS = get_enums(Freezers)
+
+
+class SerialFileFormat(Enum):
+    JSON = "json"
+    YAML = "yaml"

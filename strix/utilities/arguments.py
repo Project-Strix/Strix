@@ -16,9 +16,9 @@ from strix.utilities.click_callbacks import (
     multi_ouputnc,
     freeze_option,
     parse_project,
+    prompt_when
 )
 from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS, FREEZERS
-from utils_cw import prompt_when
 
 
 option = partial(click.option, cls=OptionEx)

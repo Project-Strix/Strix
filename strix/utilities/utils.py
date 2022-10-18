@@ -1,20 +1,21 @@
-import os
-import time
+import copy
 import json
-import yaml
+import logging
+import os
 import socket
 import struct
-import logging
+import time
 import warnings
-from pathlib import Path
 from functools import partial
-from termcolor import colored
-from typing import List, Optional, Tuple, Union, TextIO
+from pathlib import Path
+from typing import Any, Callable, List, Optional, Sequence, TextIO, Tuple, Union
 
 import matplotlib
 import pylab
 import torch
+import yaml
 from PIL import Image, ImageColor, ImageDraw
+from termcolor import colored
 
 matplotlib.use("Agg")
 import matplotlib.cm as mpl_color_map
@@ -24,24 +25,58 @@ import matplotlib.ticker as ticker
 import numpy as np
 import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
-from strix.utilities.enum import LR_SCHEDULES, Phases
-from monai.networks import one_hot
-from monai_ex.utils import ensure_list, GenericException
-from utils_cw import catch_exception, get_items_from_file, Print
+from monai.networks.utils import one_hot
+from monai_ex.utils import GenericException, catch_exception, ensure_list
+from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
+
+from strix.utilities.enum import LR_SCHEDULES, Phases, SerialFileFormat
 
 trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords="strix")
 
 
 @trycatch()
-def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = False):
-    """Wrapper of utils_cw's `get_items_from_file` function with `trycatch` decorator."""
+def get_items(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None, allow_filenotfound: bool = False) -> Any:
+    """Get items from given serialized file. Support both json and yaml.
+
+    Args:
+        filelist (Union[str, Path]): Input file path.
+        format (Optional[SerialFileFormat]): two formats are supported: SerialFileFormat.JSON or SerialFileFormat.YAML.
+        allow_filenotfound (bool, optional): donot throw error even if file is not found. Defaults to False.
+
+    Raises:
+        FileNotFoundError: filelist not found.
+        ValueError: unknown file format is given when format is not specified 
+        GenericException: json.JSONDecodeError and yaml.YAMLError
+        GenericException: data path not exists
+
+    Returns:
+        _type_: _description_
+    """
     try:
-        return get_items_from_file(filelist, format, sep)
+        filelist = Path(filelist)
+        if not filelist.is_file():
+            raise FileNotFoundError(f"No such file: {filelist}")
+
+        if not format:
+            if filelist.suffix in [".json"]:
+                format = SerialFileFormat.JSON
+            elif filelist.suffix in [".yaml", ".yml"]:
+                format = SerialFileFormat.YAML
+            else:
+                raise ValueError(f"Not supported file format {filelist.suffix}")
+
+        with filelist.open() as f:
+            if format == SerialFileFormat.YAML:
+                lines = yaml.full_load(f)
+            elif format == SerialFileFormat.JSON:
+                lines = json.load(f)
+
+        return lines
     except json.JSONDecodeError as e:
         raise GenericException("Content of your json file cannot be parsed. Please recheck it!")
     except yaml.YAMLError as e:
         if hasattr(e, "problem_mark"):
-            mark = e.problem_mark
+            mark = e.problem_mark  # type: ignore
         raise GenericException(
             f"Content of your yaml file cannot be parsed. Please recheck it!\n"
             f"Error parsing at line {mark.line}, column {mark.column+1}."
@@ -53,6 +88,42 @@ def get_items(filelist, format="auto", sep="\n", allow_filenotfound: bool = Fals
             return None
         else:
             raise GenericException(f"File not found! {filelist}")
+
+
+def split_train_test(
+    datalist: list,
+    test_ratio: float,
+    label_key: str = "label",
+    splits_num: int = 1,
+    output_dir: Optional[Path] = None,
+    output_prefix: Optional[str] = "",
+    stratify: bool = True,
+    random_seed: int = 0,
+):
+    Split = StratifiedShuffleSplit if stratify else ShuffleSplit
+
+    if test_ratio <= 0 or 1 <= test_ratio:
+        raise ValueError(f"Expect: 0 < Test ratio < 1, but got {test_ratio}")
+
+    if isinstance(datalist[0][label_key], (list, tuple)):
+        Ys = np.array([np.mean(data[label_key]) for data in datalist])
+    else:
+        Ys = np.array([int(data[label_key]) for data in datalist])
+
+    output = []
+    spliter = Split(n_splits=splits_num, test_size=test_ratio, random_state=random_seed)
+    for i, (train_idx, test_idx) in enumerate(spliter.split(np.zeros(len(Ys)), Ys)):
+        train_cohort = [datalist[idx] for idx in train_idx]
+        test_cohort = [datalist[idx] for idx in test_idx]
+        output.append((train_cohort, test_cohort))
+
+        if output_dir and output_dir.is_dir():
+            with open(output_dir / f"{output_prefix}_train_cohort{i}_{test_ratio}.json", "w") as f:
+                json.dump(train_cohort, f, indent=2)
+            with open(output_dir / f"{output_prefix}_test_cohort{i}_{test_ratio}.json", "w") as f:
+                json.dump(test_cohort, f, indent=2)
+
+    return output
 
 
 def generate_synthetic_datalist(data_num: int = 100, logger=None):
@@ -68,11 +139,11 @@ def get_attr_(obj, name, default=None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 
-def get_colors(num: int = None):
+def get_colors(num: Optional[int] = None):
     if num:
-        return list(mcolors.TABLEAU_COLORS.values())[:num]
+        return list(mcolors.TABLEAU_COLORS.values())[:num]  # type: ignore
     else:
-        return list(mcolors.TABLEAU_COLORS.values())
+        return list(mcolors.TABLEAU_COLORS.values())  # type: ignore
 
 
 def bbox_3D(img):
@@ -314,14 +385,6 @@ def is_avaible_size(value):
         if np.all(np.greater(value, 0)):
             return True
     return False
-
-
-def get_specify_file(target_dir, regex_kw, get_first=True):
-    files = list(target_dir.glob(regex_kw))
-    if len(files) > 0:
-        return files[0] if get_first else files
-    else:
-        return files
 
 
 def plot_summary(summary, output_fpath):
@@ -772,13 +835,15 @@ def save_sourcecode(code_rootdir, out_dir, verbose=True):
     if not os.path.isdir(code_rootdir):
         raise FileNotFoundError(f"Code root dir not exists! {code_rootdir}")
 
-    Print("Backup source code under root_dir:", code_rootdir, color="y", verbose=verbose)
+    if verbose:
+        print(colored(f"Backup source code under root_dir: {code_rootdir}", color="yellow"))
+
     outpath = out_dir / f"{os.path.basename(code_rootdir)}_{time.strftime('%m%d_%H%M')}.tar"
     tar_opt = "cvf" if verbose else "cf"
     os.system(f"cd {str(code_rootdir)}; tar -{tar_opt} {outpath} .")
 
 
-def get_torch_datast(strix_dataset, phase: Phases, opts: dict, synthetic_data_num=100, split_func: Optional[callable] = None):
+def get_torch_datast(strix_dataset, phase: Phases, opts: dict, synthetic_data_num=100, split_func: Optional[Callable] = None):
     """This function return pytorch dataset generated by registered strix dataset.
 
     Args:
@@ -793,7 +858,7 @@ def get_torch_datast(strix_dataset, phase: Phases, opts: dict, synthetic_data_nu
     try:
         dataset_fn, dataset_list = strix_dataset["FN"], strix_dataset["PATH"]
         if dataset_list:
-            filelist = get_items(dataset_list, format="auto")
+            filelist = get_items(dataset_list)
         else:
             filelist = generate_synthetic_datalist(synthetic_data_num)
 

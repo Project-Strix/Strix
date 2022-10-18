@@ -1,8 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from inplace_abn import ABN, InPlaceABN
-from utils_cw import Print
+from inplace_abn import InPlaceABN
 
 
 class PrunableWeights():
@@ -360,7 +359,6 @@ class Decoder_Sum(nn.Module):
         try:
             x.add_(encoder_features)
         except:
-            Print('Feat shapes:', encoder_features.shape, x.shape)
             raise ValueError
         
         x = self.basic_module(x)

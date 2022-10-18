@@ -5,9 +5,8 @@ from pathlib import Path
 from shutil import copyfile
 from strix.configures import config as cfg
 from strix.utilities.registry import DatasetRegistry
-from strix.utilities.utils import get_items, generate_synthetic_datalist
+from strix.utilities.utils import get_items, split_train_test, generate_synthetic_datalist
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
-from utils_cw import split_train_test
 import numpy as np
 
 
@@ -39,8 +38,8 @@ def generate_train_valid_cohorts(
 
     # ! Manually specified train&valid datalist
     if train_list and valid_list:
-        files_train = get_items(train_list, format="auto")
-        files_valid = get_items(valid_list, format="auto")
+        files_train = get_items(train_list)
+        files_valid = get_items(valid_list)
         return [(files_train, files_valid), ]
 
     datalist_fpath = strix_dataset.get("PATH", "")
@@ -51,7 +50,7 @@ def generate_train_valid_cohorts(
         train_datalist = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-        train_datalist = get_items(datalist_fpath, format="auto")
+        train_datalist = get_items(datalist_fpath)
 
     if not train_datalist:
         raise ValueError("No train datalist if found!")
@@ -131,7 +130,7 @@ def generate_test_cohort(
 
     testlist_fpath = strix_dataset.get("TEST_PATH")
     if testlist_fpath and os.path.isfile(testlist_fpath):
-        test_datalist = get_items(testlist_fpath, format="auto")
+        test_datalist = get_items(testlist_fpath)
     elif do_test:
         datalist_fpath = strix_dataset.get("PATH", "")
 
@@ -139,7 +138,7 @@ def generate_test_cohort(
             train_datalist = generate_synthetic_datalist(100, None)
         else:
             assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-            train_datalist = get_items(datalist_fpath, format="auto")
+            train_datalist = get_items(datalist_fpath)
 
         if not train_datalist:
             raise ValueError("No train datalist if found!")
