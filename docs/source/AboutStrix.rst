@@ -22,7 +22,6 @@ Prerequisites
 -  nibabel
 -  pytorch-ignite
 -  monai_ex
--  utils_cw
 
 Installation
 ~~~~~~~~~~~~

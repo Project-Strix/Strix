@@ -6,7 +6,6 @@ from termcolor import colored
 
 import click
 import matplotlib as mpl
-from utils_cw import Print, get_items_from_file
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -16,9 +15,10 @@ from strix.utilities.registry import DatasetRegistry
 from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.arguments import data_select
 from strix.utilities.enum import FRAMEWORKS, Phases
-from strix.utilities.utils import get_torch_datast
+from strix.utilities.utils import get_torch_datast, get_items
 from strix.configures import config as cfg
 from monai_ex.data import DatasetSummaryEx
+from monai_ex.utils.misc import Print
 
 
 @click.command("merge-roc")
@@ -63,7 +63,7 @@ def merge_roc_curves(exp_dir, dirname_as_legend):
 
         cls_result_file = roc_file.parent.joinpath("classification_results.json")
         if cls_result_file.is_file():
-            auc_value = get_items_from_file(cls_result_file).get("AUC", -1)
+            auc_value = get_items(cls_result_file).get("AUC", -1)
             auc_values.append(auc_value)
         else:
             auc_value = click.prompt(f"Input ROC value for {roc_file.parent.name}", type=float)

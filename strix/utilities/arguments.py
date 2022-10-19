@@ -8,13 +8,21 @@ from strix.configures import config as cfg
 from strix.utilities.click import OptionEx
 from strix.utilities.click_callbacks import NumericChoice as Choice, framework_select
 from strix.utilities.click_callbacks import (
-    data_select, loss_select, lr_schedule_params, model_select, parse_input_str, multi_ouputnc, freeze_option, parse_project
+    data_select,
+    loss_select,
+    lr_schedule_params,
+    model_select,
+    parse_input_str,
+    multi_ouputnc,
+    freeze_option,
+    parse_project,
+    prompt_when
 )
 from strix.utilities.enum import ACTIVATIONS, FRAMEWORKS, LR_SCHEDULES, NORMS, OPTIMIZERS, FREEZERS
-from utils_cw import prompt_when
 
 
 option = partial(click.option, cls=OptionEx)
+
 
 def get_best_trained_models(exp_folder, best_model_dirname: str = "Best_Models"):
     model_rootdir = Path(exp_folder)
@@ -138,9 +146,6 @@ def network_params(func):
         "--freeze-mode", type=Choice(FREEZERS), default=None, prompt=True,
         prompt_cond=lambda ctx: ctx.params['freeze'], callback=freeze_option, help="Freeze mode"
     )
-    # @optionex('--layer-order', prompt=True, type=Choice(LAYER_ORDERS), default=1, help='conv layer order')
-    # @optionex('--bottleneck', type=bool, default=False, help='Use bottlenect achitecture')
-    # @optionex('--sep-conv', type=bool, default=False, help='Use Depthwise Separable Convolution')
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

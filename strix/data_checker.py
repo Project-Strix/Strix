@@ -8,7 +8,6 @@ from pathlib import Path
 from functools import partial
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
-from utils_cw import check_dir
 
 import torch
 from torchvision.utils import save_image
@@ -17,7 +16,7 @@ from strix.utilities.arguments import data_select
 from strix.utilities.click import OptionEx, CommandEx
 from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.click_callbacks import get_unknown_options, dump_params, parse_project
-from strix.utilities.enum import FRAMEWORKS, Phases
+from strix.utilities.enum import FRAMEWORKS, Phases, SerialFileFormat
 from strix.utilities.utils import (
     draw_segmentation_masks,
     draw_segmentation_contour,
@@ -27,12 +26,11 @@ from strix.utilities.utils import (
     get_items,
     trycatch,
     generate_synthetic_datalist,
-    get_torch_datast,
 )
 from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg
-from monai.networks import one_hot
-from monai_ex.utils import first
+from monai.networks.utils import one_hot
+from monai_ex.utils import first, check_dir
 from monai_ex.data import DataLoader
 
 
@@ -156,7 +154,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_c
     "check-data", 
     context_settings={
         "allow_extra_args": True, "ignore_unknown_options": True, "prompt_in_default_map": True,
-        "default_map": get_items(check_cmd_history, format='yaml', allow_filenotfound=True)
+        "default_map": get_items(check_cmd_history, format=SerialFileFormat.YAML, allow_filenotfound=True)
     })
 @option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
 @option(
@@ -195,7 +193,7 @@ def check_data(ctx, **args):
         if dataset_list is None:  # synthetic data
             file_list = generate_synthetic_datalist(100, logger)
         else:
-            file_list = get_items(dataset_list, format="auto")
+            file_list = get_items(dataset_list)
         files_train, files_valid = train_test_split(file_list, test_size=cargs.split, random_state=cargs.seed)
 
         train_ds = dataset_fn(files_train, Phases.TRAIN, auxilary_params)

@@ -1,51 +1,48 @@
-import os
 import gc
-import shutil
 import logging
+import os
+import shutil
 import time
-import torch
-import numpy as np
-from pathlib import Path
 from functools import partial
-from torch.utils.tensorboard import SummaryWriter
+from pathlib import Path
 from types import SimpleNamespace as sn
 
-from strix.models import get_engine, get_test_engine
-from strix.utilities.registry import DatasetRegistry
-from strix.data_io.dataio import get_dataloader
-from strix.configures import config as cfg
-from strix.utilities.enum import Phases
-from strix.utilities.click import OptionEx, CommandEx
-import strix.utilities.oyaml as yaml
+import click
+import numpy as np
+import torch
+from ignite.engine import Events
+from monai.engines.evaluator import EnsembleEvaluator, SupervisedEvaluator
+from monai_ex.handlers import SNIP_prune_handler
+from monai_ex.utils.misc import Print, check_dir
+from torch.utils.tensorboard.writer import SummaryWriter
+
 import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger, get_items
-from strix.utilities.generate_cohorts import generate_train_valid_cohorts, generate_test_cohort
+import strix.utilities.oyaml as yaml
+from strix.configures import config as cfg
+from strix.data_io.dataio import get_dataloader
+from strix.models import get_engine, get_test_engine
+from strix.utilities.click import CommandEx, OptionEx
 from strix.utilities.click_callbacks import (
-    get_unknown_options,
-    get_exp_name,
-    input_cropsize,
-    select_gpu,
+    backup_project,
+    check_amp,
     check_batchsize,
+    check_freeze_api,
     check_loss,
     check_lr_policy,
-    check_freeze_api,
-    dump_params,
     confirmation,
+    dump_hyperparameters,
+    dump_params,
+    get_exp_name,
+    get_unknown_options,
+    input_cropsize,
+    parse_project,
     print_smi,
     prompt_when,
-    check_amp,
-    dump_hyperparameters,
-    backup_project,
-    parse_project
+    select_gpu,
 )
-
-from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
-from utils_cw import Print, check_dir, split_train_test
-
-import click
-from ignite.engine import Events
-from monai_ex.handlers import SNIP_prune_handler
-from monai_ex.engines import SupervisedEvaluator, EnsembleEvaluator
+from strix.utilities.enum import Phases, SerialFileFormat
+from strix.utilities.generate_cohorts import generate_test_cohort, generate_train_valid_cohorts
+from strix.utilities.utils import get_items, setup_logger
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)
@@ -131,7 +128,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), ".strix_train_c
         "allow_extra_args": True,
         "ignore_unknown_options": True,
         "prompt_in_default_map": True,
-        "default_map": get_items(train_cmd_history, format="yaml", allow_filenotfound=True),
+        "default_map": get_items(train_cmd_history, SerialFileFormat.YAML, allow_filenotfound=True),
     },
 )
 @arguments.hidden_auxilary_params
@@ -257,7 +254,7 @@ def train_cfg(**args):
     if len(args.get("additional_args")) != 0:  # parse additional args
         Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
-    configures = get_items(args["config"], format="yaml")
+    configures = get_items(args["config"], SerialFileFormat.YAML)
 
     configures["smi"] = False
     gpu_id = click.prompt("Current GPU id", default=configures["gpus"])
@@ -299,7 +296,7 @@ def test_cfg(**args):
         ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
         ValueError: Test file not exist error.
     """
-    configures = get_items(args["config"], format="yaml")
+    configures = get_items(args["config"], SerialFileFormat.YAML)
 
     logger_name = f"{configures['tensor_dim']}-Tester"
     logging_level = logging.DEBUG if configures["debug"] else logging.INFO
@@ -315,7 +312,7 @@ def test_cfg(**args):
 
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
-        test_files = get_items(args["test_files"], format="auto")
+        test_files = get_items(args["test_files"])
     elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
@@ -324,7 +321,7 @@ def test_cfg(**args):
         test_fpaths = list(exp_dir.glob("valid_files*"))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
-            test_files = get_items(test_fpath, format="auto")
+            test_files = get_items(test_fpath)
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
