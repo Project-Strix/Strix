@@ -1,13 +1,25 @@
 import os
 import sys
 import logging
+from typing import Sequence, Dict, Optional
 from functools import partial
-from monai_ex.transforms import *
-from monai_ex.data import *
+from monai_ex.transforms import DataStatsD, ComposeEx
+from monai_ex.transforms.register import (
+    LOADER,
+    CHANNELER,
+    ORIENTER,
+    RESCALER,
+    RESIZER,
+    CROPADER,
+    AUGMENTOR,
+    UTILS,
+)
+# from monai_ex.data import *
+from monai_ex.data.register import DATASETYPE
 from monai.utils.misc import ensure_tuple, first
-import strix.utilities.oyaml as yaml
-from strix.utilities.enum import DIMS, FRAMEWORKS, PHASES
-from strix.utilities.registry import DatasetRegistry
+
+from strix import strix_datasets
+from strix.utilities.enum import DIMS, FRAMEWORKS, PHASES, SerialFileFormat
 from strix.utilities.utils import get_items
 
 root_tree = {
@@ -45,16 +57,13 @@ mapping = {
 }
 
 
-def check_config(configs, key, candidates=None):
-    cfg = configs.copy()
+def check_config(configs: Dict, key: Sequence[str], candidates: Optional[Sequence[str]] = None):
     for k in key:
-        try:
-            cfg = cfg[k]
-        except:
-            raise ValueError("Missing key: {} in dict {}".format(k, key))
+        if k not in configs:
+            raise ValueError("Missing key: {} in dict {}".format(k, key))            
 
     if candidates is not None:
-        for item in ensure_tuple(cfg):
+        for item in ensure_tuple(configs):
             assert (
                 item in candidates
             ), f"Key '{item}' in '{key[-1]}' is not in '{candidates}'"
@@ -224,18 +233,15 @@ def create_dataset_from_cfg(
 
 
 def register_dataset_from_cfg(config_path):
-    assert config_path.is_file(), f"Config file is not found: {config_path}"
-    with config_path.open() as f:
-        configs = yaml.full_load(f)
-
+    configs = get_items(config_path, SerialFileFormat.YAML)
     datasets_, dataloader_, transforms_ = parse_dataset_config(configs)
 
-    ds_registry = DatasetRegistry()
-    ds_registry.register(
+    strix_datasets.register(
         configs["ATTRIBUTE"]["DIM"],
         configs["ATTRIBUTE"]["FRAMEWORK"],
         configs["ATTRIBUTE"]["NAME"],
         configs["ATTRIBUTE"]["FILELIST"],
+        None,
         partial(
             create_dataset_from_cfg,
             datasets=datasets_,
@@ -245,16 +251,13 @@ def register_dataset_from_cfg(config_path):
     )
 
 def test_dataset_from_config(config_path, phase, opts):
-    assert config_path.is_file(), f"Config file is not found: {config_path}"
-    with config_path.open() as f:
-        configs = yaml.full_load(f)
-
+    configs = get_items(config_path, SerialFileFormat.YAML)
     datasets_, dataloader_, transforms_ = parse_dataset_config(configs)
     transforms_[phase].add_transforms(
         DataStatsD(
             keys=configs["ATTRIBUTE"]["KEYS"],
             prefix=configs["ATTRIBUTE"]["KEYS"],
-            logger_handler=logging.StreamHandler(sys.stdout) #! No output!
+            logger_handler=logging.StreamHandler(sys.stdout)  #! No output!
         )
     )
     dataset = create_dataset_from_cfg(

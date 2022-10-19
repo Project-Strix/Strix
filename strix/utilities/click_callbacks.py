@@ -233,7 +233,7 @@ def split_input_str_(value, dtype=float):
         return None
 
 
-def parse_input_str(ctx, param, value, dtype=str):
+def parse_input_str(ctx, param, value, dtype):
     return split_input_str_(value, dtype=dtype)
 
 
