@@ -63,6 +63,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         _loss = cfg.get_key("loss")
         decollate = False
         logger_name = get_attr_(opts, 'logger_name', logger_name)
+        lr_policy_epoch_level = get_attr_(opts, "lr_policy_level", "epoch") == "epoch"
 
         val_metric = SegmentationTrainEngine.get_metric(Phases.VALID, output_nc=opts.output_nc, decollate=decollate)
         train_metric = SegmentationTrainEngine.get_metric(Phases.TRAIN, output_nc=opts.output_nc, decollate=decollate)
@@ -76,7 +77,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
             tb_summary_writer=writer,
             logger_name=logger_name,
             stats_dicts={val_metric_name: lambda x: None},
-            save_bestmodel=True,
+            save_bestmodel=opts.save_n_best > 0,
             model_file_prefix=val_metric_name,
             bestmodel_n_saved=opts.save_n_best,
             tensorboard_image_kwargs=SegmentationTrainEngine.get_tensorboard_image_transform(
@@ -131,6 +132,7 @@ class SegmentationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
                 lr_scheduler=lr_scheduler,
                 summary_writer=writer,
                 name=logger_name,
+                epoch_level=lr_policy_epoch_level,
                 step_transform=lr_step_transform,
             ),
         ]

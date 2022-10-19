@@ -10,13 +10,11 @@ from types import SimpleNamespace as sn
 import click
 import numpy as np
 import torch
-import yaml
 from ignite.engine import Events
-from monai_ex.engines import EnsembleEvaluator, SupervisedEvaluator
+from monai.engines.evaluator import EnsembleEvaluator, SupervisedEvaluator
 from monai_ex.handlers import SNIP_prune_handler
-from sklearn.model_selection import KFold, ShuffleSplit, train_test_split
-from torch.utils.tensorboard import SummaryWriter
-from utils_cw import Print, check_dir, split_train_test
+from monai_ex.utils.misc import Print, check_dir
+from torch.utils.tensorboard.writer import SummaryWriter
 
 import strix.utilities.arguments as arguments
 import strix.utilities.oyaml as yaml
@@ -42,10 +40,9 @@ from strix.utilities.click_callbacks import (
     prompt_when,
     select_gpu,
 )
-from strix.utilities.enum import Frameworks, Phases
+from strix.utilities.enum import Phases, SerialFileFormat
 from strix.utilities.generate_cohorts import generate_test_cohort, generate_train_valid_cohorts
-from strix.utilities.registry import DatasetRegistry
-from strix.utilities.utils import generate_synthetic_datalist, get_items, parse_datalist, setup_logger
+from strix.utilities.utils import get_items, setup_logger
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)
@@ -137,7 +134,7 @@ train_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), ".strix_train_c
         "allow_extra_args": True,
         "ignore_unknown_options": True,
         "prompt_in_default_map": True,
-        "default_map": get_items(train_cmd_history, format="yaml", allow_filenotfound=True),
+        "default_map": get_items(train_cmd_history, SerialFileFormat.YAML, allow_filenotfound=True),
     },
 )
 @arguments.hidden_auxilary_params
@@ -266,7 +263,7 @@ def train_cfg(**args):
     if len(args.get("additional_args")) != 0:  # parse additional args
         Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
-    configures = get_items(args["config"], format="yaml")
+    configures = get_items(args["config"], SerialFileFormat.YAML)
 
     configures["smi"] = False
     gpu_id = click.prompt("Current GPU id", default=configures["gpus"])
@@ -308,7 +305,7 @@ def test_cfg(**args):
         ValueError: External test file (.json/.yaml) must be provided for cross-validation exp!
         ValueError: Test file not exist error.
     """
-    configures = get_items(args["config"], format="yaml")
+    configures = get_items(args["config"], SerialFileFormat.YAML)
 
     logger_name = f"{configures['tensor_dim']}-Tester"
     logging_level = logging.DEBUG if configures["debug"] else logging.INFO

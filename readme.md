@@ -106,7 +106,6 @@ Strix relies heavily on following packages to make it work. Theoretically, these
 * nibabel
 * pytorch-ignite
 * monai_ex
-* utils_cw
 
 
 ### Installation

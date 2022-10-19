@@ -1,4 +1,3 @@
-from utils_cw import check_dir
 import torch
 from strix import strix_datasets, strix_networks, strix_losses
 
@@ -12,11 +11,12 @@ from strix.utilities.enum import Frameworks
 from strix.configures import config as cfg
 from strix.models.cnn.cnn_nets import *
 from strix.models.transformer.transformer_nets import *
-from monai_ex.utils import WorkflowException
+from monai_ex.utils import WorkflowException, check_dir
+from monai.optimizers.lr_scheduler import ExponentialLR, LinearLR
 
 
-ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"))
-ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_LOSS_DIR"))
+ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_NETWORK_DIR"), recursive=True)
+ModuleManager.import_all(cfg.get_strix_cfg("EXTERNAL_LOSS_DIR"), recursive=True)
 
 
 def create_feature_maps(init_channel_number, number_of_fmaps):
@@ -25,6 +25,8 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
 
 def get_loss_fn(framework: str, loss_name: str, loss_params: dict, output_nc: int, deep_supervision: bool = False):
     loss_type = strix_losses.get(framework, loss_name)
+    if loss_type is None:
+        raise ValueError(f"Loss function {loss_name} is not found. It's weird!")
 
     if output_nc == 1:
         kwargs = {
@@ -121,6 +123,7 @@ def get_engine(opts, train_loader, test_loader, unlabel_loader=None, writer=None
     nesterov = get_attr_(opts, "nesterov", False)
     momentum = get_attr_(opts, "momentum", 0.0)
     valid_interval = get_attr_(opts, "valid_interval", 5)
+    deep_supervision = get_attr_(opts, "deep_supervision", False)
 
     frame, dim, name = opts.framework, opts.tensor_dim, opts.data_list
     multi_input_keys = strix_datasets.get(dim, frame, name).get("M_IN", None)
@@ -132,14 +135,14 @@ def get_engine(opts, train_loader, test_loader, unlabel_loader=None, writer=None
     loss = lr_scheduler = None
     if opts.framework == Frameworks.MULTITASK.value:
         subloss1 = get_loss_fn(
-            opts.subtask1, opts.criterion[1], opts.loss_params_task1, opts.output_nc[0], opts.deep_supervision
+            opts.subtask1, opts.criterion[1], opts.loss_params_task1, opts.output_nc[0], deep_supervision
         )
         subloss2 = get_loss_fn(
-            opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], opts.deep_supervision
+            opts.subtask2, opts.criterion[2], opts.loss_params_task2, opts.output_nc[1], deep_supervision
         )
         loss = strix_losses.get(opts.framework, opts.criterion[0])(subloss1, subloss2, aggregate="sum", **opts.loss_params)
     else:
-        loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, opts.deep_supervision)
+        loss = get_loss_fn(opts.framework, opts.criterion, opts.loss_params, opts.output_nc, deep_supervision)
 
     net_ = get_network(opts)
 
@@ -204,8 +207,12 @@ def get_engine(opts, train_loader, test_loader, unlabel_loader=None, writer=None
             T_mult=opts.lr_policy_params["T_mult"],
             eta_min=opts.lr_policy_params["eta_min"],
         )
+    elif opts.lr_policy == "linear":
+        lr_scheduler = LinearLR(optim, **opts.lr_policy_params)
+    elif opts.lr_policy == "exponential":
+        lr_scheduler = ExponentialLR(optim, **opts.lr_policy_params)
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"Not supported LR scheduler {opts.lr_policy}")
 
     params = {
         "opts": opts,

@@ -4,21 +4,22 @@ from time import strftime
 from pathlib import Path
 from functools import partial
 from types import SimpleNamespace as sn
+from typing import Sequence
 
 import click
 import torch
-from utils_cw import get_items_from_file, Print, check_dir
 from ignite.engine import Events
 from ignite.utils import setup_logger
 
 from strix.models import get_test_engine
 from strix.data_io.dataio import get_dataloader
-from strix.utilities.utils import get_specify_file
-from strix.utilities.enum import Phases
+from strix.utilities.utils import get_items
+from strix.utilities.enum import Phases, SerialFileFormat
 from strix.utilities.click_callbacks import parse_input_str
 from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.arguments import get_trained_models
 from monai_ex.handlers import GradCamHandler
+from monai_ex.utils.misc import check_dir, Print
 
 
 @click.command("gradcam-from-cfg")
@@ -70,21 +71,21 @@ def gradcam(**args):
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
-    configures = get_items_from_file(args["config"], format="json")
+    configures = get_items(args["config"], format=SerialFileFormat.JSON)
+    if not isinstance(configures, dict):
+        raise ValueError(f"Configure must be a dict! But got {type(configures)}")
+
     exp_dir = Path(configures.get("experiment_path", os.path.dirname(args["config"])))
 
     if configures.get("n_fold", 0) > 1:
         raise NotImplementedError("Donot support cross-valid experiment")
 
-    if os.path.isfile(args["test_files"]):
-        test_fpath = args["test_files"]
-        test_files = get_items_from_file(args["test_files"], format="auto")
-    elif get_specify_file(exp_dir, "test_files*"):
-        test_fpath = get_specify_file(exp_dir, "test_files*")
-        test_files = get_items_from_file(test_fpath, format="auto")
-    elif get_specify_file(exp_dir, "valid_files*"):
-        test_fpath = get_specify_file(exp_dir, "valid_files*")
-        test_files = get_items_from_file(test_fpath, format="auto")
+    if os.path.isfile(test_fpath := args["test_files"]):
+        test_files = get_items(test_fpath)
+    elif test_fpath := list(exp_dir.glob("test_files*")):
+        test_files = get_items(test_fpath[0])
+    elif test_fpath := list(exp_dir.glob("valid_files*")):
+        test_files = get_items(test_fpath[0])
     else:
         raise ValueError(f"Test file does not exists in {exp_dir}!")
 

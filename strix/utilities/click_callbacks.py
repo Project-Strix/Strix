@@ -21,13 +21,13 @@ from termcolor import colored
 
 from strix import strix_networks, strix_datasets, strix_losses
 import strix.utilities.oyaml as yaml
-from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers
+from strix.utilities.enum import BUILTIN_TYPES, FRAMEWORKS, Frameworks, Freezers, SerialFileFormat
 from strix.utilities.utils import get_items, is_avaible_size, save_sourcecode, warning_on_one_line, parse_datalist
 from strix.utilities.click import NumericChoice
 from strix.utilities.project_loader import ProjectManager
+from monai_ex.utils.misc import Print, check_dir
 
 warnings.formatwarning = warning_on_one_line
-from utils_cw import Print, check_dir
 
 
 #######################################################################
@@ -176,6 +176,9 @@ def get_exp_name(ctx, param, value):
         ctx.params["n_worker"] = 0
         return check_dir(ctx.params["out_dir"], "debug")
 
+    if ctx.command.name == "find-lr":
+        return check_dir(ctx.params["out_dir"], "lr_finding")
+
     mapping = {"batch": "BN", "instance": "IN", "group": "GN"}
     layer_norm = mapping[ctx.params["layer_norm"]]
     # update timestamp if train-from-cfg
@@ -215,7 +218,7 @@ def get_exp_name(ctx, param, value):
 
 
 def get_nni_exp_name(ctx, param, value):
-    param_list = get_items(ctx.params["param_list"], format="json")
+    param_list = get_items(ctx.params["param_list"], format=SerialFileFormat.JSON)
     param_list["out_dir"] = ctx.params["out_dir"]
     param_list["timestamp"] = strftime("%m%d_%H%M")
     context_ = sn(**{"params": param_list})
@@ -236,7 +239,7 @@ def split_input_str_(value, dtype=float):
         return None
 
 
-def parse_input_str(ctx, param, value, dtype=str):
+def parse_input_str(ctx, param, value, dtype):
     return split_input_str_(value, dtype=dtype)
 
 
@@ -276,6 +279,23 @@ def lr_schedule_params(ctx, param, value):
         ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"patience": patience}
     elif value == "CLR":
         raise NotImplementedError
+    elif value in ["linear", "exponential"]:
+        end_lr = _prompt("Linear end LR", float, 1.0)
+        if ctx.params.get("lr_policy_level") == "iter":
+            tensor_dim, framework, data_name, split, n_batch = ctx.params.get("tensor_dim"), ctx.params.get("framework"), ctx.params.get("data_list"), ctx.params.get("split"), ctx.params.get("n_batch")
+            if data_name in ["RandomData", "SyntheticData"]:
+                all_cases = 100
+                train_len = all_cases - int(all_cases * split)
+            else:
+                datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
+                all_data_list = get_items(datalist_fname)
+                train_len = math.ceil(len(all_data_list) * (1 - split))
+            epoch_iter_num = train_len // n_batch
+            num_iter = ctx.params["n_epoch"] * epoch_iter_num
+        else:
+            num_iter = ctx.params["n_epoch"]
+
+        ctx.params["lr_policy_params"] = ctx.meta["lr_policy_params"] = {"end_lr": end_lr, "num_iter": num_iter}
 
     return value
 
@@ -421,7 +441,7 @@ def input_cropsize(ctx, param, value):
     if value is False:
         return value
 
-    configures = get_items(ctx.params["config"], format="yaml")
+    configures = get_items(ctx.params["config"], format=SerialFileFormat.YAML)
     if is_avaible_size(configures.get("crop_size", None)) or value is False:
         return value
 

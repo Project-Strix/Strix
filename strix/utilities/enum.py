@@ -80,6 +80,8 @@ class LrSchedule(Enum):
     MULTISTEP = "multistep"
     SGDR = "SGDR"
     PLATEAU = "plateau"
+    EXP = "exponential"
+    LINEAR = "linear"
 
 
 LR_SCHEDULES = get_enums(LrSchedule)
@@ -151,3 +153,8 @@ class DatalistKeywords(Enum):
     LABEL = "labeled"
 
 DATALISTKEYWORDS = get_enums(DatalistKeywords)
+
+
+class SerialFileFormat(Enum):
+    JSON = "json"
+    YAML = "yaml"

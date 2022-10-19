@@ -8,9 +8,9 @@ DEFAULT_STRIX_CONFIG = {
     "CONFIG_FNAME": "strix_configures.cfg",
     "CACHE_DIR": str(Path.home() / "Strix"),
     "OUTPUT_DIR": str(Path.home() / "Strix" / "strix_exp"),
-    "EXTERNAL_DATASET_DIR": str(Path.home() / "Strix" / "strix_datasets"),
-    "EXTERNAL_NETWORK_DIR": str(Path.home() / "Strix" / "strix_networks"),
-    "EXTERNAL_LOSS_DIR": str(Path.home() / "Strix" / "strix_losses"),
+    "EXTERNAL_DATASET_DIR": str(Path.home() / "Strix-Contrib" / "Datasets"),
+    "EXTERNAL_NETWORK_DIR": str(Path.home() / "Strix-Contrib" / "Networks"),
+    "EXTERNAL_LOSS_DIR": str(Path.home() / "Strix-Contrib" / "Losses"),
 }
 
 

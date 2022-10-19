@@ -3,7 +3,6 @@ import click
 import yaml
 from pathlib import Path
 from functools import partial
-from utils_cw import check_dir
 from strix.main_entry import train
 
 
