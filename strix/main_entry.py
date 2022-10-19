@@ -1,12 +1,8 @@
 import gc
-import shutil
 import logging
 import os
 import shutil
 import time
-import torch
-import numpy as np
-from pathlib import Path
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace as sn
@@ -23,35 +19,33 @@ from torch.utils.tensorboard import SummaryWriter
 from utils_cw import Print, check_dir, split_train_test
 
 import strix.utilities.arguments as arguments
-from strix.configures import config as cfg
-from strix.models import get_engine, get_test_engine
-from strix.utilities.registry import DatasetRegistry
-from strix.data_io.dataio import get_dataloader
-from strix.configures import config as cfg
-from strix.utilities.enum import Phases, Frameworks
-from strix.utilities.click import OptionEx, CommandEx
 import strix.utilities.oyaml as yaml
-import strix.utilities.arguments as arguments
-from strix.utilities.utils import setup_logger, get_items, parse_datalist, generate_synthetic_datalist
+from strix.configures import config as cfg
+from strix.data_io.dataio import get_dataloader
+from strix.models import get_engine, get_test_engine
+from strix.utilities.click import CommandEx, OptionEx
 from strix.utilities.click_callbacks import (
+    backup_project,
+    check_amp,
     check_batchsize,
     check_freeze_api,
     check_loss,
     check_lr_policy,
-    dump_params,
     confirmation,
+    dump_hyperparameters,
+    dump_params,
+    get_exp_name,
+    get_unknown_options,
+    input_cropsize,
+    parse_project,
     print_smi,
     prompt_when,
-    check_amp,
-    dump_hyperparameters,
-    backup_project,
     select_gpu,
-    get_exp_name,
-    input_cropsize,
-    get_unknown_options,
-    parse_project,
 )
-
+from strix.utilities.enum import Frameworks, Phases
+from strix.utilities.generate_cohorts import generate_test_cohort, generate_train_valid_cohorts
+from strix.utilities.registry import DatasetRegistry
+from strix.utilities.utils import generate_synthetic_datalist, get_items, parse_datalist, setup_logger
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)
@@ -205,123 +199,61 @@ def train(ctx, **args):
         cargs.gpu_ids = [0]
 
     # ! if is semi-supervised learning
-    is_semisupervise = cargs.semi_supervised or cargs.framework == Frameworks.SEMISUPERVISED.value
-    unlabel_files = None
+    semisupervised = cargs.semi_supervised or cargs.framework == Frameworks.SEMISUPERVISED.value
+    train_valid_cohorts = generate_train_valid_cohorts(**vars(cargs), is_semisupervised=semisupervised, logger=logger)
 
-    # ! dump dataset file
-    datasets = DatasetRegistry()
-    strix_dataset = datasets.get(cargs.tensor_dim, cargs.framework, cargs.data_list)
-    if strix_dataset is None:
-        raise ValueError(f"Dataset {cargs.data_list} not found!")
+    folds = cargs.n_fold or cargs.n_repeat
+    for i, ifold in enumerate(train_valid_cohorts):
+        ith = i if cargs.ith_fold < 0 else cargs.ith_fold
+        if i < ith:
+            continue
 
-    source_file = strix_dataset.get("SOURCE")
-    if source_file and os.path.isfile(source_file):
-        shutil.copyfile(source_file, cargs.experiment_path.joinpath(f"{cargs.data_list}.snapshot"))
-
-    # ! Manually specified train&valid datalist
-    if cargs.train_list and cargs.valid_list:
-        if is_semisupervise:
-            train_files, unlabel_files = parse_datalist(cargs.train_list, format="auto", has_unlabel=True)
-        else:
-            train_files = parse_datalist(cargs.train_list, format="auto")
-        valid_files = parse_datalist(cargs.valid_list, format="auto")  # valid dataset need no unlabel
-
-        train_core(cargs, train_files, valid_files, unlabel_files)
-        return cargs
-
-    datalist_fpath = strix_dataset.get("PATH", "")
-    testlist_fpath = strix_dataset.get("TEST_PATH")
-
-    # ! Synthetic test phase
-    if datalist_fpath is None:
-        train_files = generate_synthetic_datalist(100, logger)
-    else:
-        assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-
-        if is_semisupervise:
-            train_files, unlabel_files = parse_datalist(datalist_fpath, format="auto", has_unlabel=True)
-        else:
-            train_files = parse_datalist(datalist_fpath, format="auto")
-
-
-    if cargs.do_test and (testlist_fpath is None or not os.path.isfile(testlist_fpath)):
-        logger.warn(
-            f"Test datalist is not found, split test cohort from training data with split ratio of {cargs.split}"
-        )
-        train_test_cohort = split_train_test(
-            train_files, cargs.split, cfg.get_key("label"), 1, random_seed=cargs.seed
-        )
-        train_files, test_files = train_test_cohort[0]
-
-    if 0 < cargs.partial < 1:
-        logger.info("Use {} data".format(int(len(train_files) * cargs.partial)))
-        train_files = train_files[: int(len(train_files) * cargs.partial)]
-    elif cargs.partial > 1 or cargs.partial == 0:
-        logger.warn(f"Expect 0 < partial < 1, but got {cargs.partial}. Ignored.")
-
-    cargs.split = int(cargs.split) if cargs.split >= 1 else cargs.split
-    if cargs.n_fold > 1 or cargs.n_repeat > 1:  # ! K-fold cross-validation
-        if cargs.n_fold > 1:
-            folds = cargs.n_fold
-            kf = KFold(n_splits=cargs.n_fold, random_state=cargs.seed, shuffle=True)
-        elif cargs.n_repeat > 1:
-            folds = cargs.n_repeat
-            kf = ShuffleSplit(n_splits=cargs.n_repeat, test_size=cargs.split, random_state=cargs.seed)
-        else:
-            raise ValueError(f"Got unexpected n_fold({cargs.n_fold}) or n_repeat({cargs.n_repeat})")
-
-        for i, (train_index, test_index) in enumerate(kf.split(train_files)):
-            ith = i if cargs.ith_fold < 0 else cargs.ith_fold
-            if i < ith:
-                continue
+        if folds:
             logger.info(f"\n\n\t**** Processing {i+1}/{folds} cross-validation ****\n\n")
-            train_data = list(np.array(train_files)[train_index])
-            valid_data = list(np.array(train_files)[test_index])
 
-            if "-th" in os.path.basename(cargs.experiment_path):
-                cargs.experiment_path = check_dir(os.path.dirname(cargs.experiment_path), f"{i}-th")
-            else:
-                cargs.experiment_path = check_dir(cargs.experiment_path, f"{i}-th")
+        _experiment_path = check_dir(cargs.experiment_path, f"{i}-th") if folds else cargs.experiment_path
 
-            # copy param.list to i-fold dir
-            with cargs.experiment_path.joinpath("param.list").open("w") as f:
-                fold_args = args.copy()
-                fold_args["n_fold"] = fold_args["n_repeat"] = 0
-                fold_args["experiment_path"] = str(cargs.experiment_path)
-                yaml.dump(fold_args, f, sort_keys=True)
+        # copy param.list to i-fold dir
+        with _experiment_path.joinpath("param.list").open("w") as f:
+            fold_args = args.copy()
+            fold_args["n_fold"] = fold_args["n_repeat"] = 0
+            fold_args["experiment_path"] = str(_experiment_path)
+            yaml.dump(fold_args, f, sort_keys=True)
 
-            train_core(cargs, train_data, valid_data, unlabel_files)
-            logger.info("Cleaning CUDA cache...")
-            gc.collect()
-            torch.cuda.empty_cache()
-    else:  # ! Plain training
-        train_data, valid_data = train_test_split(train_files, test_size=cargs.split, random_state=cargs.seed)
-        train_core(cargs, train_data, valid_data, unlabel_files)
+
+        train_data, valid_data, unlabel_data = ifold
+        train_core(cargs, train_data, valid_data, unlabel_data)
+
+        logger.info("Cleaning CUDA cache...")
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # ! Do testing
     if cargs.do_test > 0:
-        if testlist_fpath and os.path.isfile(testlist_fpath):
-            test_datalist = parse_datalist(testlist_fpath, format="auto")
-        elif len(test_datalist) > 0:
-            testlist_fpath = cargs.experiment_path.joinpath("test_files.yml")
-            with testlist_fpath.open("w") as f:
-                yaml.dump(test_datalist, f)
-        else:
+        test_datalist = generate_test_cohort(
+            cargs.tensor_dim, cargs.framework, cargs.data_list, cargs.do_test, cargs.split, cargs.seed
+        )
+
+        if len(test_datalist) == 0:
+            logger.warn("No test data is found! Skip test.")
             return cargs
 
-        has_labels = np.all([cfg.get_key("label") in item for item in test_files])
+        testlist_fpath = cargs.experiment_path.joinpath("test_files.yml")
+        with testlist_fpath.open("w") as f:
+            yaml.dump(test_datalist, f)
 
-        if len(test_files) > 0:
-            configures = {
-                "config": os.path.join(args["experiment_path"], "param.list"),
-                "test_files": testlist_fpath,
-                "with_label": has_labels,
-                "use_best_model": True,
-                "smi": False,
-                "gpus": args["gpus"],
-            }
-            print("****configure:", configures)
-            test_cfg(default_map=configures)
+        has_labels = np.all([cfg.get_key("label") in item for item in test_datalist])
+
+        configures = {
+            "config": os.path.join(args["experiment_path"], "param.list"),
+            "test_files": testlist_fpath,
+            "with_label": has_labels,
+            "use_best_model": True,
+            "smi": False,
+            "gpus": args["gpus"],
+        }
+        print("****configure:", configures)
+        test_cfg(default_map=configures)
 
     return cargs
 
