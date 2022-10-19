@@ -77,46 +77,42 @@ def parse_datalist(filelist, format="auto", has_unlabel: bool = False):
     if isinstance(datalist, Sequence):
         return datalist  # normal datalist
     elif isinstance(datalist, Dict):
-        label: str = DatalistKeywords.LABEL.value
-        unlabel: str = DatalistKeywords.UNLABEL.value
-        if label not in datalist:
-            raise GenericException(f"Your datalist does not contain '{label}' key.")
-        elif:
+        if "tensorImageSize" in datalist:#nnUnet datalist
             training_list = datalist["training"]
             num = len(training_list)
-            dataset = []
-            i = 0
+            data_path =Path(filelist).parent
+            dataset = []            
+            if not (data_path/training_list[0]["image"]).exists():
+                raise GenericException(
+                    f"Your image can not found, but you need it for your task!"
+                )
             for i in range(num):
                 case_data = {}
                 if "image" in training_list[i]:
                     image_relpath = training_list[i]["image"]
-                    case_data['image'] = os.path.abspath(image_relpath)
-                else:
-                    pass
+                    case_data['image'] = str(data_path/image_relpath)
                 if "label" in training_list[i]:
                     label_relpath = training_list[i]["label"]
-                    case_data['label'] = os.path.abspath(label_relpath)
-                else:
-                    pass
+                    case_data['label'] = str(data_path/label_relpath)
                 if "mask" in training_list[i]:
                     mask_relpath = training_list[i]["mask"]
-                    case_data['mask'] = os.path.abspath(mask_relpath)
-                else:
-                    pass
-                dataset.append(case_data)
-                i = i + 1
+                    case_data['mask'] = str(data_path/mask_relpath)
+                dataset.append(case_data)   
             return dataset
-        if has_unlabel and unlabel not in datalist:
-            raise GenericException(
-                f"Your datalist does not contain '{unlabel}' key, but you need it for your task!"
-            )
-        if has_unlabel:
-            return datalist[label], datalist[unlabel]
-        return datalist[label]
+        else:
+            label: str = DatalistKeywords.LABEL.value
+            unlabel: str = DatalistKeywords.UNLABEL.value
+            if label not in datalist:
+                raise GenericException(f"Your datalist does not contain '{label}' key.")
+            if has_unlabel and unlabel not in datalist:
+                raise GenericException(
+                    f"Your datalist does not contain '{unlabel}' key, but you need it for your task!"
+                )
+            if has_unlabel:
+                return datalist[label], datalist[unlabel]
+            return datalist[label]
     else:
-        return GenericException(
-            f"Current datalist should be list or dict (labeled&unlabeled), but got {type(datalist)}"
-        )
+        raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
 
 
 def get_attr_(obj, name, default = None):
