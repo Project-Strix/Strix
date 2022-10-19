@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Sequence
 import os
 import logging
 from pathlib import Path
@@ -39,8 +39,8 @@ def generate_train_valid_cohorts(
 
     # ! Manually specified train&valid datalist
     if train_list and valid_list:
-        train_files, unlabel_files = parse_datalist(train_list, format="auto", has_unlabel=is_semisupervised)
-        valid_files = parse_datalist(valid_list, format="auto")  # valid dataset need no unlabel
+        train_files, unlabel_files = parse_datalist(train_list, has_unlabel=is_semisupervised)
+        valid_files = parse_datalist(valid_list)  # valid dataset need no unlabel
         return [(train_files, valid_files, unlabel_files), ]
 
     datalist_fpath = strix_dataset.get("PATH", "")
@@ -51,7 +51,7 @@ def generate_train_valid_cohorts(
         train_datalist = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-        train_datalist, unlabel_files = parse_datalist(datalist_fpath, format="auto", has_unlabel=is_semisupervised)
+        train_datalist, unlabel_files = parse_datalist(datalist_fpath, has_unlabel=is_semisupervised)
 
     if not train_datalist:
         raise ValueError("No train datalist if found!")
@@ -122,7 +122,7 @@ def generate_test_cohort(
         ValueError: no test file is found and train_datalist is not given.
 
     Returns:
-        Optional[List]: _description_
+        List: _description_
     """
     datasets = DatasetRegistry()
     strix_dataset = datasets.get(tensor_dim, framework, data_list)

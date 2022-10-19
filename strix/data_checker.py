@@ -26,7 +26,6 @@ from strix.utilities.utils import (
     get_items,
     trycatch,
     generate_synthetic_datalist,
-    parse_datalist,
 )
 from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg

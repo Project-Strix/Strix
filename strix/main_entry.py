@@ -42,7 +42,7 @@ from strix.utilities.click_callbacks import (
 )
 from strix.utilities.enum import Phases, SerialFileFormat
 from strix.utilities.generate_cohorts import generate_test_cohort, generate_train_valid_cohorts
-from strix.utilities.utils import get_items, setup_logger
+from strix.utilities.utils import get_items, setup_logger, parse_datalist
 
 option = partial(click.option, cls=OptionEx)
 command = partial(click.command, cls=CommandEx)
@@ -321,7 +321,7 @@ def test_cfg(**args):
 
     if os.path.isfile(args["test_files"]):
         test_fpath = args["test_files"]
-        test_files = parse_datalist(args["test_files"], format="auto")
+        test_files = parse_datalist(args["test_files"])
     elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
@@ -330,7 +330,7 @@ def test_cfg(**args):
         test_fpaths = list(exp_dir.glob("valid_files*"))
         if len(test_fpaths) > 0:
             test_fpath = test_fpaths[0]
-            test_files = parse_datalist(test_fpath, format="auto")
+            test_files = parse_datalist(test_fpath)
         else:
             raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 

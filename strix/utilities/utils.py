@@ -8,7 +8,7 @@ import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, TextIO, Tuple, Union
+from typing import Any, Callable, List, Optional, Sequence, TextIO, Tuple, Union, Dict
 
 import matplotlib
 import pylab
@@ -91,7 +91,7 @@ def get_items(filelist: Union[str, Path], format: Optional[SerialFileFormat] = N
 
 
 def split_train_test(
-    datalist: list,
+    datalist: Sequence[Any],
     test_ratio: float,
     label_key: str = "label",
     splits_num: int = 1,
@@ -136,38 +136,37 @@ def generate_synthetic_datalist(data_num: int = 100, logger=None):
 
 
 @trycatch()
-def parse_datalist(filelist, format="auto", has_unlabel: bool = False):
+def parse_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None, has_unlabel: bool = False) -> Union[List, Tuple]:
     """Wrapper of `get_items` function for parsing datalist
 
     Args:
         filelist (list): input filelist containing data path.
-        format (str, optional): datalist file format. Defaults to "auto".
+        format (Optional[SerialFileFormat]): two formats are supported: SerialFileFormat.JSON or SerialFileFormat.YAML.
         has_unlabel (bool, optional): whether return unlabeled data if exists. Defaults to False.
     """
     datalist = get_items(filelist, format=format)
-    if isinstance(datalist, Sequence):
+    if isinstance(datalist, List):
         return datalist  # normal datalist
     elif isinstance(datalist, Dict):
-        if "tensorImageSize" in datalist:#nnUnet datalist
+        if "tensorImageSize" in datalist:  # nnUnet datalist
             training_list = datalist["training"]
-            num = len(training_list)
-            data_path =Path(filelist).parent
+            data_path = Path(filelist).parent
             dataset = []            
-            if not (data_path/training_list[0]["image"]).exists():
+            if not (data_path / training_list[0]["image"]).exists():
                 raise GenericException(
-                    f"Your image can not found, but you need it for your task!"
+                    "Your image can not found, but you need it for your task!"
                 )
-            for i in range(num):
+            for train_item in training_list:
                 case_data = {}
-                if "image" in training_list[i]:
-                    image_relpath = training_list[i]["image"]
-                    case_data['image'] = str(data_path/image_relpath)
-                if "label" in training_list[i]:
-                    label_relpath = training_list[i]["label"]
-                    case_data['label'] = str(data_path/label_relpath)
-                if "mask" in training_list[i]:
-                    mask_relpath = training_list[i]["mask"]
-                    case_data['mask'] = str(data_path/mask_relpath)
+                if "image" in train_item:
+                    image_relpath = train_item["image"]
+                    case_data['image'] = str(data_path / image_relpath)
+                if "label" in train_item:
+                    label_relpath = train_item["label"]
+                    case_data['label'] = str(data_path / label_relpath)
+                if "mask" in train_item:
+                    mask_relpath = train_item["mask"]
+                    case_data['mask'] = str(data_path / mask_relpath)
                 dataset.append(case_data)   
             return dataset
         else:
@@ -186,7 +185,7 @@ def parse_datalist(filelist, format="auto", has_unlabel: bool = False):
         raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
 
 
-def get_attr_(obj, name, default = None):
+def get_attr_(obj, name, default=None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
 

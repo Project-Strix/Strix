@@ -578,11 +578,11 @@ def check_batchsize(ctx_params):
     if train_list and valid_list:
         print(valid_list, train_list)
         if is_semi:
-            train_files, unlabel_files = parse_datalist(train_list, format="auto", has_unlabel=True)
+            train_files, unlabel_files = parse_datalist(train_list, has_unlabel=True)
             unlabel_files_len = len(unlabel_files)
         else:
-            train_files = parse_datalist(train_list, format="auto")
-        valid_files = parse_datalist(valid_list, format="auto")
+            train_files = parse_datalist(train_list)
+        valid_files = parse_datalist(valid_list)
         len_train, len_valid = min(len(train_files), unlabel_files_len), len(valid_files)
     elif data_name in ["RandomData", "SyntheticData"]:
         all_cases = 100
@@ -591,10 +591,10 @@ def check_batchsize(ctx_params):
     else:
         datalist_fname = strix_datasets.get(tensor_dim, framework, data_name).get("PATH", "")
         if is_semi:
-            train_files, unlabel_files = parse_datalist(datalist_fname, format="auto", has_unlabel=True)
+            train_files, unlabel_files = parse_datalist(datalist_fname, has_unlabel=True)
             unlabel_files_len = len(unlabel_files)
         else:
-            train_files = parse_datalist(datalist_fname, format="auto")
+            train_files = parse_datalist(datalist_fname)
 
         len_valid = math.ceil(len(train_files) * split)
         len_train = min(len(train_files) - len_valid, unlabel_files_len)
