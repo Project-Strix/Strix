@@ -80,15 +80,11 @@ def gradcam(**args):
     if configures.get("n_fold", 0) > 1:
         raise NotImplementedError("Donot support cross-valid experiment")
 
-    def _get_files(target_dir, regex_kw) -> Sequence[Path]:
-        return list(target_dir.glob(regex_kw))
-
-    if os.path.isfile(args["test_files"]):
-        test_fpath = args["test_files"]
-        test_files = get_items(args["test_files"])
-    elif test_fpath := _get_files(exp_dir, "test_files*"):
+    if os.path.isfile(test_fpath := args["test_files"]):
+        test_files = get_items(test_fpath)
+    elif test_fpath := list(exp_dir.glob("test_files*")):
         test_files = get_items(test_fpath[0])
-    elif test_fpath := _get_files(exp_dir, "valid_files*"):
+    elif test_fpath := list(exp_dir.glob("valid_files*")):
         test_files = get_items(test_fpath[0])
     else:
         raise ValueError(f"Test file does not exists in {exp_dir}!")
