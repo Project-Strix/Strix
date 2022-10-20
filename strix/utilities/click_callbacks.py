@@ -572,7 +572,7 @@ def check_batchsize(ctx_params):
         ctx_params.get("n_batch_valid"),
         ctx_params.get("semi_supervised"),
     )
-    is_semi = semi or framework == Frameworks.SEMISUPERVISED.value
+    is_semi = semi or framework == Frameworks.SEMISUPERVISION.value
 
     unlabel_files_len = sys.maxsize
     if train_list and valid_list:

@@ -109,7 +109,7 @@ def common_params(func):
     @option("--debug", is_flag=True, help="Enter debug mode")
     @option("--image-size", callback=partial(parse_input_str, dtype=int), help="Image size")
     @option("--profile", is_flag=True, help="Turn on GPU profiling")
-    @option("-semi", "--semi-supervised", is_flag=True, help="Trigger semisupervised mode")
+    @option("-semi", "--semisupervision", is_flag=True, help="Trigger semisupervision mode")
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)

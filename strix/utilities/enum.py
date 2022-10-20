@@ -94,7 +94,7 @@ class Frameworks(Enum):
     SELFLEARNING = "selflearning"
     DETECTION = "detection"
     MULTITASK = "multitask"
-    SEMISUPERVISED = 'semisupervised'
+    SEMISUPERVISION = 'semisupervision'
 
 
 FRAMEWORKS = get_enums(Frameworks)

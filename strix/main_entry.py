@@ -40,7 +40,7 @@ from strix.utilities.click_callbacks import (
     prompt_when,
     select_gpu,
 )
-from strix.utilities.enum import Phases, SerialFileFormat
+from strix.utilities.enum import Phases, SerialFileFormat, Frameworks
 from strix.utilities.generate_cohorts import generate_test_cohort, generate_train_valid_cohorts
 from strix.utilities.utils import get_items, setup_logger, parse_datalist
 
@@ -196,8 +196,8 @@ def train(ctx, **args):
         cargs.gpu_ids = [0]
 
     # ! if is semi-supervised learning
-    semisupervised = cargs.semi_supervised or cargs.framework == Frameworks.SEMISUPERVISED.value
-    train_valid_cohorts = generate_train_valid_cohorts(**vars(cargs), is_semisupervised=semisupervised, logger=logger)
+    semisupervision = cargs.semisupervision or cargs.framework == Frameworks.SEMISUPERVISION.value
+    train_valid_cohorts = generate_train_valid_cohorts(**vars(cargs), is_semisupervised=semisupervision, logger=logger)
 
     folds = cargs.n_fold or cargs.n_repeat
     for i, ifold in enumerate(train_valid_cohorts):
