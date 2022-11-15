@@ -220,7 +220,7 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique())
+                    mask_class_num = len(data[msk_key].unique()) - 1
                     msk = data[msk_key]
                 else:
                     msk = None
@@ -262,7 +262,7 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique())
+                    mask_class_num = len(data[msk_key].unique()) - 1
                     msk = data[msk_key]
                 else:
                     msk = None

@@ -540,7 +540,6 @@ def plot_segmentation_masks(images: np.ndarray,
     if color_num >0:
         colors = get_colors(color_num)
         cmap = get_colormaps(color_num)
-
     for i in range(nrow):
         for j in range(ncol):
             axes[i,j].axis('off')
@@ -551,7 +550,7 @@ def plot_segmentation_masks(images: np.ndarray,
                 elif method == 'contour':
                     list = [i for i in np.unique(masks[i*ncol+j,...].squeeze()).tolist() if i != 0 and i is not None]
                     if len(list) > 0:
-                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), list, colors = colors[min(list)-1:max(list)])
+                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), levels = [x-0.01 for x in list], colors = colors[min(list)-1:max(list)])
                     else:
                         continue
     plt.subplots_adjust(
