@@ -8,6 +8,8 @@ from pathlib import Path
 from functools import partial
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
+import warnings
+from termcolor import colored
 
 import torch
 
@@ -68,7 +70,9 @@ def save_2d_image_grid(
     chn_idx=None,
     overlap_method='mask',
     mask=None,
-    mask_class_num = 2
+    mask_class_num = 2,
+    fnames: list = None,
+    alpha: float = None
 ):
     if axis is not None and chn_idx is not None:
         images = np.take(images, chn_idx, axis)
@@ -78,7 +82,7 @@ def save_2d_image_grid(
         data_slice = images.detach().numpy()
         mask_slice = mask.detach().numpy()
         fig = plot_segmentation_masks(data_slice, mask_slice, nrow, ncol, 
-                alpha = 0.6, method = overlap_method, mask_class_num = mask_class_num)
+                alpha = alpha, method = overlap_method, mask_class_num = mask_class_num, fnames = fnames)
 
     output_fname = f"-chn{chn_idx}" if chn_idx is not None else ""
 
@@ -106,7 +110,9 @@ def save_3d_image_grid(
     multichannel=False,
     overlap_method='mask',
     mask=None,
-    mask_class_num = 2
+    mask_class_num = 2,
+    fnames: list = None,
+    alpha: float = None
 ):
     images = np.take(images, slice_index, axis)
     if mask is not None:
@@ -115,7 +121,7 @@ def save_3d_image_grid(
         data_slice = images.detach().numpy()
         mask_slice = mask.detach().numpy()
         fig = plot_segmentation_masks(data_slice, mask_slice, nrow, ncol, 
-            alpha = 0.6, method = overlap_method, mask_class_num=mask_class_num)
+            alpha = alpha, method = overlap_method, mask_class_num=mask_class_num, fnames = fnames)
 
     if multichannel:
         output_fname = f"channel{slice_index}.png"
@@ -142,6 +148,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_c
 @option(
     "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
+@option("--alpha", type=float, default=0.7, help="The opacity of mask")
 @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
 @option("--data-list", type=str, callback=data_select, default=None, help="Data file list")  # todo: Rename
 @option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
@@ -209,8 +216,19 @@ def check_data(ctx, **args):
         overlap_m = 'mask'
     elif cargs.contour_overlap:
         overlap_m = 'contour'
-    else:
-        overlap_m = 'mask'
+
+    def _check_mask(masks, fnames):
+        mask_class_num = len(masks.unique()) - 1
+        msk = masks if mask_class_num > 0 else None
+        for i in range(masks.shape[0]):
+            n_class = len(msk[i,...].unique()) - 1
+            if  n_class == mask_class_num:
+                continue
+            elif n_class > 0:
+                warnings.warn(colored(f"Other cases had {mask_class_num} kinds of labels, but {fnames[i]} got {n_class}, please check your data", "yellow"))
+            else:
+                warnings.warn(colored(f"Case {fnames[i]} has no label (only background), please check your data", "yellow"))
+        return mask_class_num, msk
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {
@@ -219,11 +237,12 @@ def check_data(ctx, **args):
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
-                if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique()) - 1
-                    msk = data[msk_key]
+                if exist_mask and overlap: 
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
+                    mask_class_num = 0
+                    msk=None
                 row = int(np.ceil(np.sqrt(bs)))
                 column = row
                 if (row -1) * column >= bs:
@@ -238,7 +257,9 @@ def check_data(ctx, **args):
                     i,
                     overlap_method=overlap_m,
                     mask=msk,
-                    mask_class_num = mask_class_num
+                    mask_class_num = mask_class_num,
+                    fnames = fnames,
+                    alpha = cargs.alpha
                 )
                 if cargs.save_raw:                  
                     save_raw_image(
@@ -262,10 +283,12 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique()) - 1
-                    msk = data[msk_key]
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
+                    mask_class_num = 0
+                    msk=None
+
                 row = int(np.ceil(np.sqrt(bs)))
                 column = row
                 if (row -1) * column >= bs:
@@ -294,7 +317,9 @@ def check_data(ctx, **args):
                         chn_idx =ch_idx,
                         overlap_method=overlap_m,
                         mask=msk,
-                        mask_class_num=mask_class_num
+                        mask_class_num=mask_class_num,
+                        fnames = fnames,
+                        alpha = cargs.alpha
                     )
 
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
@@ -308,10 +333,12 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique()) - 1
-                    msk = data[msk_key]
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
+                    mask_class_num = 0
+                    msk=None
+
                 row = int(np.ceil(np.sqrt(bs)))
                 column = row
                 if (row -1) * column >= bs:
@@ -330,7 +357,9 @@ def check_data(ctx, **args):
                         multichannel=False,
                         overlap_method=overlap_m,
                         mask=msk,
-                        mask_class_num=mask_class_num
+                        mask_class_num=mask_class_num,
+                        fnames = fnames,
+                        alpha = cargs.alpha
                     )
                 
                 if cargs.save_raw:

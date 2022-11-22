@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, List, Optional, TextIO, Tuple, Union
+from typing import Any, Callable, Optional, TextIO, Union
 import matplotlib
 import pylab
 import torch
@@ -20,11 +20,10 @@ import matplotlib.cm as mpl_color_map
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 import numpy as np
 import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
-from monai.networks.utils import one_hot
 from monai_ex.utils import GenericException, catch_exception, ensure_list
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
@@ -529,7 +528,8 @@ def plot_segmentation_masks(images: np.ndarray,
     ncol:int,
     alpha: float = 0.8,
     method = 'mask',
-    mask_class_num = 2
+    mask_class_num = 2,
+    fnames = None
 ) :
     # cm = 1/2.54
     plt.close()
@@ -544,17 +544,19 @@ def plot_segmentation_masks(images: np.ndarray,
         for j in range(ncol):
             axes[i,j].axis('off')
             if i* ncol+j < images.shape[0]:
+                title = str(Path(fnames[i* ncol+j]).stem)
+                axes[i,j].set_title(title, fontsize=8)
                 axes[i,j].imshow(images[i*ncol+j,...].squeeze(), cmap = 'gray', interpolation = 'bicubic')
                 if method == 'mask':
-                    axes[i,j].imshow(np.ma.masked_equal(masks[i*ncol+j,...].squeeze(), 0), cmap, alpha = alpha, norm=matplotlib.colors.Normalize(vmin=1, vmax=color_num))
+                    axes[i,j].imshow(np.ma.masked_equal(masks[i*ncol+j,...].squeeze(), 0), cmap, alpha=alpha, norm=Normalize(vmin=1, vmax=color_num))
                 elif method == 'contour':
-                    list = [i for i in np.unique(masks[i*ncol+j,...].squeeze()).tolist() if i != 0 and i is not None]
+                    list = [i for i in np.unique(masks[i*ncol+j,...].squeeze()).tolist() if i]
                     if len(list) > 0:
-                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), levels = [x-0.01 for x in list], colors = colors[min(list)-1:max(list)])
+                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), levels=[x-0.01 for x in list], colors=colors[min(list)-1:max(list)])
                     else:
                         continue
     plt.subplots_adjust(
-        left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.1
+        left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.2
     )
     return fig
 
