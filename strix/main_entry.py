@@ -16,6 +16,7 @@ from monai_ex.handlers import SNIP_prune_handler
 from monai_ex.utils.misc import Print, check_dir
 from torch.utils.tensorboard.writer import SummaryWriter
 
+from strix import strix_datasets
 import strix.utilities.arguments as arguments
 import strix.utilities.oyaml as yaml
 from strix.configures import config as cfg
@@ -260,7 +261,7 @@ def train(ctx, **args):
 @click.argument("additional_args", nargs=-1, type=click.UNPROCESSED)
 def train_cfg(**args):
     """Entry of train-from-cfg command"""
-    if len(args.get("additional_args")) != 0:  # parse additional args
+    if len(args.get("additional_args", [])) != 0:  # parse additional args
         Print("*** Lr schedule changes do not work yet! Please make a confirmation at last!***\n", color="y")
 
     configures = get_items(args["config"], SerialFileFormat.YAML)
@@ -316,23 +317,24 @@ def test_cfg(**args):
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args["gpus"])
 
+    if not (data_list := strix_datasets.get(configures['tensor_dim'], configures['framework'], configures["data_list"])):
+        raise ValueError(f"Cannot find data_list named '{configures['data_list']}'")
+
     exp_dir = Path(configures.get("experiment_path", os.path.dirname(args["config"])))
     is_crossvalid = configures.get("n_fold", 0) > 1 or configures.get("n_repeat", 0) > 1
 
-    if os.path.isfile(args["test_files"]):
-        test_fpath = args["test_files"]
+    if os.path.isfile(test_fpath := args["test_files"]):
         test_files = parse_datalist(args["test_files"])
     elif is_crossvalid:
         raise ValueError(
             f"{configures['n_fold']} Cross-validation found! You must provide external test file (.json/.yaml)."
         )
+    elif test_fpath := data_list["TEST_PATH"]:
+        test_files = parse_datalist(test_fpath)
+    elif len(test_fpaths := list(exp_dir.glob("test_files*")) or list(exp_dir.glob("valid_files*"))) > 0:
+        test_files = parse_datalist(test_fpath := test_fpaths[0])
     else:
-        test_fpaths = list(exp_dir.glob("valid_files*"))
-        if len(test_fpaths) > 0:
-            test_fpath = test_fpaths[0]
-            test_files = parse_datalist(test_fpath)
-        else:
-            raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
+        raise ValueError(f"Test/Valid file does not exists in {exp_dir}!")
 
     if args["use_best_model"]:  #! refactor this!
         model_list = arguments.get_best_trained_models(exp_dir)
