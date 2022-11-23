@@ -1,31 +1,29 @@
+import os
 import copy
 import json
-import logging
-import os
 import socket
 import struct
 import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, TextIO, Tuple, Union
-
+from typing import Any, Callable, Optional, TextIO, Union
 import matplotlib
 import pylab
 import torch
 import yaml
-from PIL import Image, ImageColor, ImageDraw
+from PIL import Image
 from termcolor import colored
-
+import logging
 matplotlib.use("Agg")
 import matplotlib.cm as mpl_color_map
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 import numpy as np
 import tensorboard.compat.proto.event_pb2 as event_pb2
 from matplotlib.ticker import ScalarFormatter
-from monai.networks.utils import one_hot
 from monai_ex.utils import GenericException, catch_exception, ensure_list
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
@@ -145,6 +143,15 @@ def get_colors(num: Optional[int] = None):
     else:
         return list(mcolors.TABLEAU_COLORS.values())  # type: ignore
 
+def get_colormaps(num: int = None):
+    if num is None:
+        num = 10
+    if num == 1:
+        return 'tab10'
+    else:
+        colormap =  [list(plt.cm.tab10(0.1 * i)) for i in range(num)]
+        new_colormap = LinearSegmentedColormap.from_list('my_colormap', colormap, N=num + 1 if num == 1 else num)
+        return new_colormap
 
 def bbox_3D(img):
     r = np.any(img, axis=(1, 2))
@@ -463,11 +470,6 @@ def dump_tensorboard(db_file, dump_keys=None, save_image=False, verbose=False):
     return summaries
 
 
-def _generate_color_palette(num_masks):
-    palette = torch.tensor([2**25 - 1, 2**15 - 1, 2**21 - 1])
-    return [tuple((i * palette) % 255) for i in range(num_masks)]
-
-
 def norm_ip(img, min, max):
     img.clamp_(min=min, max=max)
     img.add_(-min).div_(max - min + 1e-5)
@@ -520,145 +522,43 @@ def get_bound_2d(mask, connectivity=1):
     return boundaries
 
 
-def __check_image_mask(image, masks):
-    if not isinstance(image, torch.Tensor):
-        raise TypeError(f"The image must be a tensor, got {type(image)}")
-    elif image.dtype != torch.uint8:
-        raise ValueError(f"The image dtype must be uint8, got {image.dtype}")
-    elif image.dim() != 3:
-        raise ValueError("Pass individual images, not batches")
-    elif image.size()[0] != 3:
-        if image.size()[0] == 1:
-            image = image.repeat_interleave(3, dim=0)
-        else:
-            raise ValueError(f"Pass an RGB image. Other Image formats are not supported, got {image.size()}")
-
-    mask_value_range = masks.unique()
-    if masks.ndim == 2:
-        masks = masks[None, :, :]
-        if len(mask_value_range) > 1:
-            masks = one_hot(masks, len(mask_value_range)).type(torch.bool)
-    if masks.ndim == 3:
-        if len(mask_value_range) > 1 and masks.shape[0] == 1:
-            masks = one_hot(masks, len(mask_value_range), dim=0).type(torch.bool)
-    masks = masks.type(torch.bool)
-    if masks.ndim != 3:
-        raise ValueError("masks must be of shape (H, W) or (batch_size, H, W)")
-    if masks.dtype != torch.bool:
-        raise ValueError(f"The masks must be of dtype bool. Got {masks.dtype}")
-    if masks.shape[-2:] != image.shape[-2:]:
-        raise ValueError("The image and the masks must have the same height and width")
-
-    return image, masks
-
-
-def __generate_colors(colors, num_colors):
-    if colors is not None and num_colors > len(colors):
-        raise ValueError(f"There are more masks ({num_colors}) than colors ({len(colors)})")
-
-    if colors is None:
-        colors = _generate_color_palette(num_colors)
-
-    if not isinstance(colors, list):
-        colors = [colors]
-    if not isinstance(colors[0], (tuple, str)):
-        raise ValueError("colors must be a tuple or a string, or a list thereof")
-    if isinstance(colors[0], tuple) and len(colors[0]) != 3:
-        raise ValueError("It seems that you passed a tuple of colors instead of a list of colors")
-
-    out_dtype = torch.uint8
-
-    colors_ = []
-    for color in colors:
-        if isinstance(color, str):
-            color = ImageColor.getrgb(color)
-        color = torch.tensor(color, dtype=out_dtype)
-        colors_.append(color)
-
-    return colors_
-
-
-def draw_segmentation_masks(
-    image: torch.Tensor,
-    masks: torch.Tensor,
+def plot_segmentation_masks(images: np.ndarray,
+    masks: np.ndarray,
+    nrow:int,
+    ncol:int,
     alpha: float = 0.8,
-    colors: Optional[List[Union[str, Tuple[int, int, int]]]] = None,
-) -> torch.Tensor:
-
-    """
-    Draws segmentation masks on given RGB image.
-    The values of the input image should be uint8 between 0 and 255.
-
-    Args:
-        image (Tensor): Tensor of shape (3, H, W) and dtype uint8.
-        masks (Tensor): Tensor of shape (num_masks, H, W) or (H, W) and dtype bool.
-        alpha (float): Float number between 0 and 1 denoting the transparency of the masks.
-            0 means full transparency, 1 means no transparency.
-        colors (list or None): List containing the colors of the masks. The colors can
-            be represented as PIL strings e.g. "red" or "#FF00FF", or as RGB tuples e.g. ``(240, 10, 157)``.
-            When ``masks`` has a single entry of shape (H, W), you can pass a single color instead of a list
-            with one element. By default, random colors are generated for each mask.
-
-    Returns:
-        img (Tensor[C, H, W]): Image Tensor, with segmentation masks drawn on top.
-    """
-    out_dtype = torch.uint8
-    image, masks = __check_image_mask(image, masks)
-    colors_ = __generate_colors(colors, masks.size()[0])
-
-    img_to_draw = image.detach().clone()
-    # TODO: There might be a way to vectorize this
-    if masks.ndim == 3 and masks.shape[0] > 1:
-        masks = masks[1:, ...]  # skip 0-th channel for onehotted mask
-    for mask, color in zip(masks, colors_):
-        img_to_draw[:, mask] = color[:, None]
-
-    out = image * (1 - alpha) + img_to_draw * alpha
-    return out.to(out_dtype)
-
-
-def draw_segmentation_contour(
-    image: torch.Tensor,
-    masks: torch.Tensor,
-    alpha: float = 0.8,
-    radius: float = 0.2,
-    colors: Optional[List[Union[str, Tuple[int, int, int]]]] = None,
-):
-    """
-    Draws segmentation contour on given RGB image.
-    The values of the input image should be uint8 between 0 and 255.
-
-    Args:
-        image (Tensor): Tensor of shape (3, H, W) and dtype uint8.
-        masks (Tensor): Tensor of shape (num_masks, H, W) or (H, W) and dtype bool.
-        alpha (float): Float number between 0 and 1 denoting the transparency of the masks.
-            0 means full transparency, 1 means no transparency.
-        radius (int): Integer denoting radius of keypoint.
-        colors (list or None): List containing the colors of the masks. The colors can
-            be represented as PIL strings e.g. "red" or "#FF00FF", or as RGB tuples e.g. ``(240, 10, 157)``.
-            When ``masks`` has a single entry of shape (H, W), you can pass a single color instead of a list
-            with one element. By default, random colors are generated for each mask.
-
-    Returns:
-        img (Tensor[C, H, W]): Image Tensor, with segmentation masks drawn on top.
-    """
-    out_dtype = torch.uint8
-    image, masks = __check_image_mask(image, masks)
-    colors_ = __generate_colors(colors, masks.size()[0])
-
-    ndarr = image.permute(1, 2, 0).numpy()
-    img_to_draw = Image.fromarray(ndarr)
-    draw = ImageDraw.Draw(img_to_draw)
-    boundaries = get_bound_2d(masks)
-
-    for i, bound in enumerate(boundaries):
-        for inst_id, pt in enumerate(bound):
-            x1, x2 = pt[2] - radius, pt[2] + radius  # because permute
-            y1, y2 = pt[1] - radius, pt[1] + radius
-            draw.ellipse([x1, y1, x2, y2], fill=tuple(colors_[i]), outline=None, width=0)
-
-    return torch.from_numpy(np.array(img_to_draw)).permute(2, 0, 1).to(dtype=torch.uint8)
-
+    method = 'mask',
+    mask_class_num = 2,
+    fnames = None
+) :
+    # cm = 1/2.54
+    plt.close()
+    ratio = images.shape[-1]/images.shape[-2]
+    fig = plt.figure(figsize=(15 * ratio * ncol, 15 * nrow))
+    axes = fig.subplots(nrow, ncol)
+    color_num  = mask_class_num
+    if color_num >0:
+        colors = get_colors(color_num)
+        cmap = get_colormaps(color_num)
+    for i in range(nrow):
+        for j in range(ncol):
+            axes[i,j].axis('off')
+            if i* ncol+j < images.shape[0]:
+                title = str(Path(fnames[i* ncol+j]).stem)
+                axes[i,j].set_title(title, fontsize=8)
+                axes[i,j].imshow(images[i*ncol+j,...].squeeze(), cmap = 'gray', interpolation = 'bicubic')
+                if method == 'mask':
+                    axes[i,j].imshow(np.ma.masked_equal(masks[i*ncol+j,...].squeeze(), 0), cmap, alpha=alpha, norm=Normalize(vmin=1, vmax=color_num))
+                elif method == 'contour':
+                    list = [i for i in np.unique(masks[i*ncol+j,...].squeeze()).tolist() if i]
+                    if len(list) > 0:
+                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), levels=[x-0.01 for x in list], colors=colors[min(list)-1:max(list)])
+                    else:
+                        continue
+    plt.subplots_adjust(
+        left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.2
+    )
+    return fig
 
 class LogColorFormatter(logging.Formatter):
     """Logging colored formatter, adapted from https://stackoverflow.com/a/56944256/3638629"""

@@ -8,9 +8,10 @@ from pathlib import Path
 from functools import partial
 from types import SimpleNamespace as sn
 from sklearn.model_selection import train_test_split
+import warnings
+from termcolor import colored
 
 import torch
-from torchvision.utils import save_image
 
 from strix.utilities.arguments import data_select
 from strix.utilities.click import OptionEx, CommandEx
@@ -18,10 +19,7 @@ from strix.utilities.click import NumericChoice as Choice
 from strix.utilities.click_callbacks import get_unknown_options, dump_params, parse_project
 from strix.utilities.enum import FRAMEWORKS, Phases, SerialFileFormat
 from strix.utilities.utils import (
-    draw_segmentation_masks,
-    draw_segmentation_contour,
-    norm_tensor,
-    get_colors,
+    plot_segmentation_masks,
     setup_logger,
     get_items,
     trycatch,
@@ -29,7 +27,6 @@ from strix.utilities.utils import (
 )
 from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg
-from monai.networks.utils import one_hot
 from monai_ex.utils import first, check_dir
 from monai_ex.data import DataLoader
 
@@ -64,32 +61,28 @@ def save_fnames(data, img_meta_key, image_fpath):
 def save_2d_image_grid(
     images,
     nrow,
+    ncol,
     out_dir,
     phase,
     dataset_name,
     batch_index,
     axis=None,
     chn_idx=None,
-    overlap_method=draw_segmentation_masks,
+    overlap_method='mask',
     mask=None,
+    mask_class_num = 2,
+    fnames: list = None,
+    alpha: float = None
 ):
     if axis is not None and chn_idx is not None:
-        images = torch.index_select(images, dim=axis, index=torch.tensor(chn_idx))
-
+        images = np.take(images, chn_idx, axis)
         if mask is not None and mask.size(axis) > 1:
-            mask = torch.index_select(mask, dim=axis, index=torch.tensor(chn_idx))
-
+            mask = np.take(mask, chn_idx, axis)
     if mask is not None:
-        data_slice = norm_tensor(images, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
-        mask_slice = mask.to(torch.bool)
-        mask_num_classes = len(mask_slice.unique())
-
-        images = torch.cat(
-            [
-                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.size()[0], mask_num_classes))).unsqueeze(0)
-                for img, msk in zip(data_slice, mask_slice)
-            ]
-        ).float()
+        data_slice = images.detach().numpy()
+        mask_slice = mask.detach().numpy()
+        fig = plot_segmentation_masks(data_slice, mask_slice, nrow, ncol, 
+                alpha = alpha, method = overlap_method, mask_class_num = mask_class_num, fnames = fnames)
 
     output_fname = f"-chn{chn_idx}" if chn_idx is not None else ""
 
@@ -100,8 +93,7 @@ def save_2d_image_grid(
         isFile=True,
     )
 
-    save_image(images, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True)
-
+    fig.savefig(output_path, bbox_inches="tight", pad_inches=0)
     return output_path
 
 
@@ -109,30 +101,27 @@ def save_3d_image_grid(
     images,
     axis,
     nrow,
+    ncol,
     out_dir,
     phase,
     dataset_name,
     batch_index,
     slice_index,
     multichannel=False,
-    overlap_method=draw_segmentation_masks,
+    overlap_method='mask',
     mask=None,
+    mask_class_num = 2,
+    fnames: list = None,
+    alpha: float = None
 ):
-    data_slice = torch.index_select(images, dim=axis, index=torch.tensor(slice_index)).squeeze(axis)
-
+    images = np.take(images, slice_index, axis)
     if mask is not None:
-        mask_slice = torch.index_select(mask, dim=axis, index=torch.tensor(slice_index)).squeeze(axis)
-
-        data_slice = norm_tensor(data_slice, None).mul(255).add_(0.5).clamp_(0, 255).to(torch.uint8)
-        mask_slice = mask_slice.to(torch.bool)
-        mask_num_classes = len(mask_slice.unique())
-
-        data_slice = torch.cat(
-            [
-                overlap_method(img, msk, 0.6, colors=get_colors(max(msk.shape[0], mask_num_classes))).unsqueeze(0)
-                for img, msk in zip(data_slice, mask_slice)
-            ]
-        ).float()
+        mask = np.take(mask, slice_index, axis)
+    if mask is not None:
+        data_slice = images.detach().numpy()
+        mask_slice = mask.detach().numpy()
+        fig = plot_segmentation_masks(data_slice, mask_slice, nrow, ncol, 
+            alpha = alpha, method = overlap_method, mask_class_num=mask_class_num, fnames = fnames)
 
     if multichannel:
         output_fname = f"channel{slice_index}.png"
@@ -140,8 +129,7 @@ def save_3d_image_grid(
         output_fname = f"slice{slice_index}.png"
 
     output_path = check_dir(out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True)
-    save_image(data_slice, output_path, nrow=nrow, padding=5, normalize=True, scale_each=True)
-
+    fig.savefig(output_path, bbox_inches="tight", pad_inches=0)
     return output_path
 
 
@@ -160,6 +148,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), '.strix_check_c
 @option(
     "--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type"
 )
+@option("--alpha", type=float, default=0.7, help="The opacity of mask")
 @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
 @option("--data-list", type=str, callback=data_select, default=None, help="Data file list")  # todo: Rename
 @option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
@@ -224,11 +213,22 @@ def check_data(ctx, **args):
         logger.warn(f"{msk_key} is not found in datalist.")
 
     if cargs.mask_overlap:
-        overlap_m = draw_segmentation_masks
+        overlap_m = 'mask'
     elif cargs.contour_overlap:
-        overlap_m = draw_segmentation_contour
-    else:
-        overlap_m = draw_segmentation_masks
+        overlap_m = 'contour'
+
+    def _check_mask(masks, fnames):
+        mask_class_num = len(masks.unique()) - 1
+        msk = masks if mask_class_num > 0 else None
+        for i in range(masks.shape[0]):
+            n_class = len(msk[i,...].unique()) - 1
+            if  n_class == mask_class_num:
+                continue
+            elif n_class > 0:
+                warnings.warn(colored(f"Other cases had {mask_class_num} kinds of labels, but {fnames[i]} got {n_class}, please check your data", "yellow"))
+            else:
+                warnings.warn(colored(f"Case {fnames[i]} has no label (only background), please check your data", "yellow"))
+        return mask_class_num, msk
 
     if len(shape) == 2 and channel == 1:
         for phase, dataloader in {
@@ -237,24 +237,30 @@ def check_data(ctx, **args):
         }.items():
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
-                if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique())
-                    if mask_class_num > 2:
-                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                if exist_mask and overlap: 
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
-
+                    mask_class_num = 0
+                    msk=None
+                row = int(np.ceil(np.sqrt(bs)))
+                column = row
+                if (row -1) * column >= bs:
+                    row -= 1
                 output_fpath = save_2d_image_grid(
                     data[img_key],
-                    int(np.ceil(np.sqrt(bs))),
+                    row,
+                    column,
                     cargs.out_dir,
                     phase,
                     cargs.data_list,
                     i,
                     overlap_method=overlap_m,
                     mask=msk,
+                    mask_class_num = mask_class_num,
+                    fnames = fnames,
+                    alpha = cargs.alpha
                 )
-
                 if cargs.save_raw:                  
                     save_raw_image(
                         data[img_key],
@@ -277,12 +283,16 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique())
-                    if mask_class_num > 2:
-                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
+                    mask_class_num = 0
+                    msk=None
 
+                row = int(np.ceil(np.sqrt(bs)))
+                column = row
+                if (row -1) * column >= bs:
+                    row -= 1
                 if cargs.save_raw:
                     save_raw_image(
                         data[img_key],
@@ -297,15 +307,19 @@ def check_data(ctx, **args):
                 for ch_idx in range(channel):
                     output_fpath = save_2d_image_grid(
                         data[img_key],
-                        int(np.ceil(np.sqrt(bs))),
+                        row,
+                        column,
                         cargs.out_dir,
                         phase,
                         cargs.data_list,
                         i,
-                        z_axis,
-                        ch_idx,
+                        axis = z_axis,
+                        chn_idx =ch_idx,
                         overlap_method=overlap_m,
                         mask=msk,
+                        mask_class_num=mask_class_num,
+                        fnames = fnames,
+                        alpha = cargs.alpha
                     )
 
                 save_fnames(data, img_key + "_meta_dict", output_fpath)
@@ -319,17 +333,22 @@ def check_data(ctx, **args):
             for i, data in enumerate(tqdm(dataloader)):
                 bs = dataloader.batch_size
                 if exist_mask and overlap:
-                    mask_class_num = len(data[msk_key].unique())
-                    if mask_class_num > 2:
-                        msk = one_hot(data[msk_key], mask_class_num, dim=1).type(torch.bool)
+                    fnames = data[str(img_key) + '_meta_dict']["filename_or_obj"]
+                    mask_class_num, msk = _check_mask(data[msk_key],fnames)
                 else:
-                    msk = None
+                    mask_class_num = 0
+                    msk=None
 
+                row = int(np.ceil(np.sqrt(bs)))
+                column = row
+                if (row -1) * column >= bs:
+                    row -= 1
                 for slice_idx in range(shape[z_axis]):
                     output_fpath = save_3d_image_grid(
                         data[img_key],
                         z_axis + 2,
-                        int(np.ceil(np.sqrt(bs))),
+                        row,
+                        column,
                         cargs.out_dir,
                         phase,
                         cargs.data_list,
@@ -338,6 +357,9 @@ def check_data(ctx, **args):
                         multichannel=False,
                         overlap_method=overlap_m,
                         mask=msk,
+                        mask_class_num=mask_class_num,
+                        fnames = fnames,
+                        alpha = cargs.alpha
                     )
                 
                 if cargs.save_raw:
