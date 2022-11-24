@@ -1,7 +1,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 
 import matplotlib
 import nibabel as nib
@@ -196,6 +196,7 @@ def check_dataloader(
     alpha: float = 0.7,
     save_raw: bool = False,
     logger: logging.Logger = logging.getLogger("data-check"),
+    progress_bar: Optional[Callable] = None
 ) -> None:
     logger_name = logger.name
     first_batch = first(dataloader)
@@ -260,6 +261,8 @@ def check_dataloader(
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
                 )
+            if progress_bar:
+                progress_bar(i/len(dataloader))
 
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
@@ -299,6 +302,8 @@ def check_dataloader(
                     mask_class_num=mask_class_num,
                     alpha=alpha,
                 )
+            if progress_bar:
+                progress_bar(i/len(dataloader))
 
     elif len(shape) == 3 and channel == 1:
         z_axis = np.argmin(shape)
@@ -339,6 +344,8 @@ def check_dataloader(
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
                 )
+            if progress_bar:
+                progress_bar(i/len(dataloader))
 
     else:
         raise NotImplementedError(f"Not implement data-checking for shape of {shape}, channel of {channel}")
