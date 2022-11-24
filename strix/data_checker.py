@@ -18,6 +18,7 @@ from strix.utilities.utils import (
     trycatch,
     generate_synthetic_datalist,
 )
+
 from strix.utilities.check_data_utils import check_dataloader
 from strix.utilities.registry import DatasetRegistry
 from strix.configures import config as cfg
@@ -42,6 +43,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), ".strix_check_c
 @option("--tensor-dim", prompt=True, type=Choice(["2D", "3D"]), default="2D", help="2D or 3D")
 @option("--framework", prompt=True, type=Choice(FRAMEWORKS), default="segmentation", help="Choose your framework type")
 @option("--alpha", type=float, default=0.7, help="The opacity of mask")
+@option("--line-width", type=float, default=0.1, help="The width of contour line")
 @option("--project", type=click.Path(), callback=parse_project, default=Path.cwd(), help="Project folder path")
 @option("--data-list", type=str, callback=data_select, default=None, help="Data file list")  # todo: Rename
 @option("--n-batch", prompt=True, type=int, default=9, help="Batch size")
@@ -113,6 +115,7 @@ def check_data(ctx, **args):
         dataset_name=cargs.data_list,
         overlap_method=overlap_m,
         alpha=cargs.alpha,
+        line_width = cargs.line_width,
         save_raw=cargs.save_raw,
         logger=logger,
     )
@@ -125,6 +128,7 @@ def check_data(ctx, **args):
         dataset_name=cargs.data_list,
         overlap_method=overlap_m,
         alpha=cargs.alpha,
+        line_width = cargs.line_width,
         save_raw=cargs.save_raw,
         logger=logger,
     )

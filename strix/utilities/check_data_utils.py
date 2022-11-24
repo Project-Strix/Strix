@@ -57,6 +57,7 @@ def save_2d_image_grid(
     mask: Optional[torch.Tensor] = None,
     mask_class_num: int = 2,
     alpha: float = 0.7,
+    line_width: float = 0.1,
 ):
     if axis is not None and chn_idx is not None:
         index = torch.tensor(chn_idx).to(images.device)
@@ -70,6 +71,7 @@ def save_2d_image_grid(
         nrow,
         ncol,
         alpha=alpha,
+        line_width=line_width,
         method=overlap_method,
         mask_class_num=mask_class_num,
         fnames=fnames,
@@ -105,6 +107,7 @@ def save_3d_image_grid(
     mask=None,
     mask_class_num=2,
     alpha: float = 0.7,
+    line_width: float = 0.1, 
 ):
     # images = np.take(images, slice_index, axis)
     index = torch.tensor(slice_index).to(images.device)
@@ -120,6 +123,7 @@ def save_3d_image_grid(
         nrow,
         ncol,
         alpha=alpha,
+        line_width=line_width,
         method=overlap_method,
         mask_class_num=mask_class_num,
         fnames=fnames,
@@ -136,7 +140,8 @@ def plot_segmentation_masks(
     masks: Optional[np.ndarray],
     nrow: int,
     ncol: int,
-    alpha: float = 0.8,
+    alpha: float = 0.7,
+    line_width: float = 0.1,
     method: Optional[str] = "mask",
     mask_class_num: int = 2,
     fnames: Optional[List] = None,
@@ -178,6 +183,7 @@ def plot_segmentation_masks(
                             masks[i * ncol + j, ...].squeeze(),
                             levels=[x - 0.01 for x in list],
                             colors=colors[min(list) - 1 : max(list)],
+                            linewidths = line_width
                         )
                     else:
                         continue
@@ -194,6 +200,7 @@ def check_dataloader(
     dataset_name: str,
     overlap_method: Optional[str] = None,
     alpha: float = 0.7,
+    line_width: float = 0.1,
     save_raw: bool = False,
     logger: logging.Logger = logging.getLogger("data-check"),
 ) -> None:
@@ -255,6 +262,7 @@ def check_dataloader(
                 mask=msk,
                 mask_class_num=mask_class_num,
                 alpha=alpha,
+                line_width=line_width
             )
             if save_raw:
                 save_raw_image(
@@ -298,6 +306,7 @@ def check_dataloader(
                     mask=msk,
                     mask_class_num=mask_class_num,
                     alpha=alpha,
+                    line_width=line_width
                 )
 
     elif len(shape) == 3 and channel == 1:
@@ -333,6 +342,7 @@ def check_dataloader(
                     mask=msk,
                     mask_class_num=mask_class_num,
                     alpha=alpha,
+                    line_width=line_width
                 )
 
             if save_raw:
