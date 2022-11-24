@@ -37,12 +37,20 @@ def synthetic_dataset(filelist, phase, opts):
         loader = GenerateSyntheticDataD(
             keys=["image", "label"],
             width=64, height=64,
+            num_objs = 3,
+            rad_max = 10,
+            rad_min = 5,
+            noise_max = 0.0,
             num_seg_classes=seg_cls
         )
     elif dim == "3D":
         loader = GenerateSyntheticDataD(
             keys=["image", "label"],
             width=64, height=64, depth=64,
+            num_objs = 3,
+            rad_max = 10,
+            rad_min = 5,
+            noise_max = 0.0,
             num_seg_classes=seg_cls,
         )
 
