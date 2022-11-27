@@ -13,12 +13,10 @@ from termcolor import colored
 from tqdm import tqdm
 
 from strix.configures import config as cfg
-from strix.utilities.enum import FRAMEWORKS, Phases
-from strix.utilities.utils import setup_logger, get_colors, get_colormaps
+from strix.utilities.enum import Phases
+from strix.utilities.utils import setup_logger, get_colors, get_colormaps, get_unique_filename
 
 matplotlib.use("Agg")
-import matplotlib.cm as mpl_color_map
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
@@ -46,7 +44,7 @@ def save_2d_image_grid(
     images: torch.Tensor,
     nrow: int,
     ncol: int,
-    out_dir: Union[Path, str],
+    out_dir: Optional[Union[Path, str]],
     phase: str,
     dataset_name: str,
     batch_index: int,
@@ -66,7 +64,7 @@ def save_2d_image_grid(
 
     fig = plot_segmentation_masks(
         images.detach().cpu().numpy(),
-        mask.detach().cpu().numpy() if mask else None,
+        mask.detach().cpu().numpy() if mask is not None else None,
         nrow,
         ncol,
         alpha=alpha,
@@ -75,28 +73,28 @@ def save_2d_image_grid(
         fnames=fnames,
     )
 
+    if out_dir:
+        output_fname = f"-chn{chn_idx}" if chn_idx is not None else ""
+        output_path = check_dir(
+            out_dir,
+            dataset_name,
+            f"{phase}-batch{batch_index}{output_fname}.png",
+            isFile=True,
+        )
 
-    output_fname = f"-chn{chn_idx}" if chn_idx is not None else ""
+        fig.savefig(str(output_path), bbox_inches="tight", pad_inches=0)
 
-    output_path = check_dir(
-        out_dir,
-        dataset_name,
-        f"{phase}-batch{batch_index}{output_fname}.png",
-        isFile=True,
-    )
-
-    fig.savefig(str(output_path), bbox_inches="tight", pad_inches=0)
-    return output_path
+    return fig
 
 
 def save_3d_image_grid(
     images,
-    axis,
-    nrow,
-    ncol,
-    out_dir,
-    phase,
-    dataset_name,
+    axis: int,
+    nrow: int,
+    ncol: int,
+    out_dir: Optional[Union[Path, str]],
+    phase: str,
+    dataset_name: str,
     batch_index: int,
     slice_index: int,
     fnames: List,
@@ -125,10 +123,12 @@ def save_3d_image_grid(
         fnames=fnames,
     )
 
-    output_fname = f"channel{slice_index}.png" if multichannel else f"slice{slice_index}.png"
-    output_path = check_dir(out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True)
-    fig.savefig(str(output_path), bbox_inches="tight", pad_inches=0)
-    return output_path
+    if out_dir:
+        output_fname = f"channel{slice_index}.png" if multichannel else f"slice{slice_index}.png"
+        output_path = check_dir(out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True)
+        fig.savefig(str(output_path), bbox_inches="tight", pad_inches=0)
+
+    return fig
 
 
 def plot_segmentation_masks(
@@ -157,8 +157,7 @@ def plot_segmentation_masks(
             axes[i, j].axis("off")
             if i * ncol + j < images.shape[0]:
                 if fnames:
-                    title = str(Path(fnames[i * ncol + j]).stem)
-                    axes[i, j].set_title(title, fontsize=8)
+                    axes[i, j].set_title(fnames[i * ncol + j], fontsize=8)
 
                 # draw images
                 axes[i, j].imshow(images[i * ncol + j, ...].squeeze(), cmap="gray", interpolation="bicubic")
@@ -178,7 +177,7 @@ def plot_segmentation_masks(
                             masks[i * ncol + j, ...].squeeze(),
                             levels=[x - 0.01 for x in list],
                             colors=colors[min(list) - 1 : max(list)],
-                        )
+                        )  #! TypeError: slice indices must be integers or None or have an __index__ method
                     else:
                         continue
 
@@ -190,14 +189,14 @@ def check_dataloader(
     phase: Phases,
     dataloader: DataLoader,
     mask_key: str,
-    out_dir: Union[Path, str],
+    out_dir: Optional[Union[Path, str]],
     dataset_name: str,
     overlap_method: Optional[str] = None,
     alpha: float = 0.7,
     save_raw: bool = False,
     logger: logging.Logger = logging.getLogger("data-check"),
     progress_bar: Optional[Callable] = None
-) -> None:
+):
     logger_name = logger.name
     first_batch = first(dataloader)
     img_key = cfg.get_key("IMAGE")
@@ -206,6 +205,7 @@ def check_dataloader(
     exist_mask = first_batch.get(msk_key) is not None
     channel, shape = data_shape[0], data_shape[1:]
     logger.info(f"Data Channel: {channel}, Shape: {shape}")
+    figures = []
 
     if overlap_method and not exist_mask:
         logger.warn(f"{msk_key} is not found in datalist.")
@@ -233,7 +233,7 @@ def check_dataloader(
     if len(shape) == 2 and channel == 1:
         for i, data in enumerate(tqdm(dataloader)):
             bs = dataloader.batch_size
-            fnames = data[str(img_key) + "_meta_dict"]["filename_or_obj"]
+            fnames = get_unique_filename(data[str(img_key) + "_meta_dict"]["filename_or_obj"])
             if exist_mask and overlap_method:
                 mask_class_num, msk = _check_mask(data[msk_key], fnames)
             else:
@@ -243,7 +243,8 @@ def check_dataloader(
             column = row
             if (row - 1) * column >= bs:
                 row -= 1
-            save_2d_image_grid(
+            
+            figs = save_2d_image_grid(
                 data[img_key],
                 row,
                 column,
@@ -257,19 +258,23 @@ def check_dataloader(
                 mask_class_num=mask_class_num,
                 alpha=alpha,
             )
+            figures.append(figs)
+
             if save_raw:
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
                 )
             if progress_bar:
-                progress_bar(i/len(dataloader))
+                progress_bar((i + 1) / len(dataloader))
+
+        return figures
 
     elif len(shape) == 2 and channel > 1:
         z_axis = 1
 
         for i, data in enumerate(tqdm(dataloader)):
             bs = dataloader.batch_size or 1  # prevent None
-            fnames = data[str(img_key) + "_meta_dict"]["filename_or_obj"]
+            fnames = get_unique_filename(data[str(img_key) + "_meta_dict"]["filename_or_obj"])
             if exist_mask and overlap_method:
                 mask_class_num, msk = _check_mask(data[msk_key], fnames)
             else:
@@ -285,8 +290,9 @@ def check_dataloader(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
                 )
 
+            channel_figures = {ch_idx : [] for ch_idx in range(channel)}
             for ch_idx in range(channel):
-                save_2d_image_grid(
+                figs = save_2d_image_grid(
                     data[img_key],
                     row,
                     column,
@@ -302,15 +308,28 @@ def check_dataloader(
                     mask_class_num=mask_class_num,
                     alpha=alpha,
                 )
+                channel_figures[ch_idx].append(figs)
+
+            # fill the figures with [{0: fig1, 1: fig2, 2: fig3}, {0: fig1, 1: fig2, 2: fig3}, ...]
+            for _, ch_idx in enumerate(channel_figures):
+                if _ == 0:
+                    for item in channel_figures[ch_idx]:
+                        figures.append({ch_idx: item})
+                else:
+                    for i, item in enumerate(channel_figures[ch_idx]):
+                        figures[i].update({ch_idx: item})
+
             if progress_bar:
-                progress_bar(i/len(dataloader))
+                progress_bar((i + 1) / len(dataloader))
+
+        return figures
 
     elif len(shape) == 3 and channel == 1:
-        z_axis = np.argmin(shape)
+        z_axis = int(np.argmin(shape))
 
         for i, data in enumerate(tqdm(dataloader)):
             bs = dataloader.batch_size or 1
-            fnames = data[str(img_key) + "_meta_dict"]["filename_or_obj"]
+            fnames = get_unique_filename(data[str(img_key) + "_meta_dict"]["filename_or_obj"])
             if exist_mask and overlap_method:
                 mask_class_num, msk = _check_mask(data[msk_key], fnames)
             else:
@@ -321,8 +340,10 @@ def check_dataloader(
             column = row
             if (row - 1) * column >= bs:
                 row -= 1
-            for slice_idx in range(shape[z_axis]):
-                save_3d_image_grid(
+
+            fig_volume = []
+            for slice_idx in range(data[img_key].shape[z_axis + 2]):
+                figs = save_3d_image_grid(
                     data[img_key],
                     z_axis + 2,
                     row,
@@ -339,13 +360,16 @@ def check_dataloader(
                     mask_class_num=mask_class_num,
                     alpha=alpha,
                 )
+                fig_volume.append(figs)
+            figures.append(fig_volume)
 
             if save_raw:
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
                 )
             if progress_bar:
-                progress_bar(i/len(dataloader))
+                progress_bar((i + 1) / len(dataloader))
 
+        return figures
     else:
         raise NotImplementedError(f"Not implement data-checking for shape of {shape}, channel of {channel}")
