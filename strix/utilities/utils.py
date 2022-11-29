@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Optional, TextIO, Union, List
+from typing import Any, Callable, Optional, TextIO, Union, List, Sequence, Tuple
 import matplotlib
 import pylab
 import torch
@@ -360,6 +360,32 @@ def output_filename_check(torch_dataset, meta_key="image_meta_dict"):
         if prev_item.stem != next_item.stem:
             return prev_item.parent
 
+    return ""
+
+
+# todo: check through all data
+def get_unique_filename(file_paths: List, index: int = 0):
+    if len(file_paths) == 1:
+        fpath = file_paths[0]
+        if isinstance(fpath, list):
+            fpath = fpath[0]
+        return Path(fpath).stem
+
+    if isinstance(prev_fpath := file_paths[0], list):
+        prev_fpath = prev_fpath[0]
+    if isinstance(next_fpath := file_paths[1], list):
+        next_fpath = next_fpath[0]
+
+    root_dir = None
+    prev_parents = list(Path(prev_fpath).parents)[::-1]
+    next_parents = list(Path(next_fpath).parents)[::-1]
+    for (prev_item, next_item) in zip(prev_parents, next_parents):
+        if prev_item.stem != next_item.stem:
+            root_dir = prev_item.parent
+            break
+    
+    if root_dir:
+        return [str(Path(file_path).relative_to(root_dir).parts[index]) for file_path in file_paths]
     return ""
 
 
