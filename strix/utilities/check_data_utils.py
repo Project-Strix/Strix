@@ -13,7 +13,7 @@ from monai_ex.data import DataLoader
 from monai_ex.utils import check_dir, first
 from termcolor import colored
 from tqdm import tqdm
-
+from skimage import exposure, img_as_float
 from strix.configures import config as cfg
 from strix.utilities.enum import Phases
 from strix.utilities.utils import setup_logger, get_colors, get_colormaps, get_unique_filename
@@ -135,6 +135,35 @@ def save_3d_image_grid(
     return fig
 
 
+def save_histogram_grid(
+    images: np.ndarray,
+    nrow: int,
+    ncol: int,
+    out_dir: Optional[Union[Path, str]],
+    phase: str,
+    dataset_name: str,
+    batch_index: int,
+    slice_index: int = None,
+    multichannel: bool = False,
+    fnames: Optional[List] = None,
+):
+    images = images.detach().cpu().numpy()
+
+    fig = plot_histogram(
+        images,
+        nrow,
+        ncol,
+        fnames=fnames,
+    )
+
+    if out_dir:
+        output_fname = f'channel_{slice_index}_histograms.png' if multichannel else 'histograms.png'
+        output_path = check_dir(out_dir, dataset_name, f"{phase}-batch{batch_index}", output_fname, isFile=True)
+        fig.savefig(str(output_path), bbox_inches="tight", pad_inches=0)
+
+    return fig
+
+
 def plot_segmentation_masks(
     images: np.ndarray,
     masks: Optional[np.ndarray],
@@ -149,36 +178,39 @@ def plot_segmentation_masks(
     # cm = 1/2.54
     plt.close()
     ratio = images.shape[-1] / images.shape[-2]
-    fig = plt.figure(figsize=(15 * ratio * ncol, 15 * nrow))
+    fig = plt.figure(figsize=(10 * ratio * ncol, 10 * nrow), dpi=300)
     axes = fig.subplots(nrow, ncol)
     color_num = mask_class_num
 
     if color_num > 0:
         colors = get_colors(color_num)
         cmap = get_colormaps(color_num)
+    else:
+        cmap, colors = None, None
 
     for i in range(nrow):
         for j in range(ncol):
-            axes[i, j].axis("off")
+            ax = axes[i, j] if nrow > 1 else axes[j]
+            ax.axis("off")
             if i * ncol + j < images.shape[0]:
                 if fnames:
-                    axes[i, j].set_title(fnames[i * ncol + j], fontsize=8)
+                    ax.set_title(fnames[i * ncol + j], fontsize=8)
 
                 # draw images
-                axes[i, j].imshow(images[i * ncol + j, ...].squeeze(), cmap="gray", interpolation="bicubic")
+                ax.imshow(images[i * ncol + j, ...].squeeze(), cmap="gray", interpolation="bicubic")
 
                 # draw masks if exists
-                if method == "mask" and masks is not None:
-                    axes[i, j].imshow(
+                if method == "mask" and masks is not None and cmap is not None:
+                    ax.imshow(
                         np.ma.masked_equal(masks[i * ncol + j, ...].squeeze(), 0),
                         cmap,  # ! unbound!
                         alpha=alpha,
                         norm=Normalize(vmin=1, vmax=color_num),
                     )
-                elif method == "contour" and masks is not None:
+                elif method == "contour" and masks is not None and colors is not None:
                     list = [i for i in np.unique(masks[i * ncol + j, ...].squeeze()).tolist() if i]
                     if len(list) > 0:
-                        axes[i, j].contour(
+                        ax.contour(
                             masks[i * ncol + j, ...].squeeze(),
                             levels=[x - 0.01 for x in list],
                             colors=colors[min(list) - 1: max(list)],
@@ -188,6 +220,48 @@ def plot_segmentation_masks(
                         continue
 
     plt.subplots_adjust(left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.2)
+    return fig
+
+
+def plot_histogram(
+    images: np.ndarray,
+    nrow: int,
+    ncol: int,
+    fnames: Optional[List] = None,
+):
+    plt.close()
+    plt.style.use('seaborn-white')
+    ratio = images.shape[-2] / images.shape[-3]
+    fig = plt.figure(figsize=(10 * ratio * ncol, 10 * nrow))
+    axes = fig.subplots(nrow, ncol, sharey=True)
+    images = img_as_float(images)
+
+    for i in range(nrow):
+        for j in range(ncol):
+            if i * ncol + j < images.shape[0]:
+                img = images[i * ncol + j, ...]
+                ax_hist = axes[i, j] if nrow > 1 else axes[j]
+                ax_cdf = ax_hist.twinx()
+                if fnames:
+                    ax_hist.set_title(fnames[i * ncol + j], fontsize=8)
+
+                # Display histogram
+                ax_hist.hist(img.ravel(), bins=256, color='tab:blue')
+                ax_hist.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+                x_min, x_max = ax_hist.get_xlim()
+                ax_hist.set_xlabel('Pixel intensity')
+                ax_hist.set_xticks(np.linspace(x_min, x_max, 5))
+                y_min, y_max = ax_hist.get_ylim()
+                ax_hist.set_ylabel('Number of pixels')
+                ax_hist.set_yticks(np.linspace(y_min, y_max, 5))
+
+                # Display cumulative distribution
+                img_cdf, bins = exposure.cumulative_distribution(img, 256)
+                ax_cdf.plot(bins, img_cdf, 'tab:red')
+                ax_cdf.set_yticks([])
+
+    plt.tight_layout()
+
     return fig
 
 
@@ -201,6 +275,7 @@ def check_dataloader(
     alpha: float = 0.7,
     line_width: float = 0.1,
     save_raw: bool = False,
+    check_hist: bool = False,
     logger: logging.Logger = logging.getLogger("data-check"),
     progress_bar: Optional[Callable] = None
 ):
@@ -268,6 +343,19 @@ def check_dataloader(
             )
             figures.append(figs)
 
+            if check_hist:
+                hist = save_histogram_grid(
+                    data[img_key],
+                    row,
+                    column,
+                    out_dir,
+                    phase.value,
+                    dataset_name,
+                    i,
+                    fnames=fnames,
+                )
+                figures.append(hist)
+
             if save_raw:
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
@@ -318,6 +406,19 @@ def check_dataloader(
                     line_width=line_width
                 )
                 channel_figures[ch_idx].append(figs)
+
+            if check_hist:
+                hist = save_histogram_grid(
+                    data[img_key],
+                    row,
+                    column,
+                    out_dir,
+                    phase.value,
+                    dataset_name,
+                    i,
+                    fnames=fnames,
+                )
+                figures.append(hist)
 
             # fill the figures with [{0: fig1, 1: fig2, 2: fig3}, {0: fig1, 1: fig2, 2: fig3}, ...]
             for _, ch_idx in enumerate(channel_figures):
@@ -373,6 +474,19 @@ def check_dataloader(
                 fig_volume.append(figs)
             figures.append(fig_volume)
 
+            if check_hist:
+                hist = save_histogram_grid(
+                    data[img_key],
+                    row,
+                    column,
+                    out_dir,
+                    phase.value,
+                    dataset_name,
+                    batch_index=i,
+                    fnames=fnames,
+                )
+                figures.append(hist)
+
             if save_raw:
                 save_raw_image(
                     data[img_key], data[f"{img_key}_meta_dict"], out_dir, phase.value, dataset_name, i, logger_name
@@ -381,5 +495,6 @@ def check_dataloader(
                 progress_bar((i + 1) / len(dataloader))
 
         return figures
+
     else:
         raise NotImplementedError(f"Not implement data-checking for shape of {shape}, channel of {channel}")

@@ -54,6 +54,7 @@ check_cmd_history = os.path.join(cfg.get_strix_cfg("cache_dir"), ".strix_check_c
 @option("--mask-key", type=str, default="mask", help="Specify mask key, default is 'mask'")
 @option("--seed", type=int, default=101, help="random seed")
 @option("--out-dir", type=str, prompt=True, default=cfg.get_strix_cfg("OUTPUT_DIR"))
+@option("--check-histogram", is_flag=True, help="Plotting histograms of data")
 @option(
     "--dump-params",
     hidden=True,
@@ -115,8 +116,9 @@ def check_data(ctx, **args):
         dataset_name=cargs.data_list,
         overlap_method=overlap_m,
         alpha=cargs.alpha,
-        line_width = cargs.line_width,
+        line_width=cargs.line_width,
         save_raw=cargs.save_raw,
+        check_hist=cargs.check_histogram,
         logger=logger,
     )
 
@@ -128,7 +130,8 @@ def check_data(ctx, **args):
         dataset_name=cargs.data_list,
         overlap_method=overlap_m,
         alpha=cargs.alpha,
-        line_width = cargs.line_width,
+        line_width=cargs.line_width,
         save_raw=cargs.save_raw,
+        check_hist=cargs.check_histogram,
         logger=logger,
     )

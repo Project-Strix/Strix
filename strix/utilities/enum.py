@@ -142,6 +142,7 @@ class Freezers(Enum):
     FULL = "full"
     SUBTASK = "subtask"
 
+
 FREEZERS = get_enums(Freezers)
 
 
