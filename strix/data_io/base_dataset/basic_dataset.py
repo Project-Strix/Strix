@@ -23,7 +23,7 @@ class StrixDataset(object):
         to_tensor: Union[Sequence[MapTransform], MapTransform],
         is_supervised: bool,
         dataset_type: Dataset,
-        dataset_kwargs: dict,
+        dataset_kwargs: Optional[dict] = None,
         additional_transforms: Optional[Sequence[MapTransform]] = None,
         check_data: bool = True,
         profiling: bool = False,
@@ -72,4 +72,8 @@ class StrixDataset(object):
         else:
             self.transforms = None
 
-        return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
+        if self.dataset_kwargs:
+            return self.dataset(self.input_data, transform=self.transforms, **self.dataset_kwargs)
+        else:
+            print(self.dataset, type(self.dataset))
+            return self.dataset(self.input_data, transform=self.transforms)
