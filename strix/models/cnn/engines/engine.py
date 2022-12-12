@@ -192,7 +192,9 @@ class StrixTestEngine(ABC):
         model_paths, load_dicts = ensure_list(model_path), ensure_list(load_dict)
         for load_path, load_dict in zip(model_paths, load_dicts):
             if os.path.exists(load_path):
-                handlers += [CheckpointLoader(load_path=load_path, load_dict=load_dict)]
+                handlers += [CheckpointLoader(load_path=load_path, load_dict=load_dict, name=logger_name)]
+            else:
+                raise FileNotFoundError(f"Model not found! {load_path}")
 
         if stats_dicts is not None:
             for key, output_transform_fn in stats_dicts.items():
