@@ -2,10 +2,15 @@ import os
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from typing import Callable, Dict, Optional, Sequence, Union
+from pathlib import Path
 
 import torch
+from torch.nn import Module
+from torch.utils.tensorboard.writer import SummaryWriter
+from torch.optim.optimizer import Optimizer
 
 from strix.configures import config as cfg
+from strix.utilities.enum import Phases
 from strix.utilities.utils import output_filename_check
 from monai_ex.handlers import (
     CheckpointLoader,
@@ -46,11 +51,11 @@ class StrixTrainEngine(ABC):
 
     @staticmethod
     def get_basic_handlers(
-        phase,
-        model_dir,
-        net,
-        optimizer,
-        tb_summary_writer,
+        phase: Phases,
+        model_dir: Path,
+        net: Module,
+        optimizer: Union[Optimizer, Sequence[Optimizer]],
+        tb_summary_writer: SummaryWriter,
         logger_name: Optional[str] = None,
         stats_dicts: Optional[Dict] = None,
         save_checkpoint: bool = False,
@@ -60,7 +65,7 @@ class StrixTrainEngine(ABC):
         model_file_prefix: str = "",
         bestmodel_n_saved: int = 1,
         tensorboard_image_kwargs: Optional[Union[Dict, Sequence[Dict]]] = None,
-        tensorboard_image_names: Optional[Union[Dict, Sequence[Dict]]] = "",
+        tensorboard_image_names: Union[str, Sequence[str]] = "",
         dump_tensorboard: bool = False,
         graph_batch_transform: Optional[Callable] = None,
         record_nni: bool = False,
@@ -87,7 +92,7 @@ class StrixTrainEngine(ABC):
         if save_checkpoint:
             handlers += [
                 CheckpointSaverEx(
-                    save_dir=model_dir / "Checkpoint",
+                    save_dir=str(model_dir / "Checkpoint"),
                     save_dict={"net": net, "optim": optimizer},
                     save_interval=checkpoint_save_interval,
                     epoch_level=True,
@@ -97,7 +102,7 @@ class StrixTrainEngine(ABC):
         if save_bestmodel:
             handlers += [
                 CheckpointSaverEx(
-                    save_dir=model_dir / "Best_Models",
+                    save_dir=str(model_dir / "Best_Models"),
                     save_dict={"net": net},
                     file_prefix=model_file_prefix,
                     save_key_metric=True,
@@ -117,7 +122,7 @@ class StrixTrainEngine(ABC):
             handlers += [
                 TensorBoardImageHandlerEx(
                     summary_writer=tb_summary_writer,
-                    prefix_name=name + "-" + phase,
+                    prefix_name=name + "-" + phase.value,
                     logger_name=logger_name,
                     **kwargs,
                 )
@@ -145,6 +150,7 @@ class StrixTrainEngine(ABC):
             ]
 
         if record_nni:
+            raise NotImplementedError()
             handlers += [NNIReporterHandler(**nni_kwargs)]
 
         if freeze_mode:

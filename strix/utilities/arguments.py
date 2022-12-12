@@ -122,7 +122,7 @@ def solver_params(func):
     @option("--momentum", type=float, default=0.0, help="Momentum for optimizer")
     @option("--nesterov", type=bool, default=False, help="Nesterov for SGD")
     @option("-WD", "--l2-weight-decay", type=float, default=0, help="weight decay (L2 penalty)")
-    @option("--lr", type=float, default=1e-3, help="learning rate")
+    @option("--lr", type=float, default=1e-2, help="learning rate")
     @option(
         "--lr-policy", prompt=True, type=Choice(LR_SCHEDULES),
         callback=lr_schedule_params, default="plateau", help="learning rate strategy"

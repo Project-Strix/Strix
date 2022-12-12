@@ -1,14 +1,11 @@
 import copy
-import logging
 import re
 from types import SimpleNamespace
-from functools import partial
 from pathlib import Path
 from typing import Union, Optional, Sequence, Dict
 
 import torch
 from torch.utils.data import DataLoader
-from ignite.engine import Events
 from ignite.metrics import Accuracy, Precision, Recall
 from strix.configures import config as cfg
 from strix.models.cnn.engines import ENSEMBLE_TEST_ENGINES, TEST_ENGINES, TRAIN_ENGINES
@@ -80,7 +77,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         val_handlers = StrixTrainEngine.get_basic_handlers(
-            phase="val",
+            phase=Phases.VALID,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -146,7 +143,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         ]
 
         train_handlers += StrixTrainEngine.get_basic_handlers(
-            phase="train",
+            phase=Phases.TRAIN,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -610,4 +607,3 @@ class ClassificationEnsembleTestEngine(StrixTestEngine, EnsembleEvaluator):
             amp=opts.amp,
             decollate=decollate
         )
-
