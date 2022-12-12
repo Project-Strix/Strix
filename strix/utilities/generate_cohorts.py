@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import copyfile
 from strix.configures import config as cfg
 from strix.utilities.registry import DatasetRegistry
-from strix.utilities.utils import get_items, split_train_test, generate_synthetic_datalist, parse_datalist
+from strix.utilities.utils import get_items, split_train_test, generate_synthetic_datalist, parse_datalist, parse_unlabel_datalist
 from sklearn.model_selection import train_test_split, KFold, ShuffleSplit
 import numpy as np
 
@@ -39,7 +39,8 @@ def generate_train_valid_cohorts(
 
     # ! Manually specified train&valid datalist
     if train_list and valid_list:
-        train_files, unlabel_files = parse_datalist(train_list, has_unlabel=is_semisupervised)
+        train_files = parse_datalist(train_list)
+        unlabel_files = parse_unlabel_datalist(train_list) if is_semisupervised else None
         valid_files = parse_datalist(valid_list)  # valid dataset need no unlabel
         return [(train_files, valid_files, unlabel_files), ]
 
@@ -51,7 +52,8 @@ def generate_train_valid_cohorts(
         train_datalist = generate_synthetic_datalist(100, logger)
     else:
         assert os.path.isfile(datalist_fpath), f"Data list '{datalist_fpath}' not exists!"
-        train_datalist, unlabel_files = parse_datalist(datalist_fpath, has_unlabel=is_semisupervised)
+        train_datalist = parse_datalist(datalist_fpath)
+        unlabel_files = parse_unlabel_datalist(datalist_fpath) if is_semisupervised else None
 
     if not train_datalist:
         raise ValueError("No train datalist if found!")

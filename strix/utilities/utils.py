@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Optional, TextIO, Union, List, Sequence, Tuple
+from typing import Any, Callable, Optional, TextIO, Union, List, Sequence, Tuple, Dict
 import matplotlib
 import pylab
 import torch
@@ -137,13 +137,14 @@ def generate_synthetic_datalist(data_num: int = 100, logger=None):
 
 
 @trycatch()
-def parse_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None, has_unlabel: bool = False) -> Union[List, Tuple]:
+def parse_datalist(
+    filelist: Union[str, Path], format: Optional[SerialFileFormat] = None
+) -> Union[List, Tuple]:
     """Wrapper of `get_items` function for parsing datalist
 
     Args:
         filelist (list): input filelist containing data path.
         format (Optional[SerialFileFormat]): two formats are supported: SerialFileFormat.JSON or SerialFileFormat.YAML.
-        has_unlabel (bool, optional): whether return unlabeled data if exists. Defaults to False.
     """
     datalist = get_items(filelist, format=format)
     if isinstance(datalist, List):
@@ -152,36 +153,56 @@ def parse_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat
         if "tensorImageSize" in datalist:  # nnUnet datalist
             training_list = datalist["training"]
             data_path = Path(filelist).parent
-            dataset = []            
+            dataset = []
             if not (data_path / training_list[0]["image"]).exists():
-                raise GenericException(
-                    "Your image can not found, but you need it for your task!"
-                )
+                raise GenericException("Your image can not found, but you need it for your task!")
             for train_item in training_list:
                 case_data = {}
                 if "image" in train_item:
                     image_relpath = train_item["image"]
-                    case_data['image'] = str(data_path / image_relpath)
+                    case_data["image"] = str(data_path / image_relpath)
                 if "label" in train_item:
                     label_relpath = train_item["label"]
-                    case_data['label'] = str(data_path / label_relpath)
+                    case_data["label"] = str(data_path / label_relpath)
                 if "mask" in train_item:
                     mask_relpath = train_item["mask"]
-                    case_data['mask'] = str(data_path / mask_relpath)
-                dataset.append(case_data)   
+                    case_data["mask"] = str(data_path / mask_relpath)
+                dataset.append(case_data)
             return dataset
         else:
             label: str = DatalistKeywords.LABEL.value
-            unlabel: str = DatalistKeywords.UNLABEL.value
             if label not in datalist:
                 raise GenericException(f"Your datalist does not contain '{label}' key.")
-            if has_unlabel and unlabel not in datalist:
-                raise GenericException(
-                    f"Your datalist does not contain '{unlabel}' key, but you need it for your task!"
-                )
-            if has_unlabel:
-                return datalist[label], datalist[unlabel]
             return datalist[label]
+    else:
+        raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
+
+
+@trycatch()
+def parse_unlabel_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None) -> List:
+    """Wrapper of `get_items` function to get unlabel datalist.
+       If return nomal label data, use `parse_datalist` instead
+
+    Args:
+        filelist (Union[str, Path]): input filelist containing data path.
+        format (Optional[SerialFileFormat]): two formats are supported: 
+                SerialFileFormat.JSON or SerialFileFormat.YAML. Defaults to None.
+
+    Raises:
+        GenericException: _description_
+        ValueError: _description_
+
+    Returns:
+        List: data list
+    """
+    datalist = get_items(filelist, format=format)
+    if isinstance(datalist, List):
+        return datalist  # normal datalist
+    elif isinstance(datalist, Dict):
+        unlabel: str = DatalistKeywords.UNLABEL.value
+        if unlabel not in datalist:
+            raise GenericException(f"Your datalist does not contain '{unlabel}' key, but you need it for your task!")
+        return datalist[unlabel]
     else:
         raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
 
@@ -848,5 +869,5 @@ def is_numeric(array):
 
     """
     # Boolean, unsigned integer, signed integer, float, complex.
-    _NUMERIC_KINDS = set('buifc')
+    _NUMERIC_KINDS = set("buifc")
     return np.asarray(array).dtype.kind in _NUMERIC_KINDS
