@@ -145,6 +145,13 @@ class Freezers(Enum):
 FREEZERS = get_enums(Freezers)
 
 
+class DatalistKeywords(Enum):
+    UNLABEL = "unlabeled"
+    LABEL = "labeled"
+
+DATALISTKEYWORDS = get_enums(DatalistKeywords)
+
+
 class SerialFileFormat(Enum):
     JSON = "json"
     YAML = "yaml"

@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Optional, TextIO, Union
+from typing import Any, Callable, Optional, TextIO, Union, List, Tuple, Dict
 import matplotlib
 import pylab
 import torch
@@ -15,6 +15,7 @@ import yaml
 from PIL import Image
 from termcolor import colored
 import logging
+
 matplotlib.use("Agg")
 import matplotlib.cm as mpl_color_map
 import matplotlib.colors as mcolors
@@ -27,13 +28,15 @@ from matplotlib.ticker import ScalarFormatter
 from monai_ex.utils import GenericException, catch_exception, ensure_list
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 
-from strix.utilities.enum import LR_SCHEDULES, Phases, SerialFileFormat
+from strix.utilities.enum import LR_SCHEDULES, Phases, SerialFileFormat, DatalistKeywords
 
 trycatch = partial(catch_exception, handled_exception_type=GenericException, path_keywords="strix")
 
 
 @trycatch()
-def get_items(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None, allow_filenotfound: bool = False) -> Any:
+def get_items(
+    filelist: Union[str, Path], format: Optional[SerialFileFormat] = None, allow_filenotfound: bool = False
+) -> Any:
     """Get items from given serialized file. Support both json and yaml.
 
     Args:
@@ -43,7 +46,7 @@ def get_items(filelist: Union[str, Path], format: Optional[SerialFileFormat] = N
 
     Raises:
         FileNotFoundError: filelist not found.
-        ValueError: unknown file format is given when format is not specified 
+        ValueError: unknown file format is given when format is not specified
         GenericException: json.JSONDecodeError and yaml.YAMLError
         GenericException: data path not exists
 
@@ -133,6 +136,75 @@ def generate_synthetic_datalist(data_num: int = 100, logger=None):
     return train_datalist
 
 
+@trycatch()
+def parse_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None) -> Union[List, Tuple]:
+    """Wrapper of `get_items` function for parsing datalist
+
+    Args:
+        filelist (list): input filelist containing data path.
+        format (Optional[SerialFileFormat]): two formats are supported: SerialFileFormat.JSON or SerialFileFormat.YAML.
+    """
+    datalist = get_items(filelist, format=format)
+    if isinstance(datalist, List):
+        return datalist  # normal datalist
+    elif isinstance(datalist, Dict):
+        if "tensorImageSize" in datalist:  # nnUnet datalist
+            training_list = datalist["training"]
+            data_path = Path(filelist).parent
+            dataset = []
+            if not (data_path / training_list[0]["image"]).exists():
+                raise GenericException("Your image can not found, but you need it for your task!")
+            for train_item in training_list:
+                case_data = {}
+                if "image" in train_item:
+                    image_relpath = train_item["image"]
+                    case_data["image"] = str(data_path / image_relpath)
+                if "label" in train_item:
+                    label_relpath = train_item["label"]
+                    case_data["label"] = str(data_path / label_relpath)
+                if "mask" in train_item:
+                    mask_relpath = train_item["mask"]
+                    case_data["mask"] = str(data_path / mask_relpath)
+                dataset.append(case_data)
+            return dataset
+        else:
+            label: str = DatalistKeywords.LABEL.value
+            if label not in datalist:
+                raise GenericException(f"Your datalist does not contain '{label}' key.")
+            return datalist[label]
+    else:
+        raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
+
+
+@trycatch()
+def parse_unlabel_datalist(filelist: Union[str, Path], format: Optional[SerialFileFormat] = None) -> List:
+    """Wrapper of `get_items` function to get unlabel datalist.
+       If return nomal label data, use `parse_datalist` instead
+
+    Args:
+        filelist (Union[str, Path]): input filelist containing data path.
+        format (Optional[SerialFileFormat]): two formats are supported:
+                SerialFileFormat.JSON or SerialFileFormat.YAML. Defaults to None.
+
+    Raises:
+        GenericException: _description_
+        ValueError: _description_
+
+    Returns:
+        List: data list
+    """
+    datalist = get_items(filelist, format=format)
+    if isinstance(datalist, List):
+        return datalist  # normal datalist
+    elif isinstance(datalist, Dict):
+        unlabel: str = DatalistKeywords.UNLABEL.value
+        if unlabel not in datalist:
+            raise GenericException(f"Your datalist does not contain '{unlabel}' key, but you need it for your task!")
+        return datalist[unlabel]
+    else:
+        raise ValueError(f"Unsupported datalist type, got {type(datalist)}")
+
+
 def get_attr_(obj, name, default=None):
     return getattr(obj, name) if hasattr(obj, name) else default
 
@@ -143,15 +215,17 @@ def get_colors(num: Optional[int] = None):
     else:
         return list(mcolors.TABLEAU_COLORS.values())  # type: ignore
 
+
 def get_colormaps(num: int = None):
     if num is None:
         num = 10
     if num == 1:
-        return 'tab10'
+        return "tab10"
     else:
-        colormap =  [list(plt.cm.tab10(0.1 * i)) for i in range(num)]
-        new_colormap = LinearSegmentedColormap.from_list('my_colormap', colormap, N=num + 1 if num == 1 else num)
+        colormap = [list(plt.cm.tab10(0.1 * i)) for i in range(num)]
+        new_colormap = LinearSegmentedColormap.from_list("my_colormap", colormap, N=num + 1 if num == 1 else num)
         return new_colormap
+
 
 def bbox_3D(img):
     r = np.any(img, axis=(1, 2))
@@ -522,43 +596,52 @@ def get_bound_2d(mask, connectivity=1):
     return boundaries
 
 
-def plot_segmentation_masks(images: np.ndarray,
+def plot_segmentation_masks(
+    images: np.ndarray,
     masks: np.ndarray,
-    nrow:int,
-    ncol:int,
+    nrow: int,
+    ncol: int,
     alpha: float = 0.8,
-    method = 'mask',
-    mask_class_num = 2,
-    fnames = None
-) :
+    method="mask",
+    mask_class_num=2,
+    fnames=None,
+):
     # cm = 1/2.54
     plt.close()
-    ratio = images.shape[-1]/images.shape[-2]
+    ratio = images.shape[-1] / images.shape[-2]
     fig = plt.figure(figsize=(15 * ratio * ncol, 15 * nrow))
     axes = fig.subplots(nrow, ncol)
-    color_num  = mask_class_num
-    if color_num >0:
+    color_num = mask_class_num
+    if color_num > 0:
         colors = get_colors(color_num)
         cmap = get_colormaps(color_num)
     for i in range(nrow):
         for j in range(ncol):
-            axes[i,j].axis('off')
-            if i* ncol+j < images.shape[0]:
-                title = str(Path(fnames[i* ncol+j]).stem)
-                axes[i,j].set_title(title, fontsize=8)
-                axes[i,j].imshow(images[i*ncol+j,...].squeeze(), cmap = 'gray', interpolation = 'bicubic')
-                if method == 'mask':
-                    axes[i,j].imshow(np.ma.masked_equal(masks[i*ncol+j,...].squeeze(), 0), cmap, alpha=alpha, norm=Normalize(vmin=1, vmax=color_num))
-                elif method == 'contour':
-                    list = [i for i in np.unique(masks[i*ncol+j,...].squeeze()).tolist() if i]
+            axes[i, j].axis("off")
+            if i * ncol + j < images.shape[0]:
+                title = str(Path(fnames[i * ncol + j]).stem)
+                axes[i, j].set_title(title, fontsize=8)
+                axes[i, j].imshow(images[i * ncol + j, ...].squeeze(), cmap="gray", interpolation="bicubic")
+                if method == "mask":
+                    axes[i, j].imshow(
+                        np.ma.masked_equal(masks[i * ncol + j, ...].squeeze(), 0),
+                        cmap,
+                        alpha=alpha,
+                        norm=Normalize(vmin=1, vmax=color_num),
+                    )
+                elif method == "contour":
+                    list = [i for i in np.unique(masks[i * ncol + j, ...].squeeze()).tolist() if i]
                     if len(list) > 0:
-                        axes[i,j].contour(masks[i*ncol+j,...].squeeze(), levels=[x-0.01 for x in list], colors=colors[min(list)-1:max(list)])
+                        axes[i, j].contour(
+                            masks[i * ncol + j, ...].squeeze(),
+                            levels=[x - 0.01 for x in list],
+                            colors=colors[min(list) - 1 : max(list)],
+                        )
                     else:
                         continue
-    plt.subplots_adjust(
-        left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.2
-    )
+    plt.subplots_adjust(left=0.1, right=0.2, bottom=0.1, top=0.2, wspace=0.1, hspace=0.2)
     return fig
+
 
 class LogColorFormatter(logging.Formatter):
     """Logging colored formatter, adapted from https://stackoverflow.com/a/56944256/3638629"""
@@ -717,7 +800,7 @@ def setup_logger(
 
 
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
-    return '%s:%s:\n %s: %s\n' % (filename, lineno, category.__name__, message)
+    return "%s:%s:\n %s: %s\n" % (filename, lineno, category.__name__, message)
 
 
 def singleton(cls):
@@ -743,7 +826,9 @@ def save_sourcecode(code_rootdir, out_dir, verbose=True):
     os.system(f"cd {str(code_rootdir)}; tar -{tar_opt} {outpath} .")
 
 
-def get_torch_datast(strix_dataset, phase: Phases, opts: dict, synthetic_data_num=100, split_func: Optional[Callable] = None):
+def get_torch_datast(
+    strix_dataset, phase: Phases, opts: dict, synthetic_data_num=100, split_func: Optional[Callable] = None
+):
     """This function return pytorch dataset generated by registered strix dataset.
 
     Args:
@@ -781,3 +866,26 @@ def get_torch_datast(strix_dataset, phase: Phases, opts: dict, synthetic_data_nu
         return None
     else:
         return torch_dataset
+
+
+def is_numeric(array):
+    """Determine whether the argument has a numeric datatype, when
+    converted to a NumPy array.
+
+    Booleans, unsigned integers, signed integers, floats and complex
+    numbers are the kinds of numeric datatype.
+
+    Parameters
+    ----------
+    array : array-like
+        The array to check.
+
+    Returns
+    -------
+    is_numeric : `bool`
+        True if the array has a numeric datatype, False if not.
+
+    """
+    # Boolean, unsigned integer, signed integer, float, complex.
+    _NUMERIC_KINDS = set("buifc")
+    return np.asarray(array).dtype.kind in _NUMERIC_KINDS
