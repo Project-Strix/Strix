@@ -24,8 +24,7 @@ def create_feature_maps(init_channel_number, number_of_fmaps):
 
 
 def get_loss_fn(framework: str, loss_name: str, loss_params: dict, output_nc: int, deep_supervision: bool = False):
-    loss_type = strix_losses.get(framework, loss_name)
-    if loss_type is None:
+    if (loss_type := strix_losses.get(framework, loss_name)) is None:
         raise ValueError(f"Loss function {loss_name} is not found. It's weird!")
 
     if output_nc == 1:
