@@ -80,7 +80,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         val_handlers = StrixTrainEngine.get_basic_handlers(
-            phase="val",
+            phase=Phases.VALID,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -146,7 +146,7 @@ class ClassificationTrainEngine(StrixTrainEngine, SupervisedTrainerEx):
         ]
 
         train_handlers += StrixTrainEngine.get_basic_handlers(
-            phase="train",
+            phase=Phases.TRAIN,
             model_dir=model_dir,
             net=net,
             optimizer=optim,

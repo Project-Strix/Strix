@@ -320,7 +320,7 @@ class SegmentationTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
             prepare_batch_fn = get_prepare_batch_fn(opts, _image, _label, multi_input_keys, multi_output_keys)
 
         if use_slidingwindow:
-            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=opts.n_batch, overlap=0.5)
+            inferer = SlidingWindowInferer(roi_size=crop_size, sw_batch_size=opts.n_batch, overlap=0.5, mode="gaussian")
         else:
             inferer = SimpleInferer()
 

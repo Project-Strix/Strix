@@ -38,7 +38,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
         multi_output_keys = kwargs.get("multi_output_keys", None)
         _image = cfg.get_key("image")
         _label = cfg.get_key("label")
-        _pred = cfg.get_key("pred")
+        # _pred = cfg.get_key("pred")
         _loss = cfg.get_key("loss")
         decollate = False
         freeze_mode = get_attr_(opts, "freeze_mode", None)
@@ -72,7 +72,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
         )
 
         val_handlers = StrixTrainEngine.get_basic_handlers(
-            phase=Phases.VALID.value,
+            phase=Phases.VALID,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -139,7 +139,7 @@ class MultiTaskTrainEngine(StrixTrainEngine, MultiTaskTrainer):
             ),
         ]
         train_handlers += StrixTrainEngine.get_basic_handlers(
-            phase=Phases.TRAIN.value,
+            phase=Phases.TRAIN,
             model_dir=model_dir,
             net=net,
             optimizer=optim,
@@ -215,7 +215,6 @@ class MultiTaskTestEngine(StrixTestEngine, SupervisedEvaluatorEx):
             prepare_batch_fn = get_unsupervised_prepare_batch_fn(opts, _image, multi_input_keys)
             subtask1_val_metric = subtask2_val_metric = None
 
-        
         handlers = StrixTestEngine.get_basic_handlers(
             phase=opts.phase,
             out_dir=opts.out_dir,
@@ -264,7 +263,7 @@ class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluatorEx):
     def __init__(self, opts, test_loader, net, device, logger_name, **kwargs):
         if opts.slidingwindow:
             raise ValueError("Not implemented yet")
-        
+
         model_list = opts.model_path
         is_intra_ensemble = isinstance(model_list, (list, tuple)) and len(model_list) > 0
         if is_intra_ensemble:
@@ -279,9 +278,8 @@ class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluatorEx):
         logger_name = get_attr_(opts, 'logger_name', logger_name)
         self.logger = setup_logger(logger_name)
 
-        
         if use_slidingwindow:
-            self.logger.info(f"---Use slidingwindow infer!---","\nPatch size: {crop_size}")
+            self.logger.info(f"---Use slidingwindow infer!---, \nPatch size: {crop_size}")
         else:
             self.logger.info("---Use simple infer!---")
 
@@ -346,7 +344,7 @@ class MultitaskEnsembleTestEngine(StrixTestEngine, EnsembleEvaluatorEx):
             handlers += subtask1_extra_handlers
         if subtask2_extra_handlers:
             handlers += subtask2_extra_handlers
-        
+
         EnsembleEvaluatorEx.__init__(
             self,
             device=device,

@@ -185,3 +185,7 @@ class NumericChoice(Choice):
             self.fail(f"invaid index choice: {value}. Please input integer index or correct value!" f"Error msg: {e}")
         except KeyError as e:
             self.fail(f"invalid choice: {value}. (choose from {self.choicemap})", param, ctx)
+        except TypeError as e:
+            if value in self.choicemap.values():
+                return value 
+            self.fail(f"invaid index choice: {value}. Please input integer index or correct value!" f"Error msg: {e}")
