@@ -191,6 +191,7 @@ class NetworkRegistry(DimRegistry):
 class DatasetRegistry(DimRegistry):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fn_lookup_table = {}
         for dim in DIMS:
             for framework in FRAMEWORKS:
                 self[dim].update({framework: {}})
@@ -210,29 +211,37 @@ class DatasetRegistry(DimRegistry):
         # used as function call
         if module is not None:
             _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, module)
+            self.fn_lookup_table.setdefault(module, []).append((dim, framework, module_name))
             return
 
         # used as decorator
         def register_fn(fn):
             _register_dataset(self, dim, framework, module_name, train_filepath, test_filepath, fn)
+            self.fn_lookup_table.setdefault(fn, []).append((dim, framework, module_name))
             return fn
 
         return register_fn
 
     def _get_keys(self, val):
+        if self.fn_lookup_table:
+            return self.fn_lookup_table[val]
+
+        #? can be removed
         dims = ["2D", "3D"]
         results = []
         for d in dims:
-            for key, value in self[d].items():
-                if val == value["FN"]:
-                    results.append((d, key))
+            for framework, value in self[d].items():
+                for name, attr in value.items():
+                    print("ATTR:", attr, "NAME:", name)
+                    if val == attr["FN"]:
+                        results.append((d, framework, name))
         return results
 
     def multi_in(self, *keys):
         def register_input(fn):
             dim_module_list = self._get_keys(fn)  # todo: refactor!
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_IN": keys})
+            for dim, framework, module_name in dim_module_list:
+                self[dim][framework][module_name].update({"M_IN": keys})
             return fn
 
         return register_input
@@ -240,8 +249,8 @@ class DatasetRegistry(DimRegistry):
     def multi_out(self, *keys):
         def register_output(fn):
             dim_module_list = self._get_keys(fn)  # todo: refactor!
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"M_OUT": keys})
+            for dim, framework, module_name in dim_module_list:
+                self[dim][framework][module_name].update({"M_OUT": keys})
             return fn
 
         return register_output
@@ -250,8 +259,8 @@ class DatasetRegistry(DimRegistry):
         def register_source(func):
             source = os.path.abspath(inspect.getfile(func))
             dim_module_list = self._get_keys(func)
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"SOURCE": source})
+            for dim, framework, module_name in dim_module_list:
+                self[dim][framework][module_name].update({"SOURCE": source})
             return func
 
         return register_source(fn)
@@ -259,8 +268,8 @@ class DatasetRegistry(DimRegistry):
     def project(self, proj_name):
         def register_proj(fn):
             dim_module_list = self._get_keys(fn)
-            for dim, module_name in dim_module_list:
-                self[dim][module_name].update({"PROJECT": proj_name})
+            for dim, framework, module_name in dim_module_list:
+                self[dim][framework][module_name].update({"PROJECT": proj_name})
             return fn
 
         return register_proj
